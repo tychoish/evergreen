@@ -555,7 +555,7 @@ func (uis *UIServer) testLog(w http.ResponseWriter, r *http.Request) {
 			displayLogs <- model.LogMessage{
 				Type:     model.TaskLogPrefix,
 				Severity: model.LogInfoPrefix,
-				Version:  evergreen.LogmessageCurrentVersion,
+				Version:  evergreen.LogMessageCurrentVersion,
 				Message:  line,
 			}
 		}

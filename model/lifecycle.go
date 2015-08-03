@@ -11,6 +11,7 @@ import (
 	"github.com/evergreen-ci/evergreen/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -132,9 +133,9 @@ func MarkVersionStarted(versionId string, startTime time.Time) error {
 	)
 }
 
-// MarkVersionCompleted updates the status of a completed version to reflect its correct state by
+// UpdateVersionStatus updates the status of a completed version to reflect its correct state by
 // checking the status of its individual builds.
-func MarkVersionCompleted(versionId string, finishTime time.Time) error {
+func UpdateVersionStatus(versionId string, finishTime time.Time) error {
 	status := evergreen.VersionSucceeded
 
 	// Find the statuses for all builds in the version so we can figure out the version's status
@@ -248,8 +249,8 @@ func RestartBuild(buildId string, abortInProgress bool) error {
 	return build.UpdateActivation(buildId, true)
 }
 
-// RefreshTasksCache updates a build document so that the tasks cache reflects the correct current
-// state of the tasks it represents.
+// RefreshTasksCache updates a build document so that the tasks cache
+// reflects the correct current state of the tasks it represents.
 func RefreshTasksCache(buildId string) error {
 	tasks, err := FindAllTasks(
 		bson.M{TaskBuildIdKey: buildId},
@@ -276,66 +277,64 @@ func RefreshTasksCache(buildId string) error {
 	return build.SetTasksCache(buildId, cache)
 }
 
-//AddTasksToBuild creates the tasks for the given build of a project
-func AddTasksToBuild(b *build.Build, project *Project, v *version.Version,
-	taskNames []string) (*build.Build, error) {
+// AddTasksToBuild creates the tasks for the given build of a project.
+func AddTasksToBuild(p *Project, v *version.Version, b *build.Build, taskNames []string) (*build.Build, error) {
 
-	// find the build variant for this project/build
-	buildVariant := project.FindBuildVariant(b.BuildVariant)
-	if buildVariant == nil {
-		return nil, fmt.Errorf("Could not find build %v in %v project file",
-			b.BuildVariant, project.Identifier)
+	if err := insertTasks(p, v, b, taskNames); err != nil {
+		return nil, fmt.Errorf("error creating new tasks: %v", err)
 	}
 
+	// update the build to hold the new tasks
+	if err := build.SetTasksCache(b.Id, b.Tasks); err != nil {
+		return nil, fmt.Errorf("error setting build task cache: %v", b.Id, err)
+	}
+	return b, nil
+}
+
+// insertTasks creates new tasks, inserts them into the database and updates
+// the task cache of the build.
+func insertTasks(p *Project, v *version.Version, b *build.Build, taskNames []string) error {
+
 	// create the new tasks for the build
-	tasks, err := createTasksForBuild(
-		project, buildVariant, b, v, BuildTaskIdTable(project, v), taskNames)
+	tasks, err := createTasksForBuild(p, v, b, taskNames)
 	if err != nil {
-		return nil, fmt.Errorf("error creating tasks for build %v: %v",
-			b.Id, err)
+		return fmt.Errorf("error creating tasks for build %v: %v", b.Id, err)
 	}
 
 	// insert the tasks into the db
 	for _, task := range tasks {
-		evergreen.Logger.Logf(slogger.INFO, "Creating task “%v”", task.DisplayName)
+		evergreen.Logger.Logf(slogger.INFO, "Creating task “%v”", task.Id)
 		if err := task.Insert(); err != nil {
-			return nil, fmt.Errorf("error inserting task %v: %v", task.Id, err)
+			return fmt.Errorf("error inserting task %v: %v", task.Id, err)
 		}
 	}
 
+	sortedTasks := &SortableTask{tasks}
+	sort.Sort(sortedTasks)
+
 	// create task caches for all of the tasks, and add them into the build
-	for _, t := range tasks {
-		b.Tasks = append(b.Tasks, cacheFromTask(t))
+	for _, t := range sortedTasks.Tasks {
+		b.Tasks = append(b.Tasks, cacheFromTask(&t))
 	}
 
-	// update the build to hold the new tasks
-	if err = build.SetTasksCache(b.Id, b.Tasks); err != nil {
-		return nil, err
-	}
-
-	return b, nil
+	return nil
 }
 
 // CreateBuildFromVersion creates a build given all of the necessary information
 // from the corresponding version and project and a list of tasks.
-func CreateBuildFromVersion(project *Project, v *version.Version, tt TaskIdTable,
-	buildName string, activated bool, taskNames []string) (string, error) {
+func CreateBuildFromVersion(p *Project, v *version.Version, buildName string, activated bool, taskNames []string) (string, error) {
 
 	evergreen.Logger.Logf(slogger.DEBUG, "Creating %v %v build, activated: %v", v.Requester, buildName, activated)
 
 	// find the build variant for this project/build
-	buildVariant := project.FindBuildVariant(buildName)
-	if buildVariant == nil {
-		return "", fmt.Errorf("could not find build %v in %v project file", buildName, project.Identifier)
+	bv := p.FindBuildVariant(buildName)
+	if bv == nil {
+		return "", fmt.Errorf("could not find build %v in %v project file", buildName, p.Identifier)
 	}
 
 	// create a new build id
-	buildId := util.CleanName(
-		fmt.Sprintf("%v_%v_%v_%v",
-			project.Identifier,
-			buildName,
-			v.Revision,
-			v.CreateTime.Format(build.IdTimeLayout)))
+	buildId := util.CleanName(fmt.Sprintf("%v_%v_%v_%v", p.Identifier,
+		buildName, v.Revision, v.CreateTime.Format(build.IdTimeLayout)))
 
 	// create the build itself
 	b := &build.Build{
@@ -343,12 +342,12 @@ func CreateBuildFromVersion(project *Project, v *version.Version, tt TaskIdTable
 		CreateTime:          v.CreateTime,
 		PushTime:            v.CreateTime,
 		Activated:           activated,
-		Project:             project.Identifier,
+		Project:             p.Identifier,
 		Revision:            v.Revision,
 		Status:              evergreen.BuildCreated,
 		BuildVariant:        buildName,
 		Version:             v.Id,
-		DisplayName:         buildVariant.DisplayName,
+		DisplayName:         bv.DisplayName,
 		RevisionOrderNumber: v.RevisionOrderNumber,
 		Requester:           v.Requester,
 	}
@@ -356,28 +355,14 @@ func CreateBuildFromVersion(project *Project, v *version.Version, tt TaskIdTable
 	// get a new build number for the build
 	buildNumber, err := db.GetNewBuildVariantBuildNumber(buildName)
 	if err != nil {
-		return "", fmt.Errorf("could not get build number for build variant"+
-			" %v in %v project file", buildName, project.Identifier)
+		return "", fmt.Errorf("could not get build number for build "+
+			"variant %v in project %v", buildName, p.Identifier)
 	}
 	b.BuildNumber = strconv.FormatUint(buildNumber, 10)
 
 	// create all of the necessary tasks for the build
-	tasksForBuild, err := createTasksForBuild(project, buildVariant, b, v, tt, taskNames)
-	if err != nil {
+	if err := insertTasks(p, v, b, taskNames); err != nil {
 		return "", fmt.Errorf("error creating tasks for build %v: %v", b.Id, err)
-	}
-
-	// insert all of the build's tasks into the db
-	for _, task := range tasksForBuild {
-		if err := task.Insert(); err != nil {
-			return "", fmt.Errorf("error inserting task %v: %v", task.Id, err)
-		}
-	}
-
-	// create task caches for all of the tasks, and place them into the build
-	b.Tasks = make([]build.TaskCache, 0, len(tasksForBuild))
-	for _, t := range tasksForBuild {
-		b.Tasks = append(b.Tasks, cacheFromTask(t))
 	}
 
 	// insert the build
@@ -389,40 +374,44 @@ func CreateBuildFromVersion(project *Project, v *version.Version, tt TaskIdTable
 	return b.Id, nil
 }
 
-// createTasksForBuild creates all of the necessary tasks for the build.  Returns a
-// slice of all of the tasks created, as well as an error if any occurs.
+// createTasksForBuild creates all of the necessary tasks for the build.
+// Returns a slice of all of the tasks created, as well as an error if any occurs.
 // The slice of tasks will be in the same order as the project's specified tasks
 // appear in the specified build variant.
-func createTasksForBuild(project *Project, buildVariant *BuildVariant,
-	b *build.Build, v *version.Version, tt TaskIdTable, taskNames []string) ([]*Task, error) {
+func createTasksForBuild(p *Project, v *version.Version, b *build.Build, taskNames []string) ([]Task, error) {
 
-	// the list of tasks we should create.  if tasks are passed in, then
-	// use those, else use the default set
+	// find the build variant for this project/build
+	bv := p.FindBuildVariant(b.BuildVariant)
+
+	if bv == nil {
+		return nil, fmt.Errorf("Could not find build %v in %v project", b.BuildVariant, p.Identifier)
+	}
+
+	// the list of tasks we should create. if tasks are passed in, then
+	// use those, else use the default set.
 	tasksToCreate := []BuildVariantTask{}
 	createAll := len(taskNames) == 0
-	for _, task := range buildVariant.Tasks {
-		if task.Name == evergreen.PushStage &&
-			b.Requester == evergreen.PatchVersionRequester {
-			continue
-		}
+	for _, task := range bv.Tasks {
 		if createAll || util.SliceContains(taskNames, task.Name) {
 			tasksToCreate = append(tasksToCreate, task)
 		}
 	}
 
+	taskIdTable := BuildTaskIdTable(p, v)
+
 	// if any tasks already exist in the build, add them to the id table
 	// so they can be used as dependencies
 	for _, task := range b.Tasks {
-		tt.AddId(b.BuildVariant, task.DisplayName, task.Id)
+		taskIdTable.AddId(b.BuildVariant, task.DisplayName, task.Id)
 	}
 
 	// create and insert all of the actual tasks
-	tasks := make([]*Task, 0, len(tasksToCreate))
-	for _, task := range tasksToCreate {
+	tasks := make([]Task, 0, len(tasksToCreate))
 
+	for _, task := range tasksToCreate {
 		// get the task spec out of the project
 		var taskSpec ProjectTask
-		for _, projectTask := range project.Tasks {
+		for _, projectTask := range p.Tasks {
 			if projectTask.Name == task.Name {
 				taskSpec = projectTask
 				break
@@ -431,13 +420,12 @@ func createTasksForBuild(project *Project, buildVariant *BuildVariant,
 
 		// sanity check that the config isn't malformed
 		if taskSpec.Name == "" {
-			return nil, fmt.Errorf("config is malformed: variant '%v' runs "+
-				"task called '%v' but no such task exists for repo %v for "+
-				"version %v", buildVariant.Name, task.Name, project.Identifier,
-				v.Id)
+			return nil, fmt.Errorf("variant '%v' runs task '%v' but no such"+
+				" task exists for project %v in version %v", bv.Name,
+				task.Name, p.Identifier, v.Id)
 		}
 
-		newTask := createOneTask(tt.GetId(b.BuildVariant, task.Name), task, project, buildVariant, b, v)
+		newTask := createOneTask(taskIdTable.GetId(b.BuildVariant, task.Name), task, p, bv, b, v)
 
 		// set the new task's dependencies
 		// TODO encapsulate better
@@ -452,7 +440,7 @@ func createTasksForBuild(project *Project, buildVariant *BuildVariant,
 					status = taskSpec.DependsOn[0].Status
 				}
 				newDep := Dependency{
-					TaskId: tt.GetId(b.BuildVariant, dep.Name),
+					TaskId: taskIdTable.GetId(b.BuildVariant, dep.Name),
 					Status: status,
 				}
 				if dep.Name != newTask.DisplayName {
@@ -479,10 +467,10 @@ func createTasksForBuild(project *Project, buildVariant *BuildVariant,
 					// for * case, we need to add all variants of the task
 					var ids []string
 					if dep.Name != AllDependencies {
-						ids = tt.GetIdsForAllVariants(b.BuildVariant, dep.Name)
+						ids = taskIdTable.GetIdsForAllVariants(b.BuildVariant, dep.Name)
 					} else {
 						// edge case where variant and task are both *
-						ids = tt.GetIdsForAllTasks(b.BuildVariant, newTask.DisplayName)
+						ids = taskIdTable.GetIdsForAllTasks(b.BuildVariant, newTask.DisplayName)
 					}
 					for _, id := range ids {
 						newDeps = append(newDeps, Dependency{TaskId: id, Status: status})
@@ -490,7 +478,7 @@ func createTasksForBuild(project *Project, buildVariant *BuildVariant,
 				} else {
 					// general case
 					newDep := Dependency{
-						TaskId: tt.GetId(bv, dep.Name),
+						TaskId: taskIdTable.GetId(bv, dep.Name),
 						Status: status,
 					}
 					if newDep.TaskId != "" {
@@ -503,16 +491,16 @@ func createTasksForBuild(project *Project, buildVariant *BuildVariant,
 		}
 
 		// append the task to the list of the created tasks
-		tasks = append(tasks, newTask)
+		tasks = append(tasks, *newTask)
 	}
 
 	// return all of the tasks created
 	return tasks, nil
 }
 
-// TryMarkPatchBuildFinished attempts to mark a patch as finished if all
-// the builds for the patch are finished as well
-func TryMarkPatchBuildFinished(b *build.Build, finishTime time.Time) error {
+// UpdatePatchStatus attempts to mark a patch as finished if all
+// the builds for the patch are finished as well.
+func UpdatePatchStatus(b *build.Build, finishTime time.Time) error {
 	v, err := version.FindOne(version.ById(b.Version))
 	if err != nil {
 		return err

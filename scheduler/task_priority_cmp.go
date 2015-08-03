@@ -30,20 +30,20 @@ func byPriority(t1, t2 model.Task, prioritizer *CmpBasedTaskPrioritizer) (int,
 	return 0, nil
 }
 
-// byStageName returns a dynamically generated importance comparator function.
-// The returned function will consider a Task to be more important if its
-// DisplayName field is equal to the stage name passed into byStageName.
-func byStageName(stageName string) taskPriorityCmp {
-	return func(t1, t2 model.Task, prioritizer *CmpBasedTaskPrioritizer) (int,
-		error) {
-		if t1.DisplayName == stageName && t2.DisplayName != stageName {
-			return 1, nil
-		}
-		if t2.DisplayName == stageName && t1.DisplayName != stageName {
-			return -1, nil
-		}
-		return 0, nil
+// byDependencies compares the number of tasks that depend on each task and
+// ensures that tasks with a higher dependency count, are considered more important.
+func byDependencies(t1, t2 model.Task, prioritizer *CmpBasedTaskPrioritizer) (int, error) {
+	// no entry means no task depends on it - so we use the 0 default
+	t1Count, _ := prioritizer.dependencyCache[t1.Id]
+	t2Count, _ := prioritizer.dependencyCache[t2.Id]
+
+	if t1Count > t2Count {
+		return 1, nil
+	} else if t1Count < t2Count {
+		return -1, nil
 	}
+
+	return 0, nil
 }
 
 // byRevisionOrderNumber compares the RevisionOrderNumber fields for the two Tasks,

@@ -240,7 +240,7 @@ func (apiLgr *APILogger) Append(log *slogger.Log) error {
 		Timestamp: log.Timestamp,
 		Severity:  levelToString(log.Level),
 		Type:      log.Prefix,
-		Version:   evergreen.LogmessageCurrentVersion,
+		Version:   evergreen.LogMessageCurrentVersion,
 		Message:   message,
 	}
 

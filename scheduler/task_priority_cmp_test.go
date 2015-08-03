@@ -61,31 +61,31 @@ func TestTaskImportanceComparators(t *testing.T) {
 			So(cmpResult, ShouldEqual, -1)
 		})
 
-		Convey("the stage name comparator should prioritize the appropriate"+
-			" specific stage", func() {
+		Convey("the dependencies comparator should prioritize the appropriate"+
+			" task", func() {
 
-			prioritizeCompile := byStageName(evergreen.CompileStage)
-			cmpResult, err := prioritizeCompile(tasks[0], tasks[1],
-				taskPrioritizer)
+			dependencyCache := map[string]int64{
+				taskIds[0]: 3,
+				taskIds[1]: 3,
+			}
+
+			taskPrioritizer.dependencyCache = dependencyCache
+
+			cmpResult, err := byDependencies(tasks[0], tasks[1], taskPrioritizer)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 0)
 
-			tasks[0].DisplayName = evergreen.CompileStage
-			cmpResult, err = prioritizeCompile(tasks[0], tasks[1],
-				taskPrioritizer)
+			taskPrioritizer.dependencyCache[taskIds[0]] = 4
+
+			cmpResult, err = byDependencies(tasks[0], tasks[1], taskPrioritizer)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 1)
 
-			cmpResult, err = prioritizeCompile(tasks[1], tasks[0],
-				taskPrioritizer)
+			taskPrioritizer.dependencyCache[taskIds[0]] = 2
+
+			cmpResult, err = byDependencies(tasks[0], tasks[1], taskPrioritizer)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, -1)
-
-			tasks[1].DisplayName = evergreen.CompileStage
-			cmpResult, err = prioritizeCompile(tasks[0], tasks[1],
-				taskPrioritizer)
-			So(err, ShouldBeNil)
-			So(cmpResult, ShouldEqual, 0)
 
 		})
 

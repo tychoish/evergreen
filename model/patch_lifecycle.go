@@ -53,7 +53,7 @@ func AddNewTasksForPatch(p *patch.Patch, patchVersion *version.Version,
 		}
 
 		for _, b := range builds {
-			if _, err = AddTasksToBuild(&b, project, patchVersion, newTasks); err != nil {
+			if _, err = AddTasksToBuild(project, patchVersion, &b, newTasks); err != nil {
 				return err
 			}
 		}
@@ -92,13 +92,10 @@ func AddNewBuildsForPatch(p *patch.Patch, patchVersion *version.Version,
 
 	newBuildIds := make([]string, 0)
 	newBuildStatuses := make([]version.BuildStatus, 0)
-	tt := BuildTaskIdTable(project, patchVersion)
 	for _, buildVariant := range newVariants {
-		evergreen.Logger.Logf(slogger.INFO,
-			"Creating build for version %v, buildVariant %v, activated = %v",
+		evergreen.Logger.Logf(slogger.INFO, "Creating build for version %v, buildVariant %v, activated = %v",
 			patchVersion.Id, buildVariant, p.Activated)
-		buildId, err := CreateBuildFromVersion(
-			project, patchVersion, tt, buildVariant, p.Activated, p.Tasks)
+		buildId, err := CreateBuildFromVersion(project, patchVersion, buildVariant, p.Activated, p.Tasks)
 		if err != nil {
 			return nil, err
 		}
@@ -269,9 +266,9 @@ func FinalizePatch(p *patch.Patch, settings *evergreen.Settings) (
 			buildVariants = append(buildVariants, buildVariant.Name)
 		}
 	}
-	tt := BuildTaskIdTable(project, patchVersion)
+
 	for _, buildvariant := range buildVariants {
-		buildId, err := CreateBuildFromVersion(project, patchVersion, tt, buildvariant, true, p.Tasks)
+		buildId, err := CreateBuildFromVersion(project, patchVersion, buildvariant, true, p.Tasks)
 		if err != nil {
 			return nil, err
 		}

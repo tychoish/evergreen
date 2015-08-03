@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
@@ -15,7 +14,6 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"gopkg.in/mgo.v2/bson"
 	"html/template"
-	"sort"
 	"time"
 )
 
@@ -91,63 +89,7 @@ type uiBuild struct {
 }
 
 type uiTask struct {
-	Task          model.Task
-	Gitspec       string
-	BuildDisplay  string
-	TaskLog       []model.LogMessage
-	NextTasks     []model.Task
-	PreviousTasks []model.Task
-	Elapsed       time.Duration
-	StartTime     int64
-}
-
-// implementation of sort.Interface, to allow uitasks to be sorted
-type SortableUiTaskSlice struct {
-	tasks []uiTask
-}
-
-func (suts *SortableUiTaskSlice) Len() int {
-	return len(suts.tasks)
-}
-
-func (suts *SortableUiTaskSlice) Less(i, j int) bool {
-
-	taskOne := suts.tasks[i]
-	taskTwo := suts.tasks[j]
-
-	displayNameOne := taskOne.Task.DisplayName
-	displayNameTwo := taskTwo.Task.DisplayName
-
-	if displayNameOne == evergreen.CompileStage {
-		return true
-	}
-	if displayNameTwo == evergreen.CompileStage {
-		return false
-	}
-	if displayNameOne == evergreen.PushStage {
-		return false
-	}
-	if displayNameTwo == evergreen.PushStage {
-		return true
-	}
-
-	if bytes.Compare([]byte(displayNameOne), []byte(displayNameTwo)) == -1 {
-		return true
-	}
-	if bytes.Compare([]byte(displayNameOne), []byte(displayNameTwo)) == 1 {
-		return false
-	}
-	return false
-}
-
-func (suts *SortableUiTaskSlice) Swap(i, j int) {
-	suts.tasks[i], suts.tasks[j] = suts.tasks[j], suts.tasks[i]
-}
-
-func sortUiTasks(tasks []uiTask) []uiTask {
-	suts := &SortableUiTaskSlice{tasks}
-	sort.Sort(suts)
-	return suts.tasks
+	Task model.Task
 }
 
 func PopulateUIVersion(version *version.Version) (*uiVersion, error) {
@@ -163,12 +105,14 @@ func PopulateUIVersion(version *version.Version) (*uiVersion, error) {
 	}
 
 	uiBuilds := make([]uiBuild, len(dbBuilds))
+
 	for buildIdx, buildId := range buildIds {
 		build := buildsMap[buildId]
 		buildAsUI := uiBuild{Build: build}
 
-		//Use the build's task cache, instead of querying for each individual task.
+		// use the build's task cache, instead of querying for each individual task.
 		uiTasks := make([]uiTask, len(build.Tasks))
+
 		for taskIdx, task := range build.Tasks {
 			uiTasks[taskIdx] = uiTask{
 				Task: model.Task{
@@ -179,7 +123,6 @@ func PopulateUIVersion(version *version.Version) (*uiVersion, error) {
 				},
 			}
 		}
-		uiTasks = sortUiTasks(uiTasks)
 
 		buildAsUI.Tasks = uiTasks
 		uiBuilds[buildIdx] = buildAsUI
@@ -217,9 +160,9 @@ func getTimelineData(projectName, requester string, versionsToSkip, versionsPerP
 		uiVersions[versionIdx] = versionAsUI
 
 		buildIds := version.BuildIds
-		dbBuilds, err := build.Find(build.ByIds(buildIds))
+		dbBuilds, err := build.Find(build.ByIds(buildIds).WithFields(build.IdKey, build.DisplayNameKey, build.StatusKey, build.TasksKey))
 		if err != nil {
-			evergreen.Logger.Errorf(slogger.ERROR, "Ids: %v", buildIds)
+			evergreen.Logger.Errorf(slogger.ERROR, "error finding builds: %v", err)
 		}
 
 		buildsMap := make(map[string]build.Build)

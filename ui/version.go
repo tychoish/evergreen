@@ -2,12 +2,15 @@ package ui
 
 import (
 	"fmt"
+	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/util"
+	"gopkg.in/mgo.v2/bson"
 	"net/http"
+	"sort"
 )
 
 func (uis *UIServer) versionPage(w http.ResponseWriter, r *http.Request) {
@@ -62,20 +65,47 @@ func (uis *UIServer) versionPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uiBuilds := make([]uiBuild, 0, len(projCtx.Version.BuildIds))
+
 	for _, build := range dbBuilds {
 		buildAsUI := uiBuild{Build: build}
 
-		uiTasks := make([]uiTask, 0, len(build.Tasks))
-		for _, task := range build.Tasks {
-			uiTasks = append(uiTasks,
-				uiTask{Task: model.Task{Id: task.Id, Activated: task.Activated,
-					Status: task.Status, Details: task.StatusDetails, DisplayName: task.DisplayName}})
+		// find all the relevant tasks
+		tasks, err := model.FindAllTasks(
+			bson.M{model.TaskBuildIdKey: build.Id},
+			bson.M{
+				model.TaskDependsOnKey:   1,
+				model.TaskDisplayNameKey: 1,
+			},
+			db.NoSort,
+			db.NoSkip,
+			db.NoLimit,
+		)
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("error getting build '%v' tasks: %v", build.Id, err), http.StatusInternalServerError)
+			return
+		}
+
+		sortedTasks := &model.SortableTask{tasks}
+		sort.Sort(sortedTasks)
+
+		for _, task := range sortedTasks.Tasks {
+			uiTask := uiTask{
+				Task: model.Task{
+					Id:          task.Id,
+					Activated:   task.Activated,
+					Status:      task.Status,
+					Details:     task.Details,
+					DisplayName: task.DisplayName,
+				},
+			}
+			buildAsUI.Tasks = append(buildAsUI.Tasks, uiTask)
+
 			if task.Activated {
 				versionAsUI.ActiveTasks++
 			}
 		}
-		uiTasks = sortUiTasks(uiTasks)
-		buildAsUI.Tasks = uiTasks
+
 		uiBuilds = append(uiBuilds, buildAsUI)
 	}
 	versionAsUI.Builds = uiBuilds
@@ -192,23 +222,44 @@ func (uis *UIServer) versionHistory(w http.ResponseWriter, r *http.Request) {
 		uiBuilds := make([]uiBuild, 0, len(projCtx.Version.BuildIds))
 		for _, b := range dbBuilds {
 			buildAsUI := uiBuild{Build: b}
-			uiTasks := make([]uiTask, 0, len(b.Tasks))
-			for _, task := range b.Tasks {
-				uiTasks = append(uiTasks,
-					uiTask{
-						Task: model.Task{
-							Id:          task.Id,
-							Status:      task.Status,
-							Activated:   task.Activated,
-							DisplayName: task.DisplayName,
-						},
-					})
+
+			// find all the relevant tasks
+			tasks, err := model.FindAllTasks(
+				bson.M{model.TaskBuildIdKey: b.Id},
+				bson.M{
+					model.TaskDependsOnKey:   1,
+					model.TaskDisplayNameKey: 1,
+				},
+				db.NoSort,
+				db.NoSkip,
+				db.NoLimit,
+			)
+
+			if err != nil {
+				http.Error(w, fmt.Sprintf("error getting build '%v' tasks: %v", b.Id, err), http.StatusInternalServerError)
+				return
+			}
+
+			sortedTasks := &model.SortableTask{tasks}
+			sort.Sort(sortedTasks)
+
+			for _, task := range sortedTasks.Tasks {
+				t := uiTask{
+					Task: model.Task{
+						Id:          task.Id,
+						Status:      task.Status,
+						Activated:   task.Activated,
+						DisplayName: task.DisplayName,
+					},
+				}
+
+				buildAsUI.Tasks = append(buildAsUI.Tasks, t)
+
 				if task.Activated {
 					versionAsUI.ActiveTasks++
 				}
 			}
-			uiTasks = sortUiTasks(uiTasks)
-			buildAsUI.Tasks = uiTasks
+
 			uiBuilds = append(uiBuilds, buildAsUI)
 		}
 		versionAsUI.Builds = uiBuilds

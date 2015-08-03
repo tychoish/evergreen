@@ -185,7 +185,7 @@ func TestHeartbeatSignals(t *testing.T) {
 	setupTlsConfigs(t)
 	for tlsString, tlsConfig := range tlsConfigs {
 
-		testTask, _, err := setupAPITestData(testConfig, evergreen.CompileStage, "linux-64", false, t)
+		testTask, _, err := setupAPITestData(testConfig, "compile", "linux-64", false, t)
 		testutil.HandleTestingErr(err, t, "Couldn't make test data: %v", err)
 
 		Convey("With a live api server, agent, and test task over "+tlsString, t, func() {
@@ -209,8 +209,7 @@ func TestHeartbeatSignals(t *testing.T) {
 
 func TestSecrets(t *testing.T) {
 	setupTlsConfigs(t)
-	testTask, _, err := setupAPITestData(testConfig, evergreen.CompileStage,
-		"linux-64", false, t)
+	testTask, _, err := setupAPITestData(testConfig, "compile", "linux-64", false, t)
 	testutil.HandleTestingErr(err, t, "Couldn't make test data: %v", err)
 
 	for tlsString, tlsConfig := range tlsConfigs {

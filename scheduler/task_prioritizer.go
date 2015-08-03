@@ -29,6 +29,9 @@ type CmpBasedTaskPrioritizer struct {
 	// caches for sorting
 	previousTasksCache map[string]model.Task
 
+	// maintains the number of other tasks that are dependent on each task
+	dependencyCache map[string]int64
+
 	// cache the number of tasks that have failed in other buildvariants; tasks
 	// with the same revision, project, display name and requester
 	similarFailingCount map[string]int
@@ -41,10 +44,11 @@ func NewCmpBasedTaskPrioritizer() *CmpBasedTaskPrioritizer {
 		setupFuncs: []sortSetupFunc{
 			cachePreviousTasks,
 			cacheSimilarFailing,
+			cacheDependencyCount,
 		},
 		comparators: []taskPriorityCmp{
 			byPriority,
-			byStageName(evergreen.CompileStage),
+			byDependencies,
 			byRevisionOrderNumber,
 			byCreateTime,
 			bySimilarFailing,

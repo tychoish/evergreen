@@ -529,10 +529,10 @@ func (task *Task) FindPreviousTasks(limit int) ([]Task, error) {
 	return reversed, nil
 }
 
-func FindTasksForBuild(b *build.Build) ([]Task, error) {
+func FindTasksForBuild(buildId string) ([]Task, error) {
 	tasks, err := FindAllTasks(
 		bson.M{
-			TaskBuildIdKey: b.Id,
+			TaskBuildIdKey: buildId,
 		},
 		db.NoProjection,
 		db.NoSort,
@@ -1156,156 +1156,82 @@ func (t *Task) MarkStart() error {
 
 func (t *Task) UpdateBuildStatus() error {
 	finishTime := time.Now()
+
+	// get all of the tasks in the same build
+	buildTasks, err := FindTasksForBuild(t.BuildId)
+	if err != nil {
+		return evergreen.Logger.Errorf(slogger.ERROR, "Error finding tasks for build %v: %v", t.BuildId, err)
+	}
+
 	// get all of the tasks in the same build
 	b, err := build.FindOne(build.ById(t.BuildId))
 	if err != nil {
-		return err
+		return evergreen.Logger.Errorf(slogger.ERROR, "Error finding build %v: %v", t.BuildId, err)
 	}
 
-	buildTasks, err := FindTasksForBuild(b)
-	if err != nil {
-		return err
-	}
-
-	pushTaskExists := false
-	for _, task := range buildTasks {
-		if task.DisplayName == evergreen.PushStage {
-			pushTaskExists = true
-		}
-	}
-
-	failedTask := false
-	pushSuccess := true
-	pushCompleted := false
+	hasFailure := false
+	hasRunning := false
 	finishedTasks := 0
 
 	// update the build's status based on tasks for this build
-	for _, task := range buildTasks {
-		if task.IsFinished() {
+	for _, t := range buildTasks {
+		if t.IsFinished() {
 			finishedTasks += 1
-			// if it was a compile task, mark the build status accordingly
-			if task.DisplayName == evergreen.CompileStage {
-				if task.Status != evergreen.TaskSucceeded {
-					failedTask = true
-					finishedTasks = -1
-					err = b.MarkFinished(evergreen.BuildFailed, finishTime)
-					if err != nil {
-						evergreen.Logger.Errorf(slogger.ERROR, "Error marking build as finished: %v", err)
-						return err
+
+			// update the build's status when a task isn't successful
+			if t.Status != evergreen.TaskSucceeded {
+				if b.Status != evergreen.BuildFailed {
+					if err = b.UpdateStatus(evergreen.BuildFailed); err != nil {
+						return evergreen.Logger.Errorf(slogger.ERROR, "Error updating build status: %v", err)
 					}
-					break
 				}
-			} else if task.DisplayName == evergreen.PushStage {
-				pushCompleted = true
-				// if it's a finished push, check if it was successful
-				if task.Status != evergreen.TaskSucceeded {
-					err = b.UpdateStatus(evergreen.BuildFailed)
-					if err != nil {
-						evergreen.Logger.Errorf(slogger.ERROR, "Error updating build status: %v", err)
-						return err
-					}
-					pushSuccess = false
-				}
-			} else {
-				// update the build's status when a test task isn't successful
-				if task.Status != evergreen.TaskSucceeded {
-					err = b.UpdateStatus(evergreen.BuildFailed)
-					if err != nil {
-						evergreen.Logger.Errorf(slogger.ERROR, "Error updating build status: %v", err)
-						return err
-					}
-					failedTask = true
-				}
+				hasFailure = true
 			}
+		}
+		if t.Status == evergreen.TaskDispatched || t.Status == evergreen.TaskStarted {
+			hasRunning = true
 		}
 	}
 
 	// if there are no failed tasks, mark the build as started
-	if !failedTask {
+	if !hasFailure && hasRunning {
 		err = b.UpdateStatus(evergreen.BuildStarted)
 		if err != nil {
-			evergreen.Logger.Errorf(slogger.ERROR, "Error updating build status: %v", err)
-			return err
-		}
-	}
-	// if a compile task didn't fail, then the
-	// build is only finished when both the compile
-	// and test tasks are completed or when those are
-	// both completed in addition to a push (a push
-	// does not occur if there's a failed task)
-	if finishedTasks >= len(buildTasks)-1 {
-		if !failedTask {
-			if pushTaskExists { // this build has a push task associated with it.
-				if pushCompleted && pushSuccess { // the push succeeded, so mark the build as succeeded.
-					err = b.MarkFinished(evergreen.BuildSucceeded, finishTime)
-					if err != nil {
-						evergreen.Logger.Errorf(slogger.ERROR, "Error marking build as finished: %v", err)
-						return err
-					}
-				} else if pushCompleted && !pushSuccess { // the push failed, mark build failed.
-					err = b.MarkFinished(evergreen.BuildFailed, finishTime)
-					if err != nil {
-						evergreen.Logger.Errorf(slogger.ERROR, "Error marking build as finished: %v", err)
-						return err
-					}
-				} else {
-					//This build does have a "push" task, but it hasn't finished yet
-					//So do nothing, since we don't know the status yet.
-				}
-				if err = MarkVersionCompleted(b.Version, finishTime); err != nil {
-					evergreen.Logger.Errorf(slogger.ERROR, "Error marking version as finished: %v", err)
-					return err
-				}
-			} else { // this build has no push task. so go ahead and mark it success/failure.
-				if err = b.MarkFinished(evergreen.BuildSucceeded, finishTime); err != nil {
-					evergreen.Logger.Errorf(slogger.ERROR, "Error marking build as finished: %v", err)
-					return err
-				}
-				if b.Requester == evergreen.PatchVersionRequester {
-					if err = TryMarkPatchBuildFinished(b, finishTime); err != nil {
-						evergreen.Logger.Errorf(slogger.ERROR, "Error marking patch as finished: %v", err)
-						return err
-					}
-				}
-				if err = MarkVersionCompleted(b.Version, finishTime); err != nil {
-					evergreen.Logger.Errorf(slogger.ERROR, "Error marking version as finished: %v", err)
-					return err
-				}
-			}
-		} else {
-			// some task failed
-			if err = b.MarkFinished(evergreen.BuildFailed, finishTime); err != nil {
-				evergreen.Logger.Errorf(slogger.ERROR, "Error marking build as finished: %v", err)
-				return err
-			}
-			if b.Requester == evergreen.PatchVersionRequester {
-				if err = TryMarkPatchBuildFinished(b, finishTime); err != nil {
-					evergreen.Logger.Errorf(slogger.ERROR, "Error marking patch as finished: %v", err)
-					return err
-				}
-			}
-			if err = MarkVersionCompleted(b.Version, finishTime); err != nil {
-				evergreen.Logger.Errorf(slogger.ERROR, "Error marking version as finished: %v", err)
-				return err
-			}
+			return evergreen.Logger.Errorf(slogger.ERROR, "Error updating build status: %v", err)
 		}
 	}
 
-	// this is helpful for when we restart a compile task
-	if finishedTasks == 0 {
-		err = b.UpdateStatus(evergreen.BuildCreated)
-		if err != nil {
-			evergreen.Logger.Errorf(slogger.ERROR, "Error updating build status: %v", err)
-			return err
+	if finishedTasks == len(buildTasks) {
+		buildStatus := evergreen.BuildSucceeded
+		if hasFailure {
+			buildStatus = evergreen.BuildFailed
+		}
+		if err = b.MarkFinished(buildStatus, finishTime); err != nil {
+			return evergreen.Logger.Errorf(slogger.ERROR, "error marking build as finished: %v", err)
+		}
+		if b.Requester == evergreen.PatchVersionRequester {
+			if err = UpdatePatchStatus(b, finishTime); err != nil {
+				return evergreen.Logger.Errorf(slogger.ERROR, "error updating patch status: %v", err)
+			}
+		}
+		if err = UpdateVersionStatus(b.Version, finishTime); err != nil {
+			return evergreen.Logger.Errorf(slogger.ERROR, "error updating version status: %v", err)
+		}
+	}
+
+	// takes care of when none of the build's tasks have started
+	if finishedTasks == 0 && !hasRunning {
+		if err = b.UpdateStatus(evergreen.BuildCreated); err != nil {
+			return evergreen.Logger.Errorf(slogger.ERROR, "error updating build status: %v", err)
 		}
 	}
 
 	return nil
 }
 
-// Returns true if the task should stepback upon failure, and false
-// otherwise. Note that the setting is obtained from the top-level
-// project, if not explicitly set on the task itt.
+// getStepback returns true if the task should stepback upon failure,
+// and false otherwise. Note that the setting is obtained from the
+// top-level project, if not explicitly set on the task.
 func (t *Task) getStepback(project *Project) bool {
 	projectTask := project.FindProjectTask(t.DisplayName)
 

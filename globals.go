@@ -67,17 +67,11 @@ const (
 	HostTypeStatic = "static"
 	HostTypeEC2    = "ec2"
 
-	CompileStage = "compile"
-	TestStage    = "single_test"
-	SanityStage  = "smokeCppUnitTests"
-	PushStage    = "push"
-
 	// maximum task (zero based) execution number
 	MaxTaskExecution = 3
 
 	// LogMessage struct versions
-	LogmessageFormatTimestamp = 1
-	LogmessageCurrentVersion  = LogmessageFormatTimestamp
+	LogMessageCurrentVersion = 1
 
 	EvergreenHome = "EVGHOME"
 )

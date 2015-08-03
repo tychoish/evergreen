@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -36,19 +37,19 @@ func (uis *UIServer) buildPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// add in the tasks
-	tasks, err := model.FindTasksForBuild(projCtx.Build)
+	tasks, err := model.FindTasksForBuild(projCtx.Build.Id)
 	if err != nil {
 		uis.LoggedError(w, r, http.StatusInternalServerError, err)
 		return
 	}
-	uiTasks := make([]uiTask, 0, len(tasks))
 
-	for _, task := range tasks {
-		taskAsUI := uiTask{Task: task}
-		uiTasks = append(uiTasks, taskAsUI)
+	sortedTasks := &model.SortableTask{tasks}
+	sort.Sort(sortedTasks)
+
+	for _, task := range sortedTasks.Tasks {
+		evergreen.Logger.Logf(slogger.WARN, "Tasks is %v", task.DisplayName)
+		buildAsUI.Tasks = append(buildAsUI.Tasks, uiTask{Task: task})
 	}
-
-	buildAsUI.Tasks = sortUiTasks(uiTasks)
 
 	if projCtx.Build.Requester == evergreen.PatchVersionRequester {
 		buildOnBaseCommit, err := projCtx.Build.FindBuildOnBaseCommit()
@@ -57,9 +58,10 @@ func (uis *UIServer) buildPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if buildOnBaseCommit == nil {
-			evergreen.Logger.Logf(slogger.WARN,
-				"Could not find build for base commit of patch build: %v", projCtx.Build.Id)
+			evergreen.Logger.Logf(slogger.WARN, "Could not find build "+
+				"for base commit of patch build: %v", projCtx.Build.Id)
 		}
+
 		diffs := model.StatusDiffBuilds(buildOnBaseCommit, projCtx.Build)
 
 		baseId := ""

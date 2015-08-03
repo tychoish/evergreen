@@ -65,7 +65,6 @@ type BuildVariant struct {
 	Expansions  map[string]string `yaml:"expansions" bson:"expansions"`
 	Modules     []string          `yaml:"modules" bson:"modules"`
 	Disabled    bool              `yaml:"disabled" bson:"disabled"`
-	Push        bool              `yaml:"push" bson:"push"`
 
 	// Use a *int for 2 possible states
 	// nil - not overriding the project setting

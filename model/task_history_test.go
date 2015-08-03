@@ -25,8 +25,7 @@ func TestTaskHistory(t *testing.T) {
 
 		buildVariants := []string{"bv_0", "bv_1", "bv_2"}
 		projectName := "project"
-		taskHistoryIterator := NewTaskHistoryIterator(evergreen.CompileStage,
-			buildVariants, projectName)
+		taskHistoryIterator := NewTaskHistoryIterator("compile", buildVariants, projectName)
 
 		Convey("when finding task history items", func() {
 
@@ -48,13 +47,12 @@ func TestTaskHistory(t *testing.T) {
 					Project:             projectToUse,
 				}
 
-				testutil.HandleTestingErr(ver.Insert(), t,
-					"Error inserting version")
+				testutil.HandleTestingErr(ver.Insert(), t, "Error inserting version")
 				for j := 0; j < 3; j++ {
 					task := &Task{
 						Id:                  fmt.Sprintf("t%v_%v", i, j),
 						BuildVariant:        fmt.Sprintf("bv_%v", j),
-						DisplayName:         evergreen.CompileStage,
+						DisplayName:         "compile",
 						RevisionOrderNumber: i,
 						Revision:            vid,
 						Requester:           evergreen.RepotrackerVersionRequester,

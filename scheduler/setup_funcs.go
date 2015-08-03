@@ -10,8 +10,8 @@ import (
 // information needed for prioritizing the tasks.
 type sortSetupFunc func(prioritizer *CmpBasedTaskPrioritizer) error
 
-// Get all of the previous completed tasks for the ones to be sorted, and cache
-// them appropriately.
+// cachePreviousTasks gets all of the previous completed tasks for the
+// ones to be sorted, and cache them appropriately.
 func cachePreviousTasks(prioritizer *CmpBasedTaskPrioritizer) (err error) {
 	// get the relevant previous completed tasks
 	prioritizer.previousTasksCache = make(map[string]model.Task)
@@ -31,6 +31,18 @@ func cachePreviousTasks(prioritizer *CmpBasedTaskPrioritizer) (err error) {
 		prioritizer.previousTasksCache[task.Id] = *prevTask
 	}
 
+	return nil
+}
+
+// cacheDependencyCount computes a count of how many tasks depend on
+// on each task.
+func cacheDependencyCount(prioritizer *CmpBasedTaskPrioritizer) (err error) {
+	prioritizer.dependencyCache = make(map[string]int64)
+	for _, task := range prioritizer.tasks {
+		for _, dependency := range task.DependsOn {
+			prioritizer.dependencyCache[dependency.TaskId] += 1
+		}
+	}
 	return nil
 }
 
