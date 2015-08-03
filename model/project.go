@@ -25,47 +25,47 @@ const (
 )
 
 type Project struct {
-	Enabled            bool                       `yaml:"enabled" bson:"enabled"`
-	Stepback           bool                       `yaml:"stepback" bson:"stepback"`
-	BatchTime          int                        `yaml:"batchtime" bson:"batch_time"`
-	Owner              string                     `yaml:"owner" bson:"owner_name"`
-	Repo               string                     `yaml:"repo" bson:"repo_name"`
-	RemotePath         string                     `yaml:"remote_path" bson:"remote_path"`
-	RepoKind           string                     `yaml:"repokind" bson:"repo_kind"`
-	Branch             string                     `yaml:"branch" bson:"branch_name"`
-	Identifier         string                     `yaml:"identifier" bson:"identifier"`
-	DisplayName        string                     `yaml:"display_name" bson:"display_name"`
-	CommandType        string                     `yaml:"command_type" bson:"command_type"`
-	Pre                *YAMLCommandSet            `yaml:"pre" bson:"pre"`
-	Post               *YAMLCommandSet            `yaml:"post" bson:"post"`
-	Timeout            *YAMLCommandSet            `yaml:"timeout" bson:"timeout"`
-	Modules            []Module                   `yaml:"modules" bson:"modules"`
-	BuildVariants      []BuildVariant             `yaml:"buildvariants" bson:"build_variants"`
-	Functions          map[string]*YAMLCommandSet `yaml:"functions" bson:"functions"`
-	Tasks              []ProjectTask              `yaml:"tasks" bson:"tasks"`
-	BuildVariantMatrix BuildVariantMatrix         `yaml:"build_variant_matrix" bson:"build_variant_matrix"`
+	Enabled            bool                       `yaml:"enabled,omitempty" bson:"enabled"`
+	Stepback           bool                       `yaml:"stepback,omitempty" bson:"stepback"`
+	BatchTime          int                        `yaml:"batchtime,omitempty" bson:"batch_time"`
+	Owner              string                     `yaml:"owner,omitempty" bson:"owner_name"`
+	Repo               string                     `yaml:"repo,omitempty" bson:"repo_name"`
+	RemotePath         string                     `yaml:"remote_path,omitempty" bson:"remote_path"`
+	RepoKind           string                     `yaml:"repokind,omitempty" bson:"repo_kind"`
+	Branch             string                     `yaml:"branch,omitempty" bson:"branch_name"`
+	Identifier         string                     `yaml:"identifier,omitempty" bson:"identifier"`
+	DisplayName        string                     `yaml:"display_name,omitempty" bson:"display_name"`
+	CommandType        string                     `yaml:"command_type,omitempty" bson:"command_type"`
+	Pre                *YAMLCommandSet            `yaml:"pre,omitempty" bson:"pre"`
+	Post               *YAMLCommandSet            `yaml:"post,omitempty" bson:"post"`
+	Timeout            *YAMLCommandSet            `yaml:"timeout,omitempty" bson:"timeout"`
+	Modules            []Module                   `yaml:"modules,omitempty" bson:"modules"`
+	BuildVariants      []BuildVariant             `yaml:"buildvariants,omitempty" bson:"build_variants"`
+	Functions          map[string]*YAMLCommandSet `yaml:"functions,omitempty" bson:"functions"`
+	Tasks              []ProjectTask              `yaml:"tasks,omitempty" bson:"tasks"`
+	BuildVariantMatrix BuildVariantMatrix         `yaml:"build_variant_matrix,omitempty" bson:"build_variant_matrix"`
 
 	// Flag that indicates a project as requiring user authentication
-	Private bool `yaml:"private" bson:"private"`
+	Private bool `yaml:"private,omitempty" bson:"private"`
 }
 
 // Unmarshalled from the "tasks" list in an individual build variant
 type BuildVariantTask struct {
 	// this name HAS to match the name field of one of the tasks specified at
 	// the project level, or an error will be thrown
-	Name string `yaml:"name" bson:"name"`
+	Name string `yaml:"name,omitempty" bson:"name"`
 
 	// the distros that the task can be run on
-	Distros []string `yaml:"distros" bson:"distros"`
+	Distros []string `yaml:"distros,omitempty" bson:"distros"`
 }
 
 type BuildVariant struct {
-	Name        string            `yaml:"name" bson:"name"`
-	DisplayName string            `yaml:"display_name" bson:"display_name"`
-	Expansions  map[string]string `yaml:"expansions" bson:"expansions"`
-	Modules     []string          `yaml:"modules" bson:"modules"`
-	Disabled    bool              `yaml:"disabled" bson:"disabled"`
-	Push        bool              `yaml:"push" bson:"push"`
+	Name        string            `yaml:"name,omitempty" bson:"name"`
+	DisplayName string            `yaml:"display_name,omitempty" bson:"display_name"`
+	Expansions  map[string]string `yaml:"expansions,omitempty" bson:"expansions"`
+	Modules     []string          `yaml:"modules,omitempty" bson:"modules"`
+	Disabled    bool              `yaml:"disabled,omitempty" bson:"disabled"`
+	Push        bool              `yaml:"push,omitempty" bson:"push"`
 
 	// Use a *int for 2 possible states
 	// nil - not overriding the project setting
@@ -80,73 +80,73 @@ type BuildVariant struct {
 
 	// the default distros.  will be used to run a task if no distro field is
 	// provided for the task
-	RunOn []string `yaml:"run_on" bson:"run_on"`
+	RunOn []string `yaml:"run_on,omitempty" bson:"run_on"`
 
 	// all of the tasks to be run on the build variant, compile through tests.
-	Tasks                 []BuildVariantTask `yaml:"tasks" bson:"tasks"`
-	MatrixParameterValues map[string]string  `yaml:"matrix_parameter_values" bson:"matrix_parameter_values"`
+	Tasks                 []BuildVariantTask `yaml:"tasks,omitempty" bson:"tasks"`
+	MatrixParameterValues map[string]string  `yaml:"matrix_parameter_values,omitempty" bson:"matrix_parameter_values"`
 }
 
 type Module struct {
-	Name   string `yaml:"name" bson:"name"`
-	Branch string `yaml:"branch" bson:"branch"`
-	Repo   string `yaml:"repo" bson:"repo"`
-	Prefix string `yaml:"prefix" bson:"prefix"`
+	Name   string `yaml:"name,omitempty" bson:"name"`
+	Branch string `yaml:"branch,omitempty" bson:"branch"`
+	Repo   string `yaml:"repo,omitempty" bson:"repo"`
+	Prefix string `yaml:"prefix,omitempty" bson:"prefix"`
 }
 
 type TestSuite struct {
-	Name  string `yaml:"name"`
-	Phase string `yaml:"phase"`
+	Name  string `yaml:"name,omitempty"`
+	Phase string `yaml:"phase,omitempty"`
 }
 
 type PluginCommandConf struct {
-	Function string `yaml:"func" bson:"func"`
+	Function string `yaml:"func,omitempty" bson:"func"`
 	// Type is used to differentiate between setup related commands and actual
 	// testing commands.
-	Type string `yaml:"type" bson:"type"`
+	Type string `yaml:"type,omitempty" bson:"type"`
 
 	// DisplayName is a human readable description of the function of a given
 	// command.
-	DisplayName string `yaml:"display_name" bson:"display_name"`
+	DisplayName string `yaml:"display_name,omitempty" bson:"display_name"`
 
 	// Command is a unique identifier for the command configuration. It consists of a
 	// plugin name and a command name.
-	Command string `yaml:"command" bson:"command"`
+	Command string `yaml:"command,omitempty" bson:"command"`
 
 	// Variants is used to enumerate the particular sets of buildvariants to run
 	// this command configuration on. If it is empty, it is run on all defined
 	// variants.
-	Variants []string `yaml:"variants" bson:"variants"`
+	Variants []string `yaml:"variants,omitempty" bson:"variants"`
 
 	// TimeoutSecs indicates the maximum duration the command is allowed to run
 	// for. If undefined, it is unbounded.
-	TimeoutSecs int `yaml:"timeout_secs" bson:"timeout_secs"`
+	TimeoutSecs int `yaml:"timeout_secs,omitempty" bson:"timeout_secs"`
 
 	// Params are used to supply configuratiion specific information.
-	Params map[string]interface{} `yaml:"params" bson:"params"`
+	Params map[string]interface{} `yaml:"params,omitempty" bson:"params"`
 
 	// Vars defines variables that can be used within commands.
-	Vars map[string]string `yaml:"vars" bson:"vars"`
+	Vars map[string]string `yaml:"vars,omitempty" bson:"vars"`
 }
 
 type ArtifactInstructions struct {
-	Include      []string `yaml:"include" bson:"include"`
-	ExcludeFiles []string `yaml:"excludefiles" bson:"exclude_files"`
+	Include      []string `yaml:"include,omitempty" bson:"include"`
+	ExcludeFiles []string `yaml:"excludefiles,omitempty" bson:"exclude_files"`
 }
 
 type MatrixParameterValue struct {
-	Value      string            `yaml:"value" bson:"value"`
-	Expansions map[string]string `yaml:"expansions" bson:"expansions"`
+	Value      string            `yaml:"value,omitempty" bson:"value"`
+	Expansions map[string]string `yaml:"expansions,omitempty" bson:"expansions"`
 }
 
 type MatrixParameter struct {
-	Name   string                 `yaml:"name" bson:"name"`
-	Values []MatrixParameterValue `yaml:"values" bson:"values"`
+	Name   string                 `yaml:"name,omitempty" bson:"name"`
+	Values []MatrixParameterValue `yaml:"values,omitempty" bson:"values"`
 }
 
 type BuildVariantMatrix struct {
-	MatrixParameters []MatrixParameter `yaml:"matrix_parameters" bson:"matrix_parameters"`
-	Template         BuildVariant      `yaml:"template" bson:"template"`
+	MatrixParameters []MatrixParameter `yaml:"matrix_parameters,omitempty" bson:"matrix_parameters"`
+	Template         BuildVariant      `yaml:"template,omitempty" bson:"template"`
 }
 
 type YAMLCommandSet struct {
@@ -182,17 +182,17 @@ func (c *YAMLCommandSet) UnmarshalYAML(unmarshal func(interface{}) error) error 
 
 // The information about a task's dependency
 type TaskDependency struct {
-	Name    string `yaml:"name" bson:"name"`
-	Variant string `yaml:"variant" bson:"variant,omitempty"`
-	Status  string `yaml:"status" bson:"status,omitempty"`
+	Name    string `yaml:"name,omitempty" bson:"name"`
+	Variant string `yaml:"variant,omitempty" bson:"variant,omitempty"`
+	Status  string `yaml:"status,omitempty" bson:"status,omitempty"`
 }
 
 // Unmarshalled from the "tasks" list in the project file
 type ProjectTask struct {
-	Name        string              `yaml:"name" bson:"name"`
-	ExecTimeout int                 `yaml:"exec_timeout" bson:"exec_timeout"`
-	DependsOn   []TaskDependency    `yaml:"depends_on" bson:"depends_on"`
-	Commands    []PluginCommandConf `yaml:"commands" bson:"commands"`
+	Name        string              `yaml:"name,omitempty" bson:"name"`
+	ExecTimeout int                 `yaml:"exec_timeout,omitempty" bson:"exec_timeout"`
+	DependsOn   []TaskDependency    `yaml:"depends_on,omitempty" bson:"depends_on"`
+	Commands    []PluginCommandConf `yaml:"commands,omitempty" bson:"commands"`
 
 	// Use a *bool so that there are 3 possible states:
 	//   1. nil   = not overriding the project setting (default)

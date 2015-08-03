@@ -20,6 +20,12 @@ func main() {
 	parser.AddCommand("finalize-patch", "finalize an existing patch", "", &cli.FinalizePatchCommand{GlobalOpts: opts})
 	parser.AddCommand("list-projects", "list all projects", "", &cli.ListProjectsCommand{GlobalOpts: opts})
 	parser.AddCommand("validate", "validate a config file", "", &cli.ValidateCommand{GlobalOpts: opts})
+	parser.AddCommand("evaluate", "evaluate and expand a project file (experimental)", "",
+		&cli.EvaluateCommand{Mode: cli.All})
+	parser.AddCommand("evaluate-tasks", "evaluate and expand a project file (experimental)", "",
+		&cli.EvaluateCommand{Mode: cli.Tasks})
+	parser.AddCommand("evaluate-variants", "evaluate and expand a project file (experimental)", "",
+		&cli.EvaluateCommand{Mode: cli.Variants})
 	_, err := parser.Parse()
 	if err != nil {
 		os.Exit(1)
