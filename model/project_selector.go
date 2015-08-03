@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/evergreen-ci/evergreen/util"
+	"reflect"
 	"strings"
 )
 
@@ -105,6 +106,47 @@ func NewTaskSelectorEvaluator(tasks []ProjectTask) *taskSelectorEvaluator {
 		byName: byName,
 		byTag:  byTag,
 	}
+}
+
+// EvaluateTasks expands the selectors in the given BuildVariantTask definitions, removing duplicates.
+func (tse *taskSelectorEvaluator) EvaluateTasks(bvTasks []BuildVariantTask) ([]BuildVariantTask, error) {
+	// evaluate all selectors while merging, avoiding duplicates
+	newTasks := []BuildVariantTask{}
+	newTasksByName := map[string]BuildVariantTask{}
+	for _, bvt := range bvTasks {
+		if bvt.Name == "" {
+			return nil, fmt.Errorf("task has empty name")
+		}
+		selector := ParseSelector(bvt.Name)
+		names, err := tse.evalSelector(selector)
+		if err != nil {
+			return nil, err
+		}
+		// create new BuildVariantTask definitions, throwing away duplicates
+		for _, name := range names {
+			newTask := bvt
+			newTask.Name = name
+			// add the new task if it doesn't already exists (we must avoid duplicates)
+			if oldTask, ok := newTasksByName[name]; !ok {
+				// not a duplicate--add it!
+				newTasks = append(newTasks, newTask)
+				newTasksByName[name] = newTask
+			} else {
+				// task already in the new list, so we check to make sure the definitions match.
+				if !reflect.DeepEqual(newTask, oldTask) {
+					// TODO(3rf):
+					//  It's debatable how we should handle a case where we define .tag + distro and just .tag;
+					//  however, it's such an edge case that an error is probably okay.
+					return nil, fmt.Errorf(
+						"conflicting definitions of task '%v': %v != %v", name, newTask, oldTask)
+				}
+			}
+		}
+	}
+	if len(newTasks) == 0 {
+		return nil, fmt.Errorf("no tasks satisfy the selectors")
+	}
+	return newTasks, nil
 }
 
 func (tse *taskSelectorEvaluator) evalSelector(s Selector) ([]string, error) {

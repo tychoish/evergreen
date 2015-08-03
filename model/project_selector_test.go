@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	. "github.com/smartystreets/goconvey/convey"
+	"reflect"
 	"testing"
 )
 
@@ -70,6 +71,23 @@ func taskSelectorShouldEval(tse *taskSelectorEvaluator, s string, expected []str
 		So(len(names), ShouldEqual, len(expected))
 		for _, e := range expected {
 			So(names, ShouldContain, e)
+		}
+	})
+}
+
+func taskSelectorTaskEval(tse *taskSelectorEvaluator, bvts, expected []BuildVariantTask) {
+	Convey(fmt.Sprintf(`tasks %v should evaluate properly`, bvts), func() {
+		tasks, err := tse.EvaluateTasks(bvts)
+		So(err, ShouldBeNil)
+		So(len(tasks), ShouldEqual, len(expected))
+		for _, e := range expected {
+			exists := false
+			for _, t := range tasks {
+				if reflect.DeepEqual(t, e) {
+					exists = true
+				}
+			}
+			So(exists, ShouldBeTrue)
 		}
 	})
 }
@@ -151,6 +169,64 @@ func TestTaskSelectorEvaluation(t *testing.T) {
 					So(err, ShouldNotBeNil)
 				})
 			})
+
+			Convey("should evaluate valid tasks pointers properly", func() {
+				taskSelectorTaskEval(tse,
+					[]BuildVariantTask{{Name: "white"}},
+					[]BuildVariantTask{{Name: "white"}})
+				taskSelectorTaskEval(tse,
+					[]BuildVariantTask{{Name: "red"}, {Name: ".secondary"}},
+					[]BuildVariantTask{{Name: "red"}, {Name: "orange"}, {Name: "purple"}, {Name: "green"}})
+				taskSelectorTaskEval(tse,
+					[]BuildVariantTask{
+						{Name: "orange", Distros: []string{"d1"}},
+						{Name: ".warm .secondary", Distros: []string{"d1"}}},
+					[]BuildVariantTask{{Name: "orange", Distros: []string{"d1"}}})
+				taskSelectorTaskEval(tse,
+					[]BuildVariantTask{
+						{Name: "orange", Distros: []string{"d1"}},
+						{Name: "!.warm .secondary", Distros: []string{"d1"}}},
+					[]BuildVariantTask{
+						{Name: "orange", Distros: []string{"d1"}},
+						{Name: "purple", Distros: []string{"d1"}},
+						{Name: "green", Distros: []string{"d1"}}})
+				taskSelectorTaskEval(tse,
+					[]BuildVariantTask{{Name: "*"}},
+					[]BuildVariantTask{
+						{Name: "red"}, {Name: "blue"}, {Name: "yellow"},
+						{Name: "orange"}, {Name: "purple"}, {Name: "green"},
+						{Name: "brown"}, {Name: "white"}, {Name: "black"},
+					})
+			})
+			Convey("should fail on  invalid tasks pointers like", func() {
+				Convey("tasks and tags that do not exist", func() {
+					_, err := tse.EvaluateTasks([]BuildVariantTask{{Name: "magenta"}})
+					So(err, ShouldNotBeNil)
+					_, err = tse.EvaluateTasks([]BuildVariantTask{{Name: "!magenta"}})
+					So(err, ShouldNotBeNil)
+					_, err = tse.EvaluateTasks([]BuildVariantTask{{Name: ".invisible"}})
+					So(err, ShouldNotBeNil)
+					_, err = tse.EvaluateTasks([]BuildVariantTask{{Name: "!.invisible"}})
+					So(err, ShouldNotBeNil)
+				})
+				Convey("empty results", func() {
+					_, err := tse.EvaluateTasks([]BuildVariantTask{})
+					So(err, ShouldNotBeNil)
+					_, err = tse.EvaluateTasks([]BuildVariantTask{{Name: ".warm .cool"}})
+					So(err, ShouldNotBeNil)
+				})
+				Convey("conflicting definitions", func() {
+					_, err := tse.EvaluateTasks([]BuildVariantTask{
+						{Name: "orange", Distros: []string{"d1"}},
+						{Name: ".warm .secondary", Distros: []string{"d2"}}})
+					So(err, ShouldNotBeNil)
+					_, err = tse.EvaluateTasks([]BuildVariantTask{
+						{Name: "orange", Distros: []string{"d1"}},
+						{Name: ".warm .secondary"}})
+					So(err, ShouldNotBeNil)
+				})
+			})
+
 		})
 	})
 }
