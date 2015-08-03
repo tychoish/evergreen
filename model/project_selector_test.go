@@ -21,6 +21,7 @@ func TestBasicSelector(t *testing.T) {
 			selectorShouldParse("!myTask", Selector{{name: "myTask", negated: true}})
 			selectorShouldParse(".myTag", Selector{{name: "myTag", tag: true}})
 			selectorShouldParse("!.myTag", Selector{{name: "myTag", tag: true, negated: true}})
+			selectorShouldParse("*", Selector{{name: "*"}})
 		})
 
 		Convey("multi-selectors should parse", func() {
@@ -56,6 +57,98 @@ func TestBasicSelector(t *testing.T) {
 				selectorShouldParse("\r\n.mytag\r\n!mytask\n", Selector{
 					{name: "mytag", tag: true},
 					{name: "mytask", negated: true},
+				})
+			})
+		})
+	})
+}
+
+func taskSelectorShouldEval(tse *taskSelectorEvaluator, s string, expected []string) {
+	Convey(fmt.Sprintf(`selector "%v" should evaluate to %v`, s, expected), func() {
+		names, err := tse.evalSelector(ParseSelector(s))
+		So(err, ShouldBeNil)
+		So(len(names), ShouldEqual, len(expected))
+		for _, e := range expected {
+			So(names, ShouldContain, e)
+		}
+	})
+}
+
+func TestTaskSelectorEvaluation(t *testing.T) {
+	var tse *taskSelectorEvaluator
+
+	Convey("With a colorful set of ProjectTasks", t, func() {
+		taskDefs := []ProjectTask{
+			{Name: "red", Tags: []string{"primary", "warm"}},
+			{Name: "orange", Tags: []string{"secondary", "warm"}},
+			{Name: "yellow", Tags: []string{"primary", "warm"}},
+			{Name: "green", Tags: []string{"secondary", "cool"}},
+			{Name: "blue", Tags: []string{"primary", "cool"}},
+			{Name: "purple", Tags: []string{"secondary", "cool"}},
+			{Name: "brown", Tags: []string{"tertiary"}},
+			{Name: "black", Tags: []string{"special"}},
+			{Name: "white", Tags: []string{"special"}},
+		}
+
+		Convey("a taskSelectorEvaluator", func() {
+			tse = NewTaskSelectorEvaluator(taskDefs)
+
+			Convey("should evaluate single name selectors properly", func() {
+				taskSelectorShouldEval(tse, "red", []string{"red"})
+				taskSelectorShouldEval(tse, "white", []string{"white"})
+			})
+
+			Convey("should evaluate single tag selectors properly", func() {
+				taskSelectorShouldEval(tse, ".warm", []string{"red", "orange", "yellow"})
+				taskSelectorShouldEval(tse, ".cool", []string{"blue", "green", "purple"})
+				taskSelectorShouldEval(tse, ".special", []string{"white", "black"})
+				taskSelectorShouldEval(tse, ".primary", []string{"red", "blue", "yellow"})
+			})
+
+			Convey("should evaluate multi-tag selectors properly", func() {
+				taskSelectorShouldEval(tse, ".warm .cool", []string{})
+				taskSelectorShouldEval(tse, ".cool .primary", []string{"blue"})
+				taskSelectorShouldEval(tse, ".warm .secondary", []string{"orange"})
+			})
+
+			Convey("should evaluate selectors with negation properly", func() {
+				taskSelectorShouldEval(tse, "!.special",
+					[]string{"red", "orange", "yellow", "green", "blue", "purple", "brown"})
+				taskSelectorShouldEval(tse, ".warm !yellow", []string{"red", "orange"})
+				taskSelectorShouldEval(tse, "!.primary !.secondary", []string{"black", "white", "brown"})
+			})
+
+			Convey("should evaluate special selectors", func() {
+				taskSelectorShouldEval(tse, "*",
+					[]string{"red", "orange", "yellow", "green", "blue", "purple", "brown", "black", "white"})
+			})
+
+			Convey("should fail on bad selectors like", func() {
+
+				Convey("empty selectors", func() {
+					_, err := tse.evalSelector(Selector{})
+					So(err, ShouldNotBeNil)
+				})
+
+				Convey("names that don't exist", func() {
+					_, err := tse.evalSelector(ParseSelector("salmon"))
+					So(err, ShouldNotBeNil)
+					_, err = tse.evalSelector(ParseSelector("!azure"))
+					So(err, ShouldNotBeNil)
+				})
+
+				Convey("tags that don't exist", func() {
+					_, err := tse.evalSelector(ParseSelector(".fall"))
+					So(err, ShouldNotBeNil)
+					_, err = tse.evalSelector(ParseSelector("!.spring"))
+					So(err, ShouldNotBeNil)
+				})
+
+				Convey("using . and ! with *", func() {
+					_, err := tse.evalSelector(ParseSelector(".*"))
+					So(err, ShouldNotBeNil)
+					_, err = tse.evalSelector(ParseSelector("!*"))
+					So(err, ShouldNotBeNil)
 				})
 			})
 		})

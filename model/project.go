@@ -193,6 +193,7 @@ type ProjectTask struct {
 	ExecTimeout int                 `yaml:"exec_timeout,omitempty" bson:"exec_timeout"`
 	DependsOn   []TaskDependency    `yaml:"depends_on,omitempty" bson:"depends_on"`
 	Commands    []PluginCommandConf `yaml:"commands,omitempty" bson:"commands"`
+	Tags 		[]string			`yaml:"tags,omitempty" bson:"tags"` //TODO allow array or singular?
 
 	// Use a *bool so that there are 3 possible states:
 	//   1. nil   = not overriding the project setting (default)
