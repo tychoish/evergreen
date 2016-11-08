@@ -1,7 +1,7 @@
 # start project configuration
 name := evergreen
 buildDir := bin
-packages := $(name) agent db cli archive remote command taskrunner util plugin plugin-builtin-git 
+packages := $(name) agent db cli archive remote command taskrunner util plugin plugin-builtin-git
 packages += plugin-builtin-gotest plugin-builtin-attach plugin-builtin-manifest plugin-builtin-archive
 packages += plugin-builtin-shell plugin-builtin-s3copy plugin-builtin-expansions plugin-builtin-s3
 packages += notify thirdparty alerts auth scheduler model hostutil validator service monitor repotracker
@@ -10,67 +10,90 @@ projectPath := $(orgPath)/$(name)
 # end project configuration
 
 
+# start evergreen specific configuration
+xcPlatforms := windows_amd64 windows_386 linux_386 linux_s390x linux_arm64 linux_ppc64le solaris_amd64 darwin_amd64
+goos := $(shell go env GOOS)
+goarch := $(shell go env GOARCH)
+
+agentBuildDir := executables
+clientBuildDir := clients
+
+binaries := $(buildDir)/evergreen_ui_server $(buildDir)/evergreen_runner $(buildDir)/evergreen_api_server
+raceBinaries := $(foreach bin,$(binaries),$(bin).race)
+
+agentSource := agent/main/agent.go
+clientSource := cli/main/cli.go
+# end evergreen specific configuration
+
+
 # start rules for binding agents
-define buildBinary = 
-	$(vendorGopath) go build -ldflags "-X github.com/evergreen-ci/evergreen.BuildRevision=`git rev-parse HEAD`" -o $@ "./$<" 
+#   build the server binaries:
+define buildBinary =
+	$(vendorGopath) go build -ldflags "-X github.com/evergreen-ci/evergreen.BuildRevision=`git rev-parse HEAD`" -o $@ "./$<"
 endef
-$(buildDir)/cli:cli/main/cli.go $(srcFiles)
-	$(buildBinary)
 $(buildDir)/evergreen_api_server:service/api_main/apiserver.go $(srcFiles)
 	$(buildBinary)
 $(buildDir)/evergreen_ui_server:service/ui_main/ui.go $(srcFiles)
 	$(buildBinary)
 $(buildDir)/evergreen_runner:runner/main/runner.go $(srcFiles)
 	$(buildBinary)
-
-define buildRaceBinary = 
+#   build the server binaries with the race detector:
+define buildRaceBinary =
 	$(vendorGopath) go build -race -ldflags "-X github.com/evergreen-ci/evergreen.BuildRevision=`git rev-parse HEAD`" -o $@ "./$<"
 endef
-$(buildDir)/evergreen_api_server.race:service/api_main/apiserver.go $(srcFiles) 
+$(buildDir)/evergreen_api_server.race:service/api_main/apiserver.go $(srcFiles)
 	$(buildRaceBinary)
-$(buildDir)/evergreen_runner.race:runner/main/runner.go $(srcFiles) 
+$(buildDir)/evergreen_runner.race:runner/main/runner.go $(srcFiles)
 	$(buildRaceBinary)
-$(buildDir)/evergreen_ui_server.race:service/ui_main/ui.go $(srcFiles) 
+$(buildDir)/evergreen_ui_server.race:service/ui_main/ui.go $(srcFiles)
 	$(buildRaceBinary)
-$(buildDir)/cli.race:cli/main/cli.go $(srcFiles)
-	$(buildRaceBinary)
-binaries := $(buildDir)/cli $(buildDir)/evergreen_ui_server $(buildDir)/evergreen_runner $(buildDir)/evergreen_api_server
-raceBinaries := $(foreach bin,$(binaries),$(bin).race)
-phony += $(binaries) $(raceBinares) 
-# end rules for building server binaries 
+phony += $(binaries) $(raceBinares)
+# end rules for building server binaries
 
-goos := $(shell go env GOOS)
-goarch := $(shell go env GOARCH)
-xcPlatforms := windows_amd64 windows_386 linux_386 linux_s390x linux_arm64 linux_ppc64le solaris_amd64 darwin_amd64
+
+# start cross compile tools
 $(buildDir)/build-cross-compile:scripts/build-cross-compile.go
 	@mkdir -p $(buildDir)
 	go build -o $@ $<
+define crossCompile =
+	@$(vendorGopath) ./$< -buildName=$* -ldflags="-X=github.com/evergreen-ci/evergreen.BuildRevision=`git rev-parse HEAD`"
+endef
+# end cross compile rules
 
 
-# start rules for building agents 
-agentBuildDir := executables
-$(agentBuildDir)/$(goos)_$(goarch) $(agentBuildDir):
-	mkdir -p $@
+# start rules for building agents
 $(agentBuildDir)/version:
 	@mkdir -p $(dir $@)
 	git rev-parse HEAD >| $@
-
-agentSource := agent/main/agent.go
 agent:$(agentBuildDir)/$(goos)_$(goarch)/main
+agent-race:$(agentBuildDir)/$(goos)_$(goarch)/main.race
 agents:$(foreach platform,$(xcPlatforms),$(agentBuildDir)/$(platform)/main)
+agents-race:$(foreach platform,$(xcPlatforms),$(agentBuildDir)/$(platform)/main.race)
 $(agentBuildDir)/%/main:$(buildDir)/build-cross-compile $(agentBuildDir)/version $(srcFiles)
-	@$(vendorGopath) ./$< -buildName=$* -directory=$(agentBuildDir) -ldflags="-X=github.com/evergreen-ci/evergreen.BuildRevision=`git rev-parse HEAD`" -source="$(agentSource)"
+	$(crossCompile) -directory=$(agentBuildDir) -source=$(agentSource)
+$(agentBuildDir)/%/main.race:$(buildDir)/build-cross-compile $(agentBuildDir)/version $(srcFiles)
+	$(crossCompile) -directory=$(agentBuildDir) -source=$(agentSource) -race
+phony += agents-race agents agent agent-race $(agentBuildDir)/version
+# end agent build directives
 
-phony += agents agent $(agentBuildDir)/version 
 
-clientBuildDir := clients
-cliSource := cli/main/cli.go
+# start client build directives
 cli:$(clientBuildDir)/$(goos)_$(goarch)/cli
+cli-race:$(clientBuildDir)/$(goos)_$(goarch)/cli.race
 clis:$(foreach platform,$(xcPlatforms),$(clientBuildDir)/$(platform)/cli)
+clis-race:$(foreach platform,$(xcPlatforms),$(clientBuildDir)/$(platform)/cli.race)
 $(clientBuildDir)/%/cli:$(buildDir)/build-cross-compile $(srcFiles)
-	@$(vendorGopath) ./$< -buildName=$* -directory=$(clientBuildDir) -ldflags="-X=github.com/evergreen-ci/evergreen.BuildRevision=`git rev-parse HEAD`" -source="$(cliSource)"
-phony += cli clis
+	$(crossCompile) -directory=$(clientBuildDir) -source=$(clientSource)
+$(clientBuildDir)/%/cli.race:$(buildDir)/build-cross-compile $(srcFiles)
+	$(crossCompile) -directory=$(clientBuildDir) -source=$(clientSource) -race
+phony += cli clis cli-race clis-race
 # end rules for building agetn
+
+
+# start dist configuration
+distContents := $(binaries) $(agentBuildDir) $(clientBuildDir) ./public ./service/templates ./service/plugins
+# end dist configuration
+
 
 # start linting configuration
 #   package, testing, and linter dependencies specified
@@ -84,7 +107,7 @@ lintArgs := --tests --deadline=1m --vendor
 lintArgs += --disable="gotype" --disable="gas"
 lintArgs += --skip="$(buildDir)" --skip="scripts"
 #  add and configure additional linters
-lintArgs += --enable="go fmt -s" --enable="goimports" --enable="misspell" 
+lintArgs += --enable="go fmt -s" --enable="goimports" --enable="misspell"
 lintargs += --enable="lll" --enable"unused"
 lintArgs += --line-length=100 --dupl-threshold=175
 #  two similar functions triggered the duplicate warning, but they're not.
@@ -115,15 +138,11 @@ testBin := $(foreach target,$(packages),$(buildDir)/test.$(target))
 raceBin := $(foreach target,$(packages),$(buildDir)/race.$(target))
 coverageOutput := $(foreach target,$(packages),$(buildDir)/output.$(target).coverage)
 coverageHtmlOutput := $(foreach target,$(packages),$(buildDir)/output.$(target).coverage.html)
-# $(gopath)/src/%:
-# 	@-[ ! -d $(gopath) ] && mkdir -p $(gopath) || true
-# 	go get $(subst $(gopath)/src/,,$@)
+$(gopath)/src/%:
+	@-[ ! -d $(gopath) ] && mkdir -p $(gopath) || true
+	go get $(subst $(gopath)/src/,,$@)
 # end dependency installation tools
 
-list-tests:
-	@echo -e "test targets:" $(foreach target,$(packages),\\n\\ttest-$(target))
-list-race:
-	@echo -e "test (race detector) targets:" $(foreach target,$(packages),\\n\\trace-$(target))
 
 # implementation details for building the binary and creating a
 # convienent link in the working directory
@@ -146,7 +165,11 @@ test:$(foreach target,$(packages),test-$(target))
 race:$(foreach target,$(packages),race-$(target))
 coverage:$(coverageOutput)
 coverage-html:$(coverageHtmlOutput)
-phony += lint lint-deps build build-race race test coverage coverage-html
+list-tests:
+	@echo -e "test targets:" $(foreach target,$(packages),\\n\\ttest-$(target))
+list-race:
+	@echo -e "test (race detector) targets:" $(foreach target,$(packages),\\n\\trace-$(target))
+phony += lint lint-deps build build-race race test coverage coverage-html list-race list-tests
 .PRECIOUS: $(testOutput) $(raceOutput) $(coverageOutput) $(coverageHtmlOutput)
 .PRECIOUS: $(foreach target,$(packages),$(buildDir)/test.$(target))
 .PRECIOUS: $(foreach target,$(packages),$(buildDir)/race.$(target))
@@ -159,8 +182,8 @@ $(buildDir)/make-tarball:scripts/make-tarball.go $(buildDir)/render-gopath
 dist:$(buildDir)/dist.tar.gz
 dist-test:$(buildDir)/dist-test.tar.gz
 dist-source:$(buildDir)/dist-source.tar.gz
-$(buildDir)/dist.tar.gz:$(buildDir)/make-tarball agents $(binaries) 
-	./$< --name $@ --prefix $(name) $(foreach bin,$(binaries),--item $(bin)) --item ./public --item ./executables --item ./client
+$(buildDir)/dist.tar.gz:$(buildDir)/make-tarball agents $(binaries)
+	./$< --name $@ --prefix $(name) $(foreach item,$(distContents),--item $(item))
 $(buildDir)/dist-test.tar.gz:makefile $(binaries) $(raceBinaries)
 	tar -czvf $@ $^
 $(buildDir)/dist-source.tar.gz:$(buildDir)/make-tarball $(srcFiles) $(testSrcFiles) makefile
@@ -189,10 +212,10 @@ vendor-deps:$(vendorDeps)
 #   this allows us to store our vendored code in vendor and use
 #   symlinks to support vendored code both in the legacy style and with
 #   new-style vendor directories. When this codebase can drop support
-#   for go1.4, we can delete most of this. 
+#   for go1.4, we can delete most of this.
 -include $(buildDir)/makefile.vendor
-#   nested vendoring is used to support projects that have 
-# nestedVendored := foo
+#   nested vendoring is used to support projects that have
+# nestedVendored := ""
 # nestedVendored := $(foreach project,$(nestedVendored),$(project)/build/vendor)
 $(buildDir)/makefile.vendor:$(buildDir)/render-gopath makefile
 	@mkdir -p $(buildDir)
@@ -200,9 +223,6 @@ $(buildDir)/makefile.vendor:$(buildDir)/render-gopath makefile
 #   targets for the directory components and manipulating vendored files.
 vendor-sync:$(vendorDeps)
 	./vendor.sh
-# vendor-clean:
-# 	rm -rf vendor/github.com/stretchr/testify/vendor/
-# 	find vendor/ -name "*.gif" -o -name "*.gz" -o -name "*.png" -o -name "*.ico" | xargs rm -f
 change-go-version:
 	rm -rf $(buildDir)/make-vendor $(buildDir)/render-gopath
 	@$(MAKE) $(makeArgs) vendor > /dev/null 2>&1
