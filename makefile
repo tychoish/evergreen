@@ -92,6 +92,7 @@ phony += cli clis cli-race clis-race
 
 # start dist configuration
 distContents := $(binaries) $(agentBuildDir) $(clientBuildDir) ./public ./service/templates ./service/plugins
+#  TODO add info about what needs to go in the test/src tarballs
 # end dist configuration
 
 
