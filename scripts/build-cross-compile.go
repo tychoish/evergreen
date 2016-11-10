@@ -19,6 +19,7 @@ func main() {
 		source    string
 		ldFlags   string
 		buildName string
+		goBin     string
 	)
 
 	flag.BoolVar(&race, "race", false, "build with the race detector")
@@ -28,6 +29,7 @@ func main() {
 	flag.StringVar(&source, "source", "", "path to source file")
 	flag.StringVar(&ldFlags, "ldflags", "", "specify any ldflags to pass to go build")
 	flag.StringVar(&buildName, "buildName", "", "use GOOS_ARCH to specify target platform")
+	flag.StringVar(&goBin, "goBinary", "go", "specify path to go binary")
 	flag.Parse()
 
 	if buildName != "" {
@@ -40,7 +42,7 @@ func main() {
 	}
 
 	output := filepath.Join(directory, buildName, "main")
-	cmd := exec.Command("go", "build")
+	cmd := exec.Command(goBin, "build")
 
 	if race {
 		cmd.Args = append(cmd.Args, "-race")
@@ -55,8 +57,13 @@ func main() {
 	cmd.Stderr = os.Stderr
 	cmd.Env = []string{
 		"GOPATH=" + os.Getenv("GOPATH"),
-		"GOOS=" + system,
-		"GOARCH=" + arch,
+		"GOROOT=" + runtime.GOROOT(),
+	}
+
+	if runtime.Compiler != "gccgo" {
+		cmd.Env = append(cmd.Env,
+			"GOOS="+system,
+			"GOARCH="+arch)
 	}
 
 	fmt.Println(strings.Join(cmd.Env, " "), strings.Join(cmd.Args, " "))
