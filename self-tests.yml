@@ -44,12 +44,12 @@ variables:
       - func: setup-credentials
       - func: run-make
         vars: { target: "${task_name}" }
-      - func: run-make
-        <<: *ONLY_COVERAGE_VARIANTS
-        vars: { target: "coverage-${task_name} html-${task_name}" }
-      - func: upload-coverage
-        <<: *ONLY_COVERAGE_VARIANTS
-        vars: { name: "${task_name}"}
+      # - func: run-make
+      #   <<: *ONLY_COVERAGE_VARIANTS
+      #   vars: { target: "coverage-${task_name} html-${task_name}" }
+      # - func: upload-coverage
+      #   <<: *ONLY_COVERAGE_VARIANTS
+      #   vars: { name: "${task_name}"}
   - &run-go-test-suite-with-mongodb
     # runs a make target above, but only on systems that have a
     # running mongod started for testing.
@@ -65,12 +65,12 @@ variables:
       - func: set-up-mongodb
       - func: run-make
         vars: { target: "${task_name}" }
-      - func: run-make
-        <<: *ONLY_COVERAGE_VARIANTS
-        vars: { target: "coverage-${task_name} html-${task_name}" }
-      - func: upload-coverage
-        <<: *ONLY_COVERAGE_VARIANTS
-        vars: { name: "${task_name}"}
+      # - func: run-make
+      #   <<: *ONLY_COVERAGE_VARIANTS
+      #   vars: { target: "coverage-${task_name} html-${task_name}" }
+      # - func: upload-coverage
+      #   <<: *ONLY_COVERAGE_VARIANTS
+      #   vars: { name: "${task_name}"}
 
 #######################################
 #              Functions              #
