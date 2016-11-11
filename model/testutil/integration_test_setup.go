@@ -9,6 +9,7 @@ import (
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
+	util "github.com/evergreen-ci/evergreen/testutil"
 	"gopkg.in/yaml.v2"
 )
 
@@ -20,7 +21,7 @@ var settingsOverride = flag.String("evergreen.settingsOverride", "", "Settings f
 func ConfigureIntegrationTest(t *testing.T, testSettings *evergreen.Settings,
 	testName string) {
 
-	SkipTestUnlessAll(t, testName)
+	util.SkipTestUnlessAll(t, testName)
 
 	// make sure an override file is provided
 	if (*settingsOverride) == "" {

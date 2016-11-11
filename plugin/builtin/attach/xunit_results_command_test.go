@@ -1,9 +1,10 @@
 package attach_test
 
 import (
+	"path/filepath"
 	"testing"
 
-	"github.com/10gen-labs/slogger/v1"
+	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/model"
@@ -16,10 +17,12 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-const (
-	TotalResultCount = 677
-	SingleFileConfig = "testdata/plugin_attach_xunit.yml"
-	WildcardConfig   = "testdata/plugin_attach_xunit_wildcard.yml"
+const TotalResultCount = 677
+
+var (
+	workingDirectory = testutil.GetDirectoryOfFile()
+	SingleFileConfig = filepath.Join(workingDirectory, "testdata", "plugin_attach_xunit.yml")
+	WildcardConfig   = filepath.Join(workingDirectory, "testdata", "plugin_attach_xunit_wildcard.yml")
 )
 
 // runTest abstracts away common tests and setup between all attach xunit tests.
