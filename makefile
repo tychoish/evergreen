@@ -200,6 +200,12 @@ coverage-%:$(buildDir)/output.%.coverage
 	@grep -s -q -e "^PASS" $<
 html-coverage-%:$(buildDir)/output.%.coverage.html
 	@grep -s -q -e "^PASS" $<
+# the following targets are a shim for the way that evergreen yaml
+# doesn't need extra processing for task names.
+coverage-test-%:coverage-%
+coverage-race-%:coverage-%
+html-coverage-test-%:html-coverage-%
+html-coverage-race-%:html-coverage-%
 # end convienence targets
 
 
