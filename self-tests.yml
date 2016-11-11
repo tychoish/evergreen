@@ -427,7 +427,7 @@ buildvariants:
     run_on:
       - rhel62-test
     expansions:
-      build_env: "GOROOT=/opt/go"
+      build_env: "GOROOT=/opt/go TEST_ARGS='evergreen.all'"
       mongodb_url: https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel62-3.2.9.tgz
     tasks:
       - "dist"
@@ -437,6 +437,7 @@ buildvariants:
     run_on:
       - archlinux-test
     expansions:
+      build_env: "TEST_ARGS='evergreen.all'"
       mongodb_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.2.9.tgz
     tasks:
       - "dist"
@@ -447,6 +448,7 @@ buildvariants:
     run_on:
       - osx-1010
     expansions:
+      build_env: "TEST_ARGS='evergreen.all'"
       mongodb_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-3.2.9.tgz
     tasks:
       - "dist"
@@ -456,7 +458,7 @@ buildvariants:
     run_on:
       - windows-64-vs2013-test
     expansions:
-      build_env: "GOROOT=c:\\go"
+      build_env: "GOROOT=c:\\go TEST_ARGS='evergreen.all'"
       mongodb_url: https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-3.2.9.zip
       extension: ".exe"
     tasks:
@@ -468,7 +470,7 @@ buildvariants:
       - rhel62-test
     expansions:
       mongodb_url: https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel62-3.2.9.tgz
-      build_env: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+      build_env: "PATH=/opt/mongodbtoolchain/v2/bin:$PATH TEST_ARGS='evergreen.all'"
     tasks:
       - "dist"
       - ".test"
@@ -476,7 +478,7 @@ buildvariants:
     run_on:
       - rhel71-power8-test
     expansions:
-      build_env: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+      build_env: "PATH=/opt/mongodbtoolchain/v2/bin:$PATH TEST_ARGS='evergreen.all'"
       mongodb_url: http://downloads.10gen.com/linux/mongodb-linux-s390x-enterprise-rhel72-3.3.12.tgz
     tasks:
       - "dist"
@@ -485,7 +487,7 @@ buildvariants:
     run_on:
       - rhel72-zseries-test
     expansions:
-      build_env: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+      build_env: "PATH=/opt/mongodbtoolchain/v2/bin:$PATH TEST_ARGS='evergreen.all'"
       mongodb_url: http://downloads.10gen.com/linux/mongodb-linux-s390x-enterprise-rhel72-3.3.12.tgz
     tasks:
       - "dist"
