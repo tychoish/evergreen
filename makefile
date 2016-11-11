@@ -249,7 +249,7 @@ phony += vendor vendor-deps vendor-clean vendor-sync change-go-version
 #    run. (The "build" target is intentional and makes these targetsb
 #    rerun as expected.)
 testRunDeps := $(name)
-testArgs := -test.v --test.timeout=10m
+testArgs := -test.v --test.timeout=20m
 #  targets to compile
 $(buildDir)/test.%:$(testSrcFiles)
 	$(vendorGopath) go test $(if $(DISABLE_COVERAGE),,-covermode=count) -c -o $@ ./$(subst -,/,$*)
