@@ -8,11 +8,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/10gen-labs/slogger/v1"
+	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/command"
@@ -40,9 +41,7 @@ var Verbose = testing.Verbose()
 var testConfig = evergreen.TestConfig()
 var testPidFile = "test_pid_file"
 
-var testSetups = []testConfigPath{
-	{"With plugin mode test config", "testdata/config_test_plugin"},
-}
+var testSetups []testConfigPath
 
 var buildVariantsToTest = []string{"linux-64", "windows8"}
 
@@ -84,7 +83,13 @@ func (ptm patchTestMode) String() string {
 }
 
 func init() {
+	_, file, _, _ := runtime.Caller(1)
 	dbutil.SetGlobalSessionProvider(dbutil.SessionFactoryFromConfig(testConfig))
+	testSetups = []testConfigPath{
+		{"With plugin mode test config",
+			filepath.Join(filepath.Dir(file), "testdata", "config_test_plugin")},
+	}
+
 }
 
 func (*NoopSignalHandler) HandleSignals(_ *Agent) {
@@ -1037,7 +1042,10 @@ func prependConfigToVersion(t *testing.T, versionId, configData string) {
 
 func TestMain(m *testing.M) {
 	var err error
-	testDirectory, err = os.Getwd()
+
+	_, file, _, _ := runtime.Caller(0)
+
+	testDirectory = filepath.Dir(file)
 	if err != nil {
 		panic(err)
 	}
