@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/evergreen-ci/evergreen"
@@ -25,8 +27,20 @@ func ConfigureIntegrationTest(t *testing.T, testSettings *evergreen.Settings,
 
 	// make sure an override file is provided
 	if (*settingsOverride) == "" {
-		panic("Integration tests need a settings override file to be" +
-			" provided")
+		msg := "Integration tests need a settings override file to be provided"
+		keyName := "evergreen.settingsOverride"
+		if !strings.Contains(os.Getenv("TEST_ARGS"), keyName) {
+			panic(msg)
+		}
+		for _, k := range os.Environ() {
+			if strings.HasPrefix(k, keyName) {
+				parts := strings.Split(k, "=")
+				if len(parts) < 2 {
+					panic(msg)
+				}
+				*settingsOverride = parts[1]
+			}
+		}
 	}
 
 	// grab the file with the integration test settings

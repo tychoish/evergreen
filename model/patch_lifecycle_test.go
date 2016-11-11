@@ -18,8 +18,7 @@ func TestMakePatchedConfig(t *testing.T) {
 		cwd := testutil.GetDirectoryOfFile()
 
 		Convey("the config should be patched correctly", func() {
-
-			remoteConfigPath := filepath.Join(cwd, "config", "evergreen.yml")
+			remoteConfigPath := "config/evergreen.yml"
 			fileBytes, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "patch.diff"))
 			So(err, ShouldBeNil)
 			// update patch with remove config path variable

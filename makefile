@@ -249,7 +249,8 @@ phony += vendor vendor-deps vendor-clean vendor-sync change-go-version
 #    run. (The "build" target is intentional and makes these targetsb
 #    rerun as expected.)
 testRunDeps := $(name)
-testArgs := -test.v --test.timeout=20m $(foreach arg,$(TEST_ARGS),--$(arg))
+testRunEnv := EVGHOME=$(shell pwd)
+testArgs := -test.v --test.timeout=20m
 #  targets to compile
 $(buildDir)/test.%:$(testSrcFiles)
 	$(vendorGopath) go test $(if $(DISABLE_COVERAGE),,-covermode=count) -c -o $@ ./$(subst -,/,$*)
@@ -262,12 +263,12 @@ $(buildDir)/race.$(name):$(testSrcFiles)
 	$(vendorGopath) go test -race -c -o $@ ./
 #  targets to run the tests and report the output
 $(buildDir)/output.%.test:$(buildDir)/test.% .FORCE
-	./$< $(testArgs) | tee $@
+	$(testRunEnv) ./$< $(testArgs) | tee $@
 $(buildDir)/output.%.race:$(buildDir)/race.% .FORCE
-	./$< $(testArgs) | tee $@
+	$(testRunEnv) ./$< $(testArgs) | tee $@
 #  targets to process and generate coverage reports
 $(buildDir)/output.%.coverage:$(buildDir)/test.% .FORCE
-	./$< $(testArgs) -test.coverprofile=$@
+	$(testRunEnv) ./$< $(testArgs) -test.coverprofile=$@
 	@-[ -f $@ ] && go tool cover -func=$@ | sed 's%$(projectPath)/%%' | column -t
 $(buildDir)/output.%.coverage.html:$(buildDir)/output.%.coverage
 	$(vendorGopath) go tool cover -html=$< -o $@

@@ -74,10 +74,14 @@ func TestLocalCommands(t *testing.T) {
 				Stderr:           ioutil.Discard,
 				WorkingDirectory: workingDir,
 			}
-
 			// run the command - the working directory should be as specified
 			So(command.Run(), ShouldBeNil)
-			So(string(stdout.LastWritten), ShouldEqual, workingDir+"\n")
+
+			reportedPwd := string(stdout.LastWritten)
+			reportedPwd = reportedPwd[:len(reportedPwd)-1]
+			reportedPwd, err = filepath.EvalSymlinks(reportedPwd)
+
+			So(reportedPwd, ShouldEqual, workingDir)
 
 		})
 
@@ -217,7 +221,11 @@ func TestLocalScript(t *testing.T) {
 
 			// run the command - the working directory should be as specified
 			So(command.Run(), ShouldBeNil)
-			So(string(stdout.LastWritten), ShouldEqual, workingDir+"\n")
+
+			reportedPwd := string(stdout.LastWritten)
+			reportedPwd = reportedPwd[:len(reportedPwd)-1]
+			reportedPwd, err = filepath.EvalSymlinks(reportedPwd)
+			So(reportedPwd, ShouldEqual, workingDir)
 		})
 
 	})

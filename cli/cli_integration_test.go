@@ -3,6 +3,7 @@ package cli
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/evergreen-ci/evergreen"
@@ -12,16 +13,18 @@ import (
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
-	"github.com/evergreen-ci/evergreen/model/testutil"
+	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/service"
+	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v2"
 )
 
 var testConfig = evergreen.TestConfig()
+
 var testPatch = `diff --git a/README.md b/README.md
 index e69de29..e5dcf0f 100644
 --- a/README.md
@@ -67,7 +70,7 @@ func setupCLITestHarness() cliTestHarness {
 	So(db.Clear(patch.Collection), ShouldBeNil)
 	So(db.Clear(model.ProjectRefCollection), ShouldBeNil)
 	So((&user.DBUser{Id: "testuser", APIKey: "testapikey", EmailAddress: "tester@mongodb.com"}).Insert(), ShouldBeNil)
-	localConfBytes, err := ioutil.ReadFile("testdata/sample.yml")
+	localConfBytes, err := ioutil.ReadFile(filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "sample.yml"))
 	So(err, ShouldBeNil)
 
 	projectRef := &model.ProjectRef{
@@ -101,7 +104,7 @@ func setupCLITestHarness() cliTestHarness {
 }
 
 func TestCLIFetchSource(t *testing.T) {
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchSource")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchSource")
 	Convey("with a task containing patches and modules", t, func() {
 		testSetup := setupCLITestHarness()
 		err := os.RemoveAll("source-patch-1_sample")
@@ -153,7 +156,7 @@ func TestCLIFetchSource(t *testing.T) {
 }
 
 func TestCLIFetchArtifacts(t *testing.T) {
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchArtifacts")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchArtifacts")
 	Convey("with API test server running", t, func() {
 		testSetup := setupCLITestHarness()
 
@@ -217,7 +220,7 @@ func TestCLIFetchArtifacts(t *testing.T) {
 }
 
 func TestCLIFunctions(t *testing.T) {
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFunctions")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFunctions")
 
 	Convey("with API test server running", t, func() {
 		testSetup := setupCLITestHarness()

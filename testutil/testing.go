@@ -3,8 +3,10 @@ package testutil
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -38,8 +40,8 @@ func GetDirectoryOfFile() string {
 
 // SkipTestUnlessAll skipps the current test
 func SkipTestUnlessAll(t *testing.T, testName string) {
-	if !(*runAllTests) {
-		t.Skip(fmt.Sprintf("skipping %v because '--evergreen.all' is not specified...",
+	if !(*runAllTests) || !strings.Contains(os.Getenv("TEST_ARGS"), "evergreen.all") {
+		t.Skip(fmt.Sprintf("skipping %v because 'evergreen.all' is not specified...",
 			testName))
 	}
 }
