@@ -14,9 +14,6 @@ post:
 #######################################
 #         YAML Templates              #
 #######################################
-variableMap:
-  only_coverage: &ONLY_COVERAGE_VARIANTS
-    variants: ["rhel62", "osx"]
 variables:
   - &run-build
     # runs a build operations. The task name in evergreen should
@@ -44,12 +41,6 @@ variables:
       - func: setup-credentials
       - func: run-make
         vars: { target: "${task_name}" }
-      # - func: run-make
-      #   <<: *ONLY_COVERAGE_VARIANTS
-      #   vars: { target: "coverage-${task_name} html-${task_name}" }
-      # - func: upload-coverage
-      #   <<: *ONLY_COVERAGE_VARIANTS
-      #   vars: { name: "${task_name}"}
   - &run-go-test-suite-with-mongodb
     # runs a make target above, but only on systems that have a
     # running mongod started for testing.
@@ -65,12 +56,6 @@ variables:
       - func: set-up-mongodb
       - func: run-make
         vars: { target: "${task_name}" }
-      # - func: run-make
-      #   <<: *ONLY_COVERAGE_VARIANTS
-      #   vars: { target: "coverage-${task_name} html-${task_name}" }
-      # - func: upload-coverage
-      #   <<: *ONLY_COVERAGE_VARIANTS
-      #   vars: { name: "${task_name}"}
 
 #######################################
 #              Functions              #
@@ -92,15 +77,15 @@ functions:
          # running the target.
          ${build_env} make vendor ${target}
   setup-plugins:
-    - command: shell.exec
-      params:
-        script: |
-          set -o errexit
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
 
-          echo "building Plugins file!"
-          cat > gopath/src/github.com/evergreen-ci/evergreen/Plugins <<END_OF_PLUGINS
-          ${plugins_file}
-          END_OF_PLUGINS
+        echo "building Plugins file!"
+        cat > gopath/src/github.com/evergreen-ci/evergreen/Plugins <<END_OF_PLUGINS
+        ${plugins_file}
+        END_OF_PLUGINS
   setup-credentials:
     - command: shell.exec
       params:
@@ -133,28 +118,6 @@ functions:
             manifest:
               github_token: "${github_token}"
           END_OF_CREDS
-
-  upload-coverage:
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: gopath/src/github.com/evergreen-ci/evergreen/bin/output.${name}.coverage.html
-        remote_file: evergreen/${task_id}/coverage-${name}.html
-        bucket: mciuploads
-        content_type: text/html
-        permissions: public-read
-        display_name: coverage-${name} (html)
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: gopath/src/github.com/evergreen-ci/evergreen/bin/output.${name}.coverage
-        remote_file: evergreen/${task_id}/coverage-${name}.txt
-        bucket: mciuploads
-        content_type: plain/text
-        permissions: public-read
-        display_name: coverage-${name} (txt)
   set-up-mongodb:
     - command: shell.exec
       params:
@@ -200,6 +163,25 @@ functions:
 #######################################
 
 tasks:
+  - name: coverage
+    commands:
+    - command: git.get_project
+      params:
+        directory: gopath/src/github.com/mongodb/amboy
+    - func: setup-credentials
+    - func: set-up-mongodb
+    - func: run-make
+      vars: { target: "coverage-html"}
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_files_include_filter: ["gopath/src/github.com/evergreen-ci/evergreen/bin/output.*.coverage*"]
+        remote_file: evergreen/${task_id}/
+        bucket: mciuploads
+        content_type: text/html
+        permissions: public-read
+        display_name: "coverage:"
   - <<: *run-build
     name: dist
   - <<: *run-go-test-suite
@@ -437,6 +419,8 @@ tasks:
     tags: ["db", "race"]
     name: race-plugin-builtin-s3
 
+
+
 buildvariants:
   - name: rhel62
     display_name: RHEL 6.2
@@ -456,6 +440,7 @@ buildvariants:
       mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.2.9.tgz
     tasks:
       - "dist"
+      - "coverage"
       - ".race"
   - name: osx
     display_name: OSX

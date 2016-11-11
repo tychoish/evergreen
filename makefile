@@ -254,7 +254,7 @@ testArgs := -test.v --test.timeout=20m
 $(buildDir)/test.%:$(testSrcFiles)
 	$(vendorGopath) go test $(if $(DISABLE_COVERAGE),,-covermode=count) -c -o $@ ./$(subst -,/,$*)
 $(buildDir)/race.%:$(testSrcFiles)
-	$(vendorGopath) go test -race -c -o $@ ./$(subst $*,)
+	$(vendorGopath) go test -race -c -o $@ ./$(subst -,/,$*)
 #  targets to run any tests in the top-level package
 $(buildDir)/test.$(name):$(testSrcFiles)
 	$(vendorGopath) go test $(if $(DISABLE_COVERAGE),,-covermode=count) -c -o $@ ./
