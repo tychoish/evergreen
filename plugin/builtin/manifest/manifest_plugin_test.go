@@ -3,11 +3,12 @@ package manifest
 import (
 	"testing"
 
-	"github.com/10gen-labs/slogger/v1"
+	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model/manifest"
+	modelutil "github.com/evergreen-ci/evergreen/model/testuil"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/git"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
@@ -65,7 +66,7 @@ func TestManifestLoad(t *testing.T) {
 	testConfig := evergreen.TestConfig()
 
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestManifestFetch")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestManifestFetch")
 
 	Convey("With a SimpleRegistry and test project file", t, func() {
 

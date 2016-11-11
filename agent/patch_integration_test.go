@@ -9,6 +9,7 @@ import (
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model/task"
+	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
@@ -20,7 +21,7 @@ func TestPatchTask(t *testing.T) {
 	testConfig := evergreen.TestConfig()
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
 	patchModes := []patchTestMode{InlinePatch, ExternalPatch}
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestPatchTask")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestPatchTask")
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
 			Convey(testSetup.testSpec, t, func() {

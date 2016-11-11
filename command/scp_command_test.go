@@ -1,6 +1,7 @@
 package command
 
 import (
+	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -8,13 +9,16 @@ import (
 	"testing"
 
 	"github.com/evergreen-ci/evergreen"
-	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/evergreen/util"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+var runAllTests = flag.Bool("evergreen.all", false, "all remote tests")
+
 func TestScpCommand(t *testing.T) {
-	testutil.SkipUnlessAllTests(t, "scp command tests")
+	if !(*runAllTests) {
+		t.Skip("skipping scp tests because --evergreen.all is not specified")
+	}
 
 	Convey("With files to scp", t, func() {
 

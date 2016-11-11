@@ -10,6 +10,7 @@ import (
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model/artifact"
 	"github.com/evergreen-ci/evergreen/model/task"
+	modelutil "github.com/evergreen-ci/evergreen/model/testuil"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
@@ -22,7 +23,7 @@ func TestPushTask(t *testing.T) {
 	testConfig := evergreen.TestConfig()
 	setupTlsConfigs(t)
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestPushTask")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestPushTask")
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
 			Convey(testSetup.testSpec, t, func() {

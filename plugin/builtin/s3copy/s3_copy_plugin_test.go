@@ -3,11 +3,12 @@ package s3copy_test
 import (
 	"testing"
 
-	"github.com/10gen-labs/slogger/v1"
+	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
+	modelutil "github.com/evergreen-ci/evergreen/model/testuil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/s3"
@@ -23,7 +24,7 @@ func TestS3CopyPluginExecution(t *testing.T) {
 	testConfig := evergreen.TestConfig()
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
 
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestS3CopyPluginExecution")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestS3CopyPluginExecution")
 
 	Convey("With a SimpleRegistry and test project file", t, func() {
 		registry := plugin.NewSimpleRegistry()

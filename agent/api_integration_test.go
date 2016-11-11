@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +24,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/manifest"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
+	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/service"
@@ -83,11 +83,10 @@ func (ptm patchTestMode) String() string {
 }
 
 func init() {
-	_, file, _, _ := runtime.Caller(1)
 	dbutil.SetGlobalSessionProvider(dbutil.SessionFactoryFromConfig(testConfig))
 	testSetups = []testConfigPath{
 		{"With plugin mode test config",
-			filepath.Join(filepath.Dir(file), "testdata", "config_test_plugin")},
+			filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "config_test_plugin")},
 	}
 
 }
@@ -369,7 +368,7 @@ func TestSecrets(t *testing.T) {
 
 func TestTaskSuccess(t *testing.T) {
 	setupTlsConfigs(t)
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestTaskSuccess")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestTaskSuccess")
 
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
@@ -496,7 +495,7 @@ func TestTaskSuccess(t *testing.T) {
 func TestTaskFailures(t *testing.T) {
 	setupTlsConfigs(t)
 
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestTaskFailures")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestTaskFailures")
 
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
@@ -545,7 +544,7 @@ func TestTaskFailures(t *testing.T) {
 func TestTaskAbortion(t *testing.T) {
 	setupTlsConfigs(t)
 
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestTaskAbortion")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestTaskAbortion")
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
 			Convey(testSetup.testSpec, t, func() {
@@ -1043,9 +1042,7 @@ func prependConfigToVersion(t *testing.T, versionId, configData string) {
 func TestMain(m *testing.M) {
 	var err error
 
-	_, file, _, _ := runtime.Caller(0)
-
-	testDirectory = filepath.Dir(file)
+	testDirectory = testutil.GetDirectoryOfFile()
 	if err != nil {
 		panic(err)
 	}

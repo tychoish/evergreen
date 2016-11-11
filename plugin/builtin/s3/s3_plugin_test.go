@@ -15,6 +15,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/artifact"
 	"github.com/evergreen-ci/evergreen/model/task"
+	modelutil "github.com/evergreen-ci/evergreen/model/testuil"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
 	"github.com/evergreen-ci/evergreen/service"
@@ -78,7 +79,7 @@ func TestS3PutAndGetSingleFile(t *testing.T) {
 		"error clearing test collections")
 
 	conf := evergreen.TestConfig()
-	testutil.ConfigureIntegrationTest(t, conf, "TestS3PutAndGet")
+	modelutil.ConfigureIntegrationTest(t, conf, "TestS3PutAndGet")
 
 	Convey("When putting to and retrieving from an s3 bucket", t, func() {
 
@@ -268,7 +269,7 @@ func TestS3PutAndGetMultiFile(t *testing.T) {
 		"error clearing test collections")
 
 	conf := evergreen.TestConfig()
-	testutil.ConfigureIntegrationTest(t, conf, "TestS3PutAndGet")
+	modelutil.ConfigureIntegrationTest(t, conf, "TestS3PutAndGet")
 
 	Convey("When putting to and retrieving from an s3 bucket", t, func() {
 

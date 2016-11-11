@@ -12,26 +12,15 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	// run the integration tests
-	runIntegration = flag.Bool("evergreen.all", false, "Run integration tests")
-	// path to an mci settings file containing sensitive information
-	settingsOverride = flag.String("evergreen.settingsOverride", "", "Settings file"+
-		" to be used to override sensitive info in the testing mci settings"+
-		" file")
-)
-
-func SkipUnlessAllTests(t *testing.T, testName string) {
-	if !(*runIntegration) {
-		t.Skip(fmt.Sprintf("skipping %v because '--evergreen.all' is not specified...",
-			testName))
-	}
-}
+// path to an mci settings file containing sensitive information
+var settingsOverride = flag.String("evergreen.settingsOverride", "", "Settings file"+
+	" to be used to override sensitive info in the testing mci settings"+
+	" file")
 
 func ConfigureIntegrationTest(t *testing.T, testSettings *evergreen.Settings,
 	testName string) {
 
-	SkipUnlessAllTests(t, "integration test "+testName)
+	SkipTestUnlessAll(t, testName)
 
 	// make sure an override file is provided
 	if (*settingsOverride) == "" {

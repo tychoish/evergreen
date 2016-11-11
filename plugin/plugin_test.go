@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/10gen-labs/slogger/v1"
+	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/db"
@@ -17,6 +17,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
+	modelutil "github.com/evergreen-ci/evergreen/model/testuil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/expansions"
@@ -180,7 +181,7 @@ func TestRegistry(t *testing.T) {
 
 func TestPluginFunctions(t *testing.T) {
 	testConfig := evergreen.TestConfig()
-	testutil.ConfigureIntegrationTest(t, testConfig, "TestPatchTask")
+	modelutil.ConfigureIntegrationTest(t, testConfig, "TestPatchTask")
 	Convey("With a SimpleRegistry", t, func() {
 		Convey("with a project file containing functions", func() {
 			registry := plugin.NewSimpleRegistry()

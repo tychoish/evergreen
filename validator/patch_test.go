@@ -12,6 +12,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/distro"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
+	modelutil "github.com/evergreen-ci/evergreen/model/testuil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/evergreen/thirdparty"
@@ -148,7 +149,7 @@ func resetProjectlessPatchSetup(t *testing.T, testPath string) *patch.Patch {
 
 func TestProjectRef(t *testing.T) {
 	Convey("When inserting a project ref", t, func() {
-		err := testutil.CreateTestLocalConfig(patchTestConfig, "mci-test", "")
+		err := modelutil.CreateTestLocalConfig(patchTestConfig, "mci-test", "")
 		So(err, ShouldBeNil)
 		projectRef, err := model.FindOneProjectRef("mci-test")
 		So(err, ShouldBeNil)
@@ -158,7 +159,7 @@ func TestProjectRef(t *testing.T) {
 }
 
 func TestGetPatchedProject(t *testing.T) {
-	testutil.ConfigureIntegrationTest(t, patchTestConfig, "TestConfigurePatch")
+	modelutil.ConfigureIntegrationTest(t, patchTestConfig, "TestConfigurePatch")
 	Convey("With calling GetPatchedProject with a config and remote configuration path",
 		t, func() {
 			Convey("Calling GetPatchedProject returns a valid project given a patch and settings", func() {
@@ -182,7 +183,7 @@ func TestGetPatchedProject(t *testing.T) {
 }
 
 func TestFinalizePatch(t *testing.T) {
-	testutil.ConfigureIntegrationTest(t, patchTestConfig, "TestFinalizePatch")
+	modelutil.ConfigureIntegrationTest(t, patchTestConfig, "TestFinalizePatch")
 
 	Convey("With FinalizePatch on a project and commit event generated from GetPatchedProject path",
 		t, func() {

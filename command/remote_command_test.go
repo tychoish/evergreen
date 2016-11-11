@@ -5,12 +5,13 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestRemoteCommand(t *testing.T) {
-	testutil.SkipUnlessAllTests(t, "remote command tests")
+	if !(*runAllTests) {
+		t.Skip("skipping scp tests because --evergreen.all is not specified")
+	}
 
 	Convey("With a remote command", t, func() {
 
