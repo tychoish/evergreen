@@ -24,7 +24,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/manifest"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/service"
@@ -368,7 +367,7 @@ func TestSecrets(t *testing.T) {
 
 func TestTaskSuccess(t *testing.T) {
 	setupTlsConfigs(t)
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestTaskSuccess")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestTaskSuccess")
 
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
@@ -495,7 +494,7 @@ func TestTaskSuccess(t *testing.T) {
 func TestTaskFailures(t *testing.T) {
 	setupTlsConfigs(t)
 
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestTaskFailures")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestTaskFailures")
 
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
@@ -544,7 +543,7 @@ func TestTaskFailures(t *testing.T) {
 func TestTaskAbortion(t *testing.T) {
 	setupTlsConfigs(t)
 
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestTaskAbortion")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestTaskAbortion")
 	for tlsString, tlsConfig := range tlsConfigs {
 		for _, testSetup := range testSetups {
 			Convey(testSetup.testSpec, t, func() {

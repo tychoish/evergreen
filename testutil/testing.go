@@ -8,10 +8,18 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/evergreen-ci/evergreen"
 )
 
-// run the integration tests
-var runAllTests = flag.Bool("evergreen.all", false, "Run integration tests")
+var (
+	// run the integration tests
+	runAllTests = flag.Bool("evergreen.all", false, "Run integration tests")
+	// path to an mci settings file containing sensitive information
+	settingsOverride = flag.String("evergreen.settingsOverride", "", "Settings file"+
+		" to be used to override sensitive info in the testing mci settings"+
+		" file")
+)
 
 // HandleTestingErr catches errors that we do not want to treat
 // as relevant a goconvey statement. HandleTestingErr is used
@@ -44,4 +52,44 @@ func SkipTestUnlessAll(t *testing.T, testName string) {
 		t.Skip(fmt.Sprintf("skipping %v because 'evergreen.all' is not specified...",
 			testName))
 	}
+}
+
+func ConfigureIntegrationTest(t *testing.T, testSettings *evergreen.Settings,
+	testName string) {
+
+	SkipTestUnlessAll(t, testName)
+
+	// make sure an override file is provided
+	if (*settingsOverride) == "" {
+		msg := "Integration tests need a settings override file to be provided"
+		keyName := "evergreen.settingsOverride"
+		if !strings.Contains(os.Getenv("TEST_ARGS"), keyName) {
+			panic(msg)
+		}
+		for _, k := range os.Environ() {
+			if strings.HasPrefix(k, keyName) {
+				parts := strings.Split(k, "=")
+				if len(parts) < 2 {
+					panic(msg)
+				}
+				*settingsOverride = parts[1]
+			}
+		}
+	}
+
+	// grab the file with the integration test settings
+	integrationSettings, err := evergreen.NewSettings(*settingsOverride)
+	if err != nil {
+		panic(fmt.Sprintf("Error opening settings override file %v: %v",
+			*settingsOverride, err))
+	}
+
+	// override the appropriate params
+	t.Logf("Loading cloud provider settings from %v", *settingsOverride)
+
+	testSettings.Providers = integrationSettings.Providers
+	testSettings.Credentials = integrationSettings.Credentials
+	testSettings.AuthConfig = integrationSettings.AuthConfig
+	testSettings.Plugins = integrationSettings.Plugins
+	testSettings.Jira = integrationSettings.Jira
 }

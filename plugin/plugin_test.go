@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/expansions"
@@ -161,7 +161,9 @@ func TestRegistry(t *testing.T) {
 			registry.Register(&MockPlugin{})
 			registry.Register(&shell.ShellPlugin{})
 			registry.Register(&expansions.ExpansionsPlugin{})
-			data, err := ioutil.ReadFile("testdata/plugin_project.yml")
+
+			data, err := ioutil.ReadFile(filepath.Join(testutil.GetDirectoryOfFile(),
+				"testdata", "plugin_project.yml"))
 			testutil.HandleTestingErr(err, t, "failed to load test yaml file")
 			project := &model.Project{}
 			err = yaml.Unmarshal(data, project)
@@ -181,7 +183,7 @@ func TestRegistry(t *testing.T) {
 
 func TestPluginFunctions(t *testing.T) {
 	testConfig := evergreen.TestConfig()
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestPatchTask")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestPatchTask")
 	Convey("With a SimpleRegistry", t, func() {
 		Convey("with a project file containing functions", func() {
 			registry := plugin.NewSimpleRegistry()
@@ -251,7 +253,8 @@ func TestPluginExecution(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(httpCom, ShouldNotBeNil)
 
-		taskConfig, err := createTestConfig("testdata/plugin_project.yml", t)
+		pluginConfigPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "plugin_project.yml")
+		taskConfig, err := createTestConfig(pluginConfigPath, t)
 		testutil.HandleTestingErr(err, t, "failed to create test config: %v", err)
 		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
 		logger := agent.NewTestLogger(sliceAppender)

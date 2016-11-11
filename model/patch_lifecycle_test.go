@@ -9,7 +9,6 @@ import (
 
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/testutil"
-	"github.com/evergreen-ci/evergreen/thirdparty"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -30,7 +29,7 @@ func TestMakePatchedConfig(t *testing.T) {
 					Githash: "revision",
 					PatchSet: patch.PatchSet{
 						Patch: diffString,
-						Summary: []thirdparty.Summary{{
+						Summary: []Summary{{
 							Name:      remoteConfigPath,
 							Additions: 3,
 							Deletions: 3,
@@ -54,7 +53,7 @@ func TestMakePatchedConfig(t *testing.T) {
 					Githash: "revision",
 					PatchSet: patch.PatchSet{
 						Patch:   string(fileBytes),
-						Summary: []thirdparty.Summary{{Name: remoteConfigPath}},
+						Summary: []Summary{{Name: remoteConfigPath}},
 					},
 				}},
 			}

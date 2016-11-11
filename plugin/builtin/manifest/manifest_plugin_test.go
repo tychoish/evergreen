@@ -8,7 +8,6 @@ import (
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model/manifest"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/git"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
@@ -66,7 +65,7 @@ func TestManifestLoad(t *testing.T) {
 	testConfig := evergreen.TestConfig()
 
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestManifestFetch")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestManifestFetch")
 
 	Convey("With a SimpleRegistry and test project file", t, func() {
 

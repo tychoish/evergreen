@@ -9,7 +9,6 @@ import (
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/distro"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
@@ -32,9 +31,9 @@ func init() {
 
 func TestFetchRevisions(t *testing.T) {
 	dropTestDB(t)
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestFetchRevisions")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestFetchRevisions")
 	Convey("With a GithubRepositoryPoller with a valid OAuth token...", t, func() {
-		err := modelutil.CreateTestLocalConfig(testConfig, "mci-test", "")
+		err := testutil.CreateTestLocalConfig(testConfig, "mci-test", "")
 		So(err, ShouldBeNil)
 		repoTracker := RepoTracker{
 			testConfig,
@@ -73,9 +72,9 @@ func TestFetchRevisions(t *testing.T) {
 
 func TestStoreRepositoryRevisions(t *testing.T) {
 	dropTestDB(t)
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestStoreRepositoryRevisions")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestStoreRepositoryRevisions")
 	Convey("When storing revisions gotten from a repository...", t, func() {
-		err := modelutil.CreateTestLocalConfig(testConfig, "mci-test", "")
+		err := testutil.CreateTestLocalConfig(testConfig, "mci-test", "")
 		So(err, ShouldBeNil)
 		repoTracker := RepoTracker{testConfig, projectRef, NewGithubRepositoryPoller(projectRef,
 			testConfig.Credentials["github"])}

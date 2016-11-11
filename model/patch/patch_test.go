@@ -3,7 +3,6 @@ package patch
 import (
 	"testing"
 
-	"github.com/evergreen-ci/evergreen/thirdparty"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -17,7 +16,7 @@ func TestConfigChanged(t *testing.T) {
 			p := &Patch{
 				Patches: []ModulePatch{{
 					PatchSet: PatchSet{
-						Summary: []thirdparty.Summary{{
+						Summary: []Summary{{
 							Name:      remoteConfigPath,
 							Additions: 3,
 							Deletions: 3,
@@ -33,7 +32,7 @@ func TestConfigChanged(t *testing.T) {
 			p := &Patch{
 				Patches: []ModulePatch{{
 					PatchSet: PatchSet{
-						Summary: []thirdparty.Summary{{
+						Summary: []Summary{{
 							Name:      "dakar",
 							Additions: 3,
 							Deletions: 3,

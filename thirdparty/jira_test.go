@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/evergreen-ci/evergreen/model/testutil"
+	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

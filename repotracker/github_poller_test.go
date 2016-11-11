@@ -6,7 +6,6 @@ import (
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/evergreen/thirdparty"
 	. "github.com/smartystreets/goconvey/convey"
@@ -58,7 +57,7 @@ func dropTestDB(t *testing.T) {
 
 func TestGetRevisionsSinceWithPaging(t *testing.T) {
 	dropTestDB(t)
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestGetRevisionsSince")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestGetRevisionsSince")
 	grp := &GithubRepositoryPoller{
 		ProjectRef: evgProjectRef,
 		OauthToken: testConfig.Credentials[evgProjectRef.RepoKind],
@@ -78,7 +77,7 @@ func TestGetRevisionsSince(t *testing.T) {
 	dropTestDB(t)
 	var self GithubRepositoryPoller
 
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestGetRevisionsSince")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestGetRevisionsSince")
 
 	Convey("When fetching github revisions (by commit) - from a repo "+
 		"containing 3 commits - given a valid Oauth token...", t, func() {
@@ -118,7 +117,7 @@ func TestGetRemoteConfig(t *testing.T) {
 	dropTestDB(t)
 	var self GithubRepositoryPoller
 
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestGetRemoteConfig")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestGetRemoteConfig")
 
 	Convey("When fetching a specific github revision configuration...",
 		t, func() {
@@ -166,7 +165,7 @@ func TestGetAllRevisions(t *testing.T) {
 	dropTestDB(t)
 	var self GithubRepositoryPoller
 
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestGetAllRevisions")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestGetAllRevisions")
 
 	Convey("When fetching recent github revisions (by count) - from a repo "+
 		"containing 3 commits - given a valid Oauth token...", t, func() {
@@ -205,7 +204,7 @@ func TestGetChangedFiles(t *testing.T) {
 	dropTestDB(t)
 	var grp GithubRepositoryPoller
 
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestGetAllRevisions")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestGetAllRevisions")
 
 	Convey("When fetching changed files from evergreen-ci/evergreen ", t, func() {
 		grp.ProjectRef = evgProjectRef

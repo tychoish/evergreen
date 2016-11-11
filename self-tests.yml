@@ -167,7 +167,7 @@ tasks:
     commands:
     - command: git.get_project
       params:
-        directory: gopath/src/github.com/mongodb/amboy
+        directory: gopath/src/github.com/evergreen-ci/evergreen
     - func: setup-credentials
     - func: set-up-mongodb
     - func: run-make

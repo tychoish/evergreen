@@ -13,7 +13,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/service"
@@ -104,7 +103,7 @@ func setupCLITestHarness() cliTestHarness {
 }
 
 func TestCLIFetchSource(t *testing.T) {
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchSource")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchSource")
 	Convey("with a task containing patches and modules", t, func() {
 		testSetup := setupCLITestHarness()
 		err := os.RemoveAll("source-patch-1_sample")
@@ -156,7 +155,7 @@ func TestCLIFetchSource(t *testing.T) {
 }
 
 func TestCLIFetchArtifacts(t *testing.T) {
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchArtifacts")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFetchArtifacts")
 	Convey("with API test server running", t, func() {
 		testSetup := setupCLITestHarness()
 
@@ -220,7 +219,7 @@ func TestCLIFetchArtifacts(t *testing.T) {
 }
 
 func TestCLIFunctions(t *testing.T) {
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFunctions")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestCLIFunctions")
 
 	Convey("with API test server running", t, func() {
 		testSetup := setupCLITestHarness()

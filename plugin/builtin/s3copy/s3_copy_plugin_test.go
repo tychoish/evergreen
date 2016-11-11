@@ -8,7 +8,6 @@ import (
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/s3"
@@ -24,7 +23,7 @@ func TestS3CopyPluginExecution(t *testing.T) {
 	testConfig := evergreen.TestConfig()
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
 
-	modelutil.ConfigureIntegrationTest(t, testConfig, "TestS3CopyPluginExecution")
+	testutil.ConfigureIntegrationTest(t, testConfig, "TestS3CopyPluginExecution")
 
 	Convey("With a SimpleRegistry and test project file", t, func() {
 		registry := plugin.NewSimpleRegistry()

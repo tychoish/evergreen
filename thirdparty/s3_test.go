@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/evergreen-ci/evergreen/model/testutil"
+	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/goamz/goamz/aws"
 	. "github.com/smartystreets/goconvey/convey"

@@ -9,7 +9,6 @@ import (
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/plugin"
 	. "github.com/evergreen-ci/evergreen/plugin/builtin/gotest"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
@@ -95,7 +94,7 @@ func TestGotestPluginOnPassingTests(t *testing.T) {
 	SkipConvey("With gotest plugin installed into plugin registry", t, func() {
 		reset(t)
 		testConfig := evergreen.TestConfig()
-		modelutil.ConfigureIntegrationTest(t, testConfig, "TestGotestPluginOnPassingTests")
+		testutil.ConfigureIntegrationTest(t, testConfig, "TestGotestPluginOnPassingTests")
 		registry := plugin.NewSimpleRegistry()
 		testPlugin := &GotestPlugin{}
 		err := registry.Register(testPlugin)
@@ -164,7 +163,7 @@ func TestGotestPluginWithEnvironmentVariables(t *testing.T) {
 	Convey("With gotest plugin installed into plugin registry", t, func() {
 		reset(t)
 		testConfig := evergreen.TestConfig()
-		modelutil.ConfigureIntegrationTest(t, testConfig, "TestGotestPluginWithEnvironmentVariables")
+		testutil.ConfigureIntegrationTest(t, testConfig, "TestGotestPluginWithEnvironmentVariables")
 		registry := plugin.NewSimpleRegistry()
 		testPlugin := &GotestPlugin{}
 		err := registry.Register(testPlugin)
