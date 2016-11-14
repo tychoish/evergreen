@@ -202,6 +202,9 @@ tasks:
   - <<: *run-go-test-suite
     tags: ["nodb", "test"]
     name: test-db-bsonutil
+  - <<: *run-go-test-suite
+    tags: ["nodb", "test"]
+    name: test-agent-comm
   - <<: *run-go-test-suite-with-mongodb
     tags: ["db", "test"]
     name: test-agent
@@ -319,6 +322,9 @@ tasks:
   - <<: *run-go-test-suite
     tags: ["nodb", "race"]
     name: race-db-bsonutil
+  - <<: *run-go-test-suite
+    tags: ["nodb", "race"]
+    name: race-agent-comm
   - <<: *run-go-test-suite-with-mongodb
     tags: ["db", "race"]
     name: race-agent

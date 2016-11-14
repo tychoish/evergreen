@@ -9,7 +9,7 @@ import (
 
 	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
-	"github.com/evergreen-ci/evergreen/agent"
+	"github.com/evergreen-ci/evergreen/agent/comm"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/build"
@@ -99,8 +99,8 @@ func CreateTestConfig(filename string, t *testing.T) (*model.TaskConfig, error) 
 	return model.NewTaskConfig(testDistro, testVersion, testProject, testTask, projectRef)
 }
 
-func TestAgentCommunicator(taskId string, taskSecret string, apiRootUrl string) *agent.HTTPCommunicator {
-	agentCommunicator, err := agent.NewHTTPCommunicator(apiRootUrl, taskId, taskSecret, "", nil)
+func TestAgentCommunicator(taskId string, taskSecret string, apiRootUrl string) *comm.HTTPCommunicator {
+	agentCommunicator, err := comm.NewHTTPCommunicator(apiRootUrl, taskId, taskSecret, "", nil)
 	if err != nil {
 		panic(err)
 	}

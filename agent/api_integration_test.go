@@ -14,6 +14,7 @@ import (
 
 	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
+	"github.com/evergreen-ci/evergreen/agent/comm"
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/command"
 	dbutil "github.com/evergreen-ci/evergreen/db"
@@ -204,7 +205,7 @@ func TestBasicEndpoints(t *testing.T) {
 						time.Sleep(3 * time.Second)
 						timeoutSignal, ok := <-testAgent.signalHandler.idleTimeoutChan
 						So(ok, ShouldBeTrue)
-						So(timeoutSignal, ShouldEqual, IdleTimeout)
+						So(timeoutSignal, ShouldEqual, comm.IdleTimeout)
 					})
 				})
 			})
@@ -233,7 +234,7 @@ func TestHeartbeatSignals(t *testing.T) {
 				testServer.Listener.Close()
 				signal, ok := <-testAgent.signalHandler.heartbeatChan
 				So(ok, ShouldBeTrue)
-				So(signal, ShouldEqual, HeartbeatMaxFailed)
+				So(signal, ShouldEqual, comm.HeartbeatMaxFailed)
 			})
 		})
 	}
@@ -359,7 +360,7 @@ func TestSecrets(t *testing.T) {
 				testServer.Listener.Close()
 				signal, ok := <-testAgent.signalHandler.heartbeatChan
 				So(ok, ShouldBeTrue)
-				So(signal, ShouldEqual, HeartbeatMaxFailed)
+				So(signal, ShouldEqual, comm.HeartbeatMaxFailed)
 			})
 		})
 	}

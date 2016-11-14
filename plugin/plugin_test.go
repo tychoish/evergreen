@@ -10,7 +10,8 @@ import (
 
 	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
-	"github.com/evergreen-ci/evergreen/agent"
+	"github.com/evergreen-ci/evergreen/agent/comm"
+	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/build"
@@ -209,13 +210,13 @@ func TestPluginFunctions(t *testing.T) {
 				}
 			})
 
-			httpCom, err := agent.NewHTTPCommunicator(testServer.URL, "mocktaskid", "mocktasksecret", "", nil)
+			httpCom, err := comm.NewHTTPCommunicator(testServer.URL, "mocktaskid", "mocktasksecret", "", nil)
 			So(err, ShouldBeNil)
 			So(httpCom, ShouldNotBeNil)
 
 			Convey("all commands in test project should execute successfully", func() {
 				sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-				logger := agent.NewTestLogger(sliceAppender)
+				logger := agentutil.NewTestLogger(sliceAppender)
 				for _, newTask := range taskConfig.Project.Tasks {
 					So(len(newTask.Commands), ShouldNotEqual, 0)
 					for _, command := range newTask.Commands {
@@ -225,7 +226,7 @@ func TestPluginFunctions(t *testing.T) {
 						So(err, ShouldBeNil)
 						So(len(pluginCmds), ShouldEqual, 1)
 						cmd := pluginCmds[0]
-						pluginCom := &agent.TaskJSONCommunicator{cmd.Plugin(), httpCom}
+						pluginCom := &comm.TaskJSONCommunicator{cmd.Plugin(), httpCom}
 						err = cmd.Execute(logger, pluginCom, taskConfig, make(chan bool))
 						So(err, ShouldBeNil)
 					}
@@ -249,7 +250,7 @@ func TestPluginExecution(t *testing.T) {
 		testServer, err := service.CreateTestServer(evergreen.TestConfig(), nil, apiPlugins, false)
 		testutil.HandleTestingErr(err, t, "Couldn't set up testing server")
 
-		httpCom, err := agent.NewHTTPCommunicator(testServer.URL, "mocktaskid", "mocktasksecret", "", nil)
+		httpCom, err := comm.NewHTTPCommunicator(testServer.URL, "mocktaskid", "mocktasksecret", "", nil)
 		So(err, ShouldBeNil)
 		So(httpCom, ShouldNotBeNil)
 
@@ -257,7 +258,7 @@ func TestPluginExecution(t *testing.T) {
 		taskConfig, err := createTestConfig(pluginConfigPath, t)
 		testutil.HandleTestingErr(err, t, "failed to create test config: %v", err)
 		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-		logger := agent.NewTestLogger(sliceAppender)
+		logger := agentutil.NewTestLogger(sliceAppender)
 
 		Convey("all commands in test project should execute successfully", func() {
 			for _, newTask := range taskConfig.Project.Tasks {
@@ -268,7 +269,7 @@ func TestPluginExecution(t *testing.T) {
 					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)
 					for _, c := range pluginCmds {
-						pluginCom := &agent.TaskJSONCommunicator{c.Plugin(), httpCom}
+						pluginCom := &comm.TaskJSONCommunicator{c.Plugin(), httpCom}
 						err = c.Execute(logger, pluginCom, taskConfig, make(chan bool))
 						So(err, ShouldBeNil)
 					}

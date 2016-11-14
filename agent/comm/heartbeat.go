@@ -1,7 +1,10 @@
-package agent
+package comm
 
-import "time"
-import "github.com/10gen-labs/slogger/v1"
+import (
+	"time"
+
+	slogger "github.com/10gen-labs/slogger/v1"
+)
 
 // HeartbeatTicker manages heartbeat communication with the API server
 type HeartbeatTicker struct {

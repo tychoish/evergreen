@@ -17,7 +17,7 @@ func TestMakePatchedConfig(t *testing.T) {
 		cwd := testutil.GetDirectoryOfFile()
 
 		Convey("the config should be patched correctly", func() {
-			remoteConfigPath := "config/evergreen.yml"
+			remoteConfigPath := filepath.Join("config", "evergreen.yml")
 			fileBytes, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "patch.diff"))
 			So(err, ShouldBeNil)
 			// update patch with remove config path variable
@@ -45,7 +45,7 @@ func TestMakePatchedConfig(t *testing.T) {
 			So(len(project.Tasks), ShouldEqual, 2)
 		})
 		Convey("an empty base config should be patched correctly", func() {
-			remoteConfigPath := filepath.Join(cwd, "model", "testdata", "project2.config")
+			remoteConfigPath := filepath.Join("model", "testdata", "project2.config")
 			fileBytes, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "project.diff"))
 			So(err, ShouldBeNil)
 			p := &patch.Patch{
@@ -57,6 +57,7 @@ func TestMakePatchedConfig(t *testing.T) {
 					},
 				}},
 			}
+
 			project, err := MakePatchedConfig(p, remoteConfigPath, "")
 			So(err, ShouldBeNil)
 			So(project, ShouldNotBeNil)
@@ -66,7 +67,6 @@ func TestMakePatchedConfig(t *testing.T) {
 			Reset(func() {
 				os.Remove(remoteConfigPath)
 			})
-
 		})
 	})
 }

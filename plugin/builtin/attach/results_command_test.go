@@ -7,7 +7,8 @@ import (
 
 	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
-	"github.com/evergreen-ci/evergreen/agent"
+	"github.com/evergreen-ci/evergreen/agent/comm"
+	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
@@ -46,7 +47,7 @@ func TestAttachResults(t *testing.T) {
 		testutil.HandleTestingErr(err, t, "failed to create test config: %v")
 		taskConfig.WorkDir = "."
 		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-		logger := agent.NewTestLogger(sliceAppender)
+		logger := agentutil.NewTestLogger(sliceAppender)
 
 		Convey("all commands in test project should execute successfully", func() {
 			for _, projTask := range taskConfig.Project.Tasks {
@@ -56,7 +57,7 @@ func TestAttachResults(t *testing.T) {
 					testutil.HandleTestingErr(err, t, "Couldn't get plugin command: %v")
 					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)
-					pluginCom := &agent.TaskJSONCommunicator{pluginCmds[0].Plugin(), httpCom}
+					pluginCom := &comm.TaskJSONCommunicator{pluginCmds[0].Plugin(), httpCom}
 					err = pluginCmds[0].Execute(logger, pluginCom, taskConfig, make(chan bool))
 					So(err, ShouldBeNil)
 					testTask, err := task.FindOne(task.ById(httpCom.TaskId))
@@ -96,7 +97,7 @@ func TestAttachRawResults(t *testing.T) {
 		testutil.HandleTestingErr(err, t, "failed to create test config: %v")
 		taskConfig.WorkDir = "."
 		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-		logger := agent.NewTestLogger(sliceAppender)
+		logger := agentutil.NewTestLogger(sliceAppender)
 
 		Convey("when attaching a raw log ", func() {
 			for _, projTask := range taskConfig.Project.Tasks {
@@ -108,7 +109,7 @@ func TestAttachRawResults(t *testing.T) {
 					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)
 					// create a plugin communicator
-					pluginCom := &agent.TaskJSONCommunicator{pluginCmds[0].Plugin(), httpCom}
+					pluginCom := &comm.TaskJSONCommunicator{pluginCmds[0].Plugin(), httpCom}
 					err = pluginCmds[0].Execute(logger, pluginCom, taskConfig, make(chan bool))
 					So(err, ShouldBeNil)
 					Convey("when retrieving task", func() {
