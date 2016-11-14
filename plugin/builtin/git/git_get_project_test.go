@@ -2,9 +2,10 @@ package git_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/10gen-labs/slogger/v1"
+	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/db"
@@ -32,7 +33,9 @@ func TestGitPlugin(t *testing.T) {
 		testutil.HandleTestingErr(err, t, "Couldn't set up testing server")
 		httpCom := plugintest.TestAgentCommunicator("mocktaskid", "mocktasksecret", server.URL)
 
-		taskConfig, err := plugintest.CreateTestConfig("testdata/plugin_clone.yml", t)
+		taskConfig, err := plugintest.CreateTestConfig(
+			filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "plugin_clone.yml"),
+			t)
 		testutil.HandleTestingErr(err, t, "failed to create test config")
 		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
 		logger := agent.NewTestLogger(sliceAppender)

@@ -29,7 +29,7 @@ func TestMakePatchedConfig(t *testing.T) {
 					Githash: "revision",
 					PatchSet: patch.PatchSet{
 						Patch: diffString,
-						Summary: []Summary{{
+						Summary: []patch.Summary{{
 							Name:      remoteConfigPath,
 							Additions: 3,
 							Deletions: 3,
@@ -53,7 +53,7 @@ func TestMakePatchedConfig(t *testing.T) {
 					Githash: "revision",
 					PatchSet: patch.PatchSet{
 						Patch:   string(fileBytes),
-						Summary: []Summary{{Name: remoteConfigPath}},
+						Summary: []patch.Summary{{Name: remoteConfigPath}},
 					},
 				}},
 			}

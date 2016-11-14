@@ -3,10 +3,11 @@ package plugintest
 import (
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/10gen-labs/slogger/v1"
+	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent"
 	"github.com/evergreen-ci/evergreen/db"
@@ -146,7 +147,8 @@ func SetupAPITestData(taskDisplayName string, isPatch bool, t *testing.T) (*task
 	version := &version.Version{Id: "testVersionId", BuildIds: []string{task.BuildId}}
 	testutil.HandleTestingErr(version.Insert(), t, "failed to insert version %v")
 	if isPatch {
-		modulePatchContent, err := ioutil.ReadFile("testdata/testmodule.patch")
+
+		modulePatchContent, err := ioutil.ReadFile(filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "testmodule.patch"))
 		testutil.HandleTestingErr(err, t, "failed to read test module patch file %v")
 
 		patch := &patch.Patch{
