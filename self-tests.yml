@@ -176,36 +176,45 @@ functions:
 
 tasks:
   - name: coverage
+    tags: [ "report" ]
     commands:
-    - command: git.get_project
-      params:
-        directory: gopath/src/github.com/evergreen-ci/evergreen
-    - func: setup-credentials
-    - func: set-up-mongodb
-    - func: run-make
-      vars:
-        target: "coverage-html"
-        make_args: "-k"
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_files_include_filter: ["gopath/src/github.com/evergreen-ci/evergreen/bin/output.*.coverage.html"]
-        remote_file: evergreen/${task_id}/
-        bucket: mciuploads
-        content_type: text/html
-        permissions: public-read
-        display_name: "(html) coverage:"
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_files_include_filter: ["gopath/src/github.com/evergreen-ci/evergreen/bin/output.*.coverage"]
-        remote_file: evergreen/${task_id}/
-        bucket: mciuploads
-        content_type: text/plain
-        permissions: public-read
-        display_name: "(txt) coverage:"
+      - command: git.get_project
+        params:
+          directory: gopath/src/github.com/evergreen-ci/evergreen
+      - func: setup-credentials
+      - func: set-up-mongodb
+      - func: run-make
+        vars:
+          target: "coverage-html"
+          make_args: "-k"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_files_include_filter: ["gopath/src/github.com/evergreen-ci/evergreen/bin/output.*.coverage.html"]
+          remote_file: evergreen/${task_id}/
+          bucket: mciuploads
+          content_type: text/html
+          permissions: public-read
+          display_name: "(html) coverage:"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_files_include_filter: ["gopath/src/github.com/evergreen-ci/evergreen/bin/output.*.coverage"]
+          remote_file: evergreen/${task_id}/
+          bucket: mciuploads
+          content_type: text/plain
+          permissions: public-read
+          display_name: "(txt) coverage:"
+  - name: lint
+    tags: [ "report" ]
+    commands:
+      - command: git.get_project
+        params:
+          directory: gopath/src/github.com/evergreen-ci/evergreen
+      - func: run-make
+        vars: { target: "${task_name}" }
   - <<: *run-build
     name: dist
   - <<: *run-build
@@ -473,8 +482,7 @@ buildvariants:
       mongodb_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-3.2.9.tgz
     tasks:
       - name: "dist-race"
-      - name: "coverage"
-      - name: ".race !.burn_in"
+      - name: ".race !.burn_in .report"
   - name: osx
     display_name: OSX
     run_on:

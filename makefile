@@ -171,7 +171,8 @@ $(buildDir)/dist-source.tar.gz:$(buildDir)/make-tarball $(srcFiles) $(testSrcFil
 
 # userfacing targets for basic build and development operations
 lint:$(lintDeps)
-	$(gopath)/bin/gometalinter $(lintArgs) ./... | sed 's%$</%%' | grep -v "$(gopath)"
+	@-$(gopath)/bin/gometalinter --install >/dev/null
+	$(gopath)/bin/gometalinter $(lintArgs) ./...
 build:$(binaries)
 build-race:$(raceBinaries)
 test:$(foreach target,$(packages),test-$(target))
@@ -248,7 +249,8 @@ phony += vendor vendor-deps vendor-clean vendor-sync change-go-version
 #    run. (The "build" target is intentional and makes these targetsb
 #    rerun as expected.)
 testRunDeps := $(name)
-testArgs := -test.v --test.timeout=20m
+testTimeout := --test.timeout=20m
+testArgs := -test.v $(testTimeout)
 testRunEnv := EVGHOME=$(shell pwd)
 ifeq ($(OS),Windows_NT)
 testRunEnv := EVGHOME=$(shell cygpath -m `pwd`)
@@ -270,7 +272,7 @@ $(buildDir)/output.%.race:$(buildDir)/race.% .FORCE
 	$(testRunEnv) ./$< $(testArgs) 2>&1 | tee $@
 #  targets to process and generate coverage reports
 $(buildDir)/output.%.coverage:$(buildDir)/test.% .FORCE
-	$(testRunEnv) ./$< $(testArgs) -test.coverprofile=$@
+	$(testRunEnv) ./$< $(testTimeout -test.coverprofile=$@ || true
 	@-[ -f $@ ] && go tool cover -func=$@ | sed 's%$(projectPath)/%%' | column -t
 $(buildDir)/output.%.coverage.html:$(buildDir)/output.%.coverage
 	$(vendorGopath) go tool cover -html=$< -o $@
