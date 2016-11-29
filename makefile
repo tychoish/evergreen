@@ -83,22 +83,24 @@ lintArgs += --exclude="package comment should be of the form \"Package .* \(goli
 
 # start rules for binding agents
 #   build the server binaries:
-plugins:
+plugins:$(buildDir)/.plugins
+$(buildDir)/.plugins:Plugins
 	./install_plugins.sh
-$(buildDir)/evergreen_api_server:service/api_main/apiserver.go $(srcFiles) plugins
+	@touch $@
+$(buildDir)/evergreen_api_server:service/api_main/apiserver.go $(srcFiles) $(buildDir)/.plugins
 	$(buildBinary)
-$(buildDir)/evergreen_ui_server:service/ui_main/ui.go $(srcFiles) plugins
+$(buildDir)/evergreen_ui_server:service/ui_main/ui.go $(srcFiles) $(buildDir)/.plugins
 	$(buildBinary)
-$(buildDir)/evergreen_runner:runner/main/runner.go $(srcFiles) plugins
+$(buildDir)/evergreen_runner:runner/main/runner.go $(srcFiles) $(buildDir)/.plugins
 	$(buildBinary)
 #   build the server binaries with the race detector:
-$(buildDir)/evergreen_api_server.race:service/api_main/apiserver.go $(srcFiles) plugins
+$(buildDir)/evergreen_api_server.race:service/api_main/apiserver.go $(srcFiles) $(buildDir)/.plugins
 	$(buildRaceBinary)
-$(buildDir)/evergreen_runner.race:runner/main/runner.go $(srcFiles) plugins
+$(buildDir)/evergreen_runner.race:runner/main/runner.go $(srcFiles) $(buildDir)/.plugins
 	$(buildRaceBinary)
-$(buildDir)/evergreen_ui_server.race:service/ui_main/ui.go $(srcFiles) plugins
+$(buildDir)/evergreen_ui_server.race:service/ui_main/ui.go $(srcFiles) $(buildDir)/.plugins
 	$(buildRaceBinary)
-phony += $(binaries) $(raceBinaries) plugins
+phony += $(binaries) $(raceBinaries)
 # end rules for building server binaries
 
 
@@ -125,10 +127,13 @@ phony += cli clis
 
 ######################################################################
 ##
-## Everything below this point is generic and is not project specific.
+## Build, Test, and Dist targets and mechisms.
 ##
 ######################################################################
 
+# most of the targets and variables in this section are generic
+# instructions for go programs of all kinds, and are not particularly
+# specific to evergreen; though the dist targets are more specific than the rest.
 
 # start dependency installation tools
 #   implementation details for being able to lazily install dependencies.
@@ -140,7 +145,7 @@ testOutput := $(foreach target,$(packages),$(buildDir)/output.$(target).test)
 raceOutput := $(foreach target,$(packages),$(buildDir)/output.$(target).race)
 testBin := $(foreach target,$(packages),$(buildDir)/test.$(target))
 raceBin := $(foreach target,$(packages),$(buildDir)/race.$(target))
-coverageOutput := $(foreach target,$(packages),$(buildDir)/output.$(target).coverage)
+coverageOutput :a= $(foreach target,$(packages),$(buildDir)/output.$(target).coverage)
 coverageHtmlOutput := $(foreach target,$(packages),$(buildDir)/output.$(target).coverage.html)
 $(gopath)/src/%:
 	@-[ ! -d $(gopath) ] && mkdir -p $(gopath) || true
@@ -198,7 +203,7 @@ test-%:$(buildDir)/output.%.test
 	@grep -s -q -e "^PASS" $<
 coverage-%:$(buildDir)/output.%.coverage
 	@grep -s -q -e "^PASS" $<
-html-coverage-%:$(buildDir)/output.%.coverage.html
+html-coverage-%:$(buildDir)/output.%.coverage $(buildDir)/output.%.coverage.html
 	@grep -s -q -e "^PASS" $<
 # end convienence targets
 
@@ -221,6 +226,7 @@ $(buildDir)/makefile.vendor:$(buildDir)/render-gopath makefile
 	@echo "vendorGopath := \$$(shell \$$(buildDir)/render-gopath $(nestedVendored))" >| $@
 #   targets for the directory components and manipulating vendored files.
 vendor-sync:$(vendorDeps)
+	rm -rf vendor
 	glide install -s
 change-go-version:
 	rm -rf $(buildDir)/make-vendor $(buildDir)/render-gopath
@@ -235,7 +241,6 @@ $(buildDir)/make-vendor:scripts/make-vendor.go
 $(buildDir)/render-gopath:scripts/render-gopath.go
 	@mkdir -p $(buildDir)
 	go build -o $@ $<
-
 #   define dependencies for scripts
 scripts/make-vendor.go:scripts/vendoring/vendoring.go
 scripts/render-gopath.go:scripts/vendoring/vendoring.go

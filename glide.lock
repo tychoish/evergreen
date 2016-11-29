@@ -14,6 +14,7 @@ imports:
     subpackages:
       - s3
       - aws
+      - ec2
   - name: github.com/10gen-labs/slogger
     version: c972902347f8b08b39dac87b43955d01caedb63a
     subpackages:
