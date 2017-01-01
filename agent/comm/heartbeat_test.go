@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/tychoish/grip/send"
+	"github.com/tychoish/grip/slogger"
 )
 
 func TestHeartbeat(t *testing.T) {
@@ -19,24 +20,24 @@ func TestHeartbeat(t *testing.T) {
 			SignalChan:          sigChan,
 			TaskCommunicator:    mockCommunicator,
 			Logger: &slogger.Logger{
-				Appenders: []slogger.Appender{},
+				Appenders: []send.Sender{slogger.StdOutAppender()},
 			},
 		}
 
 		Convey("abort signals detected by heartbeat are sent on sigChan", func() {
-			mockCommunicator.shouldFailHeartbeat = false
+			mockCommunicator.setShouldFail(false)
 			hbTicker.StartHeartbeating()
 			go func() {
 				time.Sleep(2 * time.Second)
-				mockCommunicator.abort = true
+				mockCommunicator.setAbort(true)
 			}()
 			signal := <-sigChan
 			So(signal, ShouldEqual, AbortedByUser)
 		})
 
 		Convey("failed heartbeats must signal failure on sigChan", func() {
-			mockCommunicator.abort = false
-			mockCommunicator.shouldFailHeartbeat = true
+			mockCommunicator.setAbort(false)
+			mockCommunicator.setShouldFail(true)
 			hbTicker.StartHeartbeating()
 			signal := <-sigChan
 			So(signal, ShouldEqual, HeartbeatMaxFailed)

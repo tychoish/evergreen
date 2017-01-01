@@ -4,9 +4,10 @@ import (
 	"testing"
 	"time"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen/model"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/tychoish/grip/send"
+	"github.com/tychoish/grip/slogger"
 )
 
 func TestLogging(t *testing.T) {
@@ -20,8 +21,8 @@ func TestLogging(t *testing.T) {
 		apiLogger = NewAPILogger(taskCommunicator)
 
 		testLogger = slogger.Logger{
-			Prefix:    "",
-			Appenders: []slogger.Appender{apiLogger},
+			Name:      "",
+			Appenders: []send.Sender{slogger.WrapAppender(apiLogger)},
 		}
 
 		Convey("Logging fewer msgs than threshold should not flush", func() {
@@ -69,18 +70,7 @@ func TestLogging(t *testing.T) {
 	})
 }
 
-// mock appender to just store into a slice
-type sliceAppender struct {
-	messages []string
-}
-
-func (self *sliceAppender) Append(log *slogger.Log) error {
-	self.messages = append(self.messages, slogger.FormatLog(log))
-	return nil
-}
-
 func TestCommandLogger(t *testing.T) {
-
 	Convey("With an CommandLogger", t, func() {
 
 		var logger *StreamLogger
@@ -88,12 +78,12 @@ func TestCommandLogger(t *testing.T) {
 
 		Convey("logging via the CommandLogger should add the command"+
 			" name to the front of the message", func() {
+			sender := send.MakeInternalLogger()
 
-			appender := &sliceAppender{}
 			logger = &StreamLogger{
 				Local: &slogger.Logger{
-					Prefix:    "test",
-					Appenders: []slogger.Appender{appender},
+					Name:      "test",
+					Appenders: []send.Sender{sender},
 				},
 			}
 
@@ -104,9 +94,9 @@ func TestCommandLogger(t *testing.T) {
 
 			commandLogger.LogLocal(slogger.INFO, "Test %v", 1)
 			commandLogger.LogLocal(slogger.INFO, "Test %v", "2")
-			So(len(appender.messages), ShouldEqual, 2)
-			So(appender.messages[0], ShouldEndWith, "[test] Test 1\n")
-			So(appender.messages[1], ShouldEndWith, "[test] Test 2\n")
+			So(sender.Len(), ShouldEqual, 2)
+			So(sender.GetMessage().Rendered, ShouldEndWith, "[test] Test 1")
+			So(sender.GetMessage().Rendered, ShouldEndWith, "[test] Test 2")
 
 		})
 

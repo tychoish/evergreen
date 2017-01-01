@@ -3,7 +3,6 @@ package s3copy_test
 import (
 	"testing"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent/comm"
 	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
@@ -17,6 +16,7 @@ import (
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/tychoish/grip/slogger"
 )
 
 func TestS3CopyPluginExecution(t *testing.T) {
@@ -48,8 +48,7 @@ func TestS3CopyPluginExecution(t *testing.T) {
 		taskConfig, err := plugintest.CreateTestConfig("testdata/plugin_s3_copy.yml", t)
 		testutil.HandleTestingErr(err, t, "failed to create test config: %v", err)
 		taskConfig.WorkDir = "."
-		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-		logger := agentutil.NewTestLogger(sliceAppender)
+		logger := agentutil.NewTestLogger(slogger.StdOutAppender())
 
 		taskConfig.Expansions.Update(map[string]string{
 			"aws_key":    testConfig.Providers.AWS.Id,

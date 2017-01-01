@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent/comm"
 	"github.com/evergreen-ci/evergreen/apimodels"
@@ -17,6 +17,7 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/shell"
 	_ "github.com/evergreen-ci/evergreen/plugin/config"
+	"github.com/tychoish/grip/slogger"
 )
 
 const (
@@ -126,7 +127,8 @@ type Agent struct {
 	APILogger *comm.APILogger
 
 	// Holds the current command being executed by the agent.
-	currentCommand model.PluginCommandConf
+	currentCommand      model.PluginCommandConf
+	currentCommandMutex sync.RWMutex
 
 	// taskConfig holds the project, distro and task objects for the agent's
 	// assigned task.
@@ -327,13 +329,19 @@ func (sh *SignalHandler) HandleSignals(agt *Agent) {
 // GetCurrentCommand returns the current command being executed
 // by the agent.
 func (agt *Agent) GetCurrentCommand() model.PluginCommandConf {
+	agt.currentCommandMutex.RLock()
+	defer agt.currentCommandMutex.RUnlock()
+
 	return agt.currentCommand
 }
 
 // CheckIn updates the agent's execution stage and current timeout duration,
 // and resets its timer back to zero.
 func (agt *Agent) CheckIn(command model.PluginCommandConf, duration time.Duration) {
+	agt.currentCommandMutex.Lock()
 	agt.currentCommand = command
+	agt.currentCommandMutex.Unlock()
+
 	agt.idleTimeoutWatcher.SetDuration(duration)
 	agt.idleTimeoutWatcher.CheckIn()
 	agt.logger.LogExecution(slogger.INFO, "Command timeout set to %v", duration.String())
@@ -509,9 +517,9 @@ func (agt *Agent) RunTask() (*apimodels.TaskEndResponse, error) {
 		return agt.finishAndAwaitCleanup(evergreen.TaskFailed)
 	}
 
-	if agt.taskConfig.Project.Pre != nil {
+	if taskConfig.Project.Pre != nil {
 		agt.logger.LogExecution(slogger.INFO, "Running pre-task commands.")
-		err = agt.RunCommands(agt.taskConfig.Project.Pre.List(), false, agt.callbackTimeoutSignal())
+		err = agt.RunCommands(taskConfig.Project.Pre.List(), false, agt.callbackTimeoutSignal())
 		if err != nil {
 			agt.logger.LogExecution(slogger.ERROR, "Running pre-task script failed: %v", err)
 		}

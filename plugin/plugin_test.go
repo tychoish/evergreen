@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"testing"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent/comm"
 	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
@@ -31,6 +30,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v2"
 )
@@ -216,8 +216,7 @@ func TestPluginFunctions(t *testing.T) {
 			So(httpCom, ShouldNotBeNil)
 
 			Convey("all commands in test project should execute successfully", func() {
-				sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-				logger := agentutil.NewTestLogger(sliceAppender)
+				logger := agentutil.NewTestLogger(slogger.StdOutAppender())
 				for _, newTask := range taskConfig.Project.Tasks {
 					So(len(newTask.Commands), ShouldNotEqual, 0)
 					for _, command := range newTask.Commands {
@@ -258,8 +257,7 @@ func TestPluginExecution(t *testing.T) {
 		pluginConfigPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "plugin_project.yml")
 		taskConfig, err := createTestConfig(pluginConfigPath, t)
 		testutil.HandleTestingErr(err, t, "failed to create test config: %v", err)
-		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-		logger := agentutil.NewTestLogger(sliceAppender)
+		logger := agentutil.NewTestLogger(slogger.StdOutAppender())
 
 		Convey("all commands in test project should execute successfully", func() {
 			for _, newTask := range taskConfig.Project.Tasks {

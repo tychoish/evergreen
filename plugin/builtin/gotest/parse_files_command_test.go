@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
 	"github.com/evergreen-ci/evergreen/model"
@@ -13,6 +12,7 @@ import (
 	. "github.com/evergreen-ci/evergreen/plugin/builtin/gotest"
 	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/tychoish/grip/slogger"
 )
 
 func TestAllOutputFiles(t *testing.T) {
@@ -74,8 +74,7 @@ func TestParseOutputFiles(t *testing.T) {
 		Convey("The output in all of the specified files should be parsed correctly", func() {
 
 			// mock up a logger
-			sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-			logger := agentutil.NewTestLogger(sliceAppender)
+			logger := agentutil.NewTestLogger(slogger.StdOutAppender())
 
 			// mock up a task config
 			taskConfig := &model.TaskConfig{Task: &task.Task{Id: "taskOne", Execution: 1}}

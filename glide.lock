@@ -75,3 +75,5 @@ imports:
     version: 6e4869b434bd001f6983749881c7ead3545887d8
   - name: github.com/aws/aws-sdk-go
     version: 87a2cff6c2601f69429f336067d1deb7f713d1c6
+  - name: github.com/tychoish/grip
+    version: 5bc554aee637654c1ecca44016411f0ec1a466cd

@@ -3,7 +3,6 @@ package manifest
 import (
 	"testing"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent/comm"
 	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
@@ -15,6 +14,7 @@ import (
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/tychoish/grip/slogger"
 )
 
 func reset(t *testing.T) {
@@ -83,8 +83,7 @@ func TestManifestLoad(t *testing.T) {
 		taskConfig, err := plugintest.CreateTestConfig("testdata/mongodb-mongo-master.yml", t)
 		testutil.HandleTestingErr(err, t, "Couldnt get task config from config file")
 
-		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-		logger := agentutil.NewTestLogger(sliceAppender)
+		logger := agentutil.NewTestLogger(slogger.StdOutAppender())
 
 		httpCom := plugintest.TestAgentCommunicator("mocktaskid", "mocktasksecret", server.URL)
 

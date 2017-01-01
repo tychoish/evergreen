@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	slogger "github.com/10gen-labs/slogger/v1"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/agent/comm"
 	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
@@ -16,6 +15,7 @@ import (
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/tychoish/grip/slogger"
 )
 
 const TotalResultCount = 677
@@ -43,8 +43,7 @@ func runTest(t *testing.T, configPath string, customTests func()) {
 		taskConfig, err := plugintest.CreateTestConfig(configPath, t)
 		testutil.HandleTestingErr(err, t, "failed to create test config: %v")
 		taskConfig.WorkDir = "."
-		sliceAppender := &evergreen.SliceAppender{[]*slogger.Log{}}
-		logger := agentutil.NewTestLogger(sliceAppender)
+		logger := agentutil.NewTestLogger(slogger.StdOutAppender())
 
 		Convey("all commands in test project should execute successfully", func() {
 			for _, projTask := range taskConfig.Project.Tasks {
