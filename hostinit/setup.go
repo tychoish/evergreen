@@ -26,6 +26,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/evergreen-ci/evergreen/notify"
 	"github.com/evergreen-ci/evergreen/util"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2"
 )
@@ -55,7 +56,7 @@ type HostInit struct {
 func (init *HostInit) setupReadyHosts() error {
 	// set SSH timeout duration
 	if timeoutSecs := init.Settings.HostInit.SSHTimeoutSeconds; timeoutSecs <= 0 {
-		evergreen.Logger.Logf(slogger.WARN, "SSH timeout set to %vs (<= 0s) using %vs instead", timeoutSecs, SSHTimeoutSeconds)
+		grip.Warningf("SSH timeout set to %vs (<= 0s) using %vs instead", timeoutSecs, SSHTimeoutSeconds)
 	} else {
 		SSHTimeoutSeconds = timeoutSecs
 	}
@@ -218,7 +219,7 @@ func (init *HostInit) setupHost(targetHost *host.Host) (string, error) {
 	err = cloudMgr.OnUp(targetHost)
 	if err != nil {
 		// if this fails it is probably due to an API hiccup, so we keep going.
-		evergreen.Logger.Logf(slogger.WARN, "OnUp callback failed for host '%v': '%v'", targetHost.Id, err)
+		grip.Warningf("OnUp callback failed for host '%v': '%+v'", targetHost.Id, err)
 	}
 	cloudHost, err := providers.GetCloudHost(targetHost, init.Settings)
 	if err != nil {

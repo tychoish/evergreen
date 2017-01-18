@@ -19,7 +19,6 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/gorilla/mux"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -118,7 +117,7 @@ func (uis *UIServer) taskPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if projCtx.ProjectRef == nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Project ref is nil")
+		grip.Error("Project ref is nil")
 		uis.LoggedError(w, r, http.StatusInternalServerError, fmt.Errorf("version not found"))
 		return
 	}

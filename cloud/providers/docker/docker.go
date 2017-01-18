@@ -99,7 +99,7 @@ func generateClient(d *distro.Distro) (*docker.Client, *Settings, error) {
 	endpoint := fmt.Sprintf("tcp://%s:%v", settings.HostIp, settings.ClientPort)
 	client, err := docker.NewTLSClientFromBytes(endpoint, cert, key, ca)
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Docker initialize client API call failed for host '%s': %v", endpoint, err)
+		grip.Errorf("Docker initialize client API call failed for host '%s': %v", endpoint, err)
 	}
 	return client, settings, err
 }
@@ -116,7 +116,7 @@ func populateHostConfig(hostConfig *docker.HostConfig, d *distro.Distro) error {
 	// Get all the things!
 	containers, err := client.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Docker list containers API call failed. %v", err)
+		grip.Errorf("Docker list containers API call failed. %v", err)
 		return err
 	}
 	reservedPorts := make(map[int64]bool)
@@ -229,7 +229,7 @@ func (dockerMgr *DockerManager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 	hostConfig := &docker.HostConfig{}
 	err = populateHostConfig(hostConfig, d)
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Unable to populate docker host config for host '%s': %v", settings.HostIp, err)
+		grip.Errorf("Unable to populate docker host config for host '%s': %v", settings.HostIp, err)
 		return nil, err
 	}
 
@@ -249,7 +249,7 @@ func (dockerMgr *DockerManager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 		},
 	)
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Docker create container API call failed for host '%s': %v", settings.HostIp, err)
+		grip.Errorf("Docker create container API call failed for host '%s': %v", settings.HostIp, err)
 		return nil, err
 	}
 
@@ -266,20 +266,20 @@ func (dockerMgr *DockerManager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 		if err2 != nil {
 			err = fmt.Errorf("%v. And was unable to clean up container %v: %v", err, newContainer.ID, err2)
 		}
-		evergreen.Logger.Logf(slogger.ERROR, "Docker start container API call failed for host '%s': %v", settings.HostIp, err)
+		grip.Errorf("Docker start container API call failed for host '%s': %v", settings.HostIp, err)
 		return nil, err
 	}
 
 	// Retrieve container details
 	newContainer, err = dockerClient.InspectContainer(newContainer.ID)
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Docker inspect container API call failed for host '%s': %v", settings.HostIp, err)
+		grip.Errorf("Docker inspect container API call failed for host '%s': %v", settings.HostIp, err)
 		return nil, err
 	}
 
 	hostPort, err := retrieveOpenPortBinding(newContainer)
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Error with docker container '%v': %v", newContainer.ID, err)
+		grip.Errorf("Error with docker container '%v': %v", newContainer.ID, err)
 		return nil, err
 	}
 
