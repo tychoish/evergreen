@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
@@ -16,6 +15,8 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -373,22 +374,19 @@ func getHostData(hostId string) (*uiHost, error) {
 func getPluginDataAndHTML(pluginManager plugin.PanelManager, page plugin.PageScope, ctx plugin.UIContext) pluginData {
 	includes, err := pluginManager.Includes(page)
 	if err != nil {
-		evergreen.Logger.Errorf(
-			slogger.ERROR, "error getting include html from plugin manager on %v page: %v",
+		grip.Errorf("error getting include html from plugin manager on %v page: %v",
 			page, err)
 	}
 
 	panels, err := pluginManager.Panels(page)
 	if err != nil {
-		evergreen.Logger.Errorf(
-			slogger.ERROR, "error getting panel html from plugin manager on %v page: %v",
+		grip.Errorf("error getting panel html from plugin manager on %v page: %v",
 			page, err)
 	}
 
 	data, err := pluginManager.UIData(ctx, page)
 	if err != nil {
-		evergreen.Logger.Errorf(slogger.ERROR, "error getting plugin data on %v page: %v",
-			page, err)
+		grip.Errorf("error getting plugin data on %v page: %+v", page, err)
 	}
 
 	return pluginData{includes, panels, data}

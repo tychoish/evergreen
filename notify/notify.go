@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/mail"
@@ -9,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/build"
@@ -19,6 +19,8 @@ import (
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/evergreen-ci/evergreen/web"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 	"gopkg.in/yaml.v2"
 )
 
@@ -747,7 +749,9 @@ func NotifyAdmins(subject, message string, settings *evergreen.Settings) error {
 		return TrySendNotification(settings.Notify.SMTP.AdminEmail,
 			subject, message, ConstructMailer(settings.Notify))
 	}
-	return evergreen.Logger.Errorf(slogger.ERROR, "Cannot notify admins: admin_email not set")
+	err := errors.New("Cannot notify admins: admin_email not set")
+	grip.Error(err)
+	return err
 }
 
 // String method for notification key

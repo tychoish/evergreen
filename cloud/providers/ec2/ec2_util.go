@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	gcec2 "github.com/dynport/gocloud/aws/ec2"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/cloud"
@@ -23,6 +22,8 @@ import (
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/ec2"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 const (
@@ -162,15 +163,19 @@ func getInstanceInfo(ec2Handle *ec2.EC2, instanceId string) (*ec2.Instance, erro
 
 	reservation := resp.Reservations
 	if len(reservation) < 1 {
-		return nil, evergreen.Logger.Errorf(slogger.ERROR, "No reservation found for "+
-			"instance id: %v", instanceId)
+		err = fmt.Errorf("No reservation found for instance id: %s", instanceId)
+		grip.Error(err)
+		return err
 	}
 
 	instances := reservation[0].Instances
 	if len(instances) < 1 {
-		return nil, evergreen.Logger.Errorf(slogger.ERROR, "'%v' was not found in "+
-			"reservation '%v'", instanceId, resp.Reservations[0].ReservationId)
+		err = fmt.Errorf("'%v' was not found in reservation '%v'",
+			instanceId, resp.Reservations[0].ReservationId)
+		grip.Error(err)
+		return err
 	}
+
 	return &instances[0], nil
 }
 

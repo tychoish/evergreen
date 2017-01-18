@@ -1,13 +1,16 @@
 package repotracker
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 type Runner struct{}
@@ -28,11 +31,15 @@ func (r *Runner) Description() string {
 func (r *Runner) Run(config *evergreen.Settings) error {
 	lockAcquired, err := db.WaitTillAcquireGlobalLock(RunnerName, db.LockTimeout)
 	if err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "Error acquiring global lock: %v", err)
+		err = fmt.Errorf("Error acquiring global lock: %+v", err)
+		grip.Error(err)
+		return err
 	}
 
 	if !lockAcquired {
-		return evergreen.Logger.Errorf(slogger.ERROR, "Timed out acquiring global lock")
+		err = errors.New("Timed out acquiring global lock")
+		grip.Error(err)
+		return err
 	}
 
 	defer func() {
@@ -46,7 +53,9 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 
 	allProjects, err := model.FindAllTrackedProjectRefs()
 	if err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "Error finding tracked projects %v", err)
+		err = fmt.Errorf("Error finding tracked projects %+v", err)
+		grip.Error(err)
+		return err
 	}
 
 	numNewRepoRevisionsToFetch := config.RepoTracker.NumNewRepoRevisionsToFetch
@@ -76,7 +85,9 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 
 	runtime := time.Now().Sub(startTime)
 	if err = model.SetProcessRuntimeCompleted(RunnerName, runtime); err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "Error updating process status: %v", err)
+		err = fmt.Errorf("Error updating process status: %+v", err)
+		grip.Error(err)
+		return err
 	}
 	evergreen.Logger.Logf(slogger.INFO, "Repository tracker took %v to run", runtime)
 	return nil

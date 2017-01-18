@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/cloud/providers"
 	"github.com/evergreen-ci/evergreen/cloud/providers/static"
@@ -16,6 +15,8 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 const (
@@ -478,14 +479,16 @@ func (self *DurationBasedHostAllocator) numNewHostsForDistro(
 
 	cloudManager, err := providers.GetCloudManager(distro.Provider, settings)
 	if err != nil {
-		return 0, evergreen.Logger.Errorf(slogger.ERROR, "Couldn't get cloud manager for %v (%v): %v",
+		err = fmt.Errorf("Couldn't get cloud manager for %s (%s): %+v",
 			distro.Provider, distro.Id, err)
+		grip.Error(err)
+		return 0, err
 	}
 
 	can, err := cloudManager.CanSpawn()
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR,
-			"Error checking if '%v' provider can spawn hosts: %v", distro.Provider, err)
+		grip.Errorf("Problem checking if '%v' provider can spawn hosts: %+v",
+			distro.Provider, err)
 		return 0, nil
 	}
 	if !can {

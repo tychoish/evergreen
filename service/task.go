@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/model"
@@ -19,6 +18,8 @@ import (
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/gorilla/mux"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -525,15 +526,11 @@ func (uis *UIServer) taskLogRaw(w http.ResponseWriter, r *http.Request) {
 
 	if (r.FormValue("text") == "true") || (r.Header.Get("Content-Type") == "text/plain") {
 		err = uis.StreamText(w, http.StatusOK, logTemplateData{channel, GetUser(r)}, "base", "task_log_raw.html")
-		if err != nil {
-			evergreen.Logger.Logf(slogger.ERROR, err.Error())
-		}
+		grip.Error(err)
 		return
 	}
 	err = uis.StreamHTML(w, http.StatusOK, logTemplateData{channel, GetUser(r)}, "base", "task_log.html")
-	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, err.Error())
-	}
+	grip.CatchError(err)
 }
 
 // avoids type-checking json params for the below function

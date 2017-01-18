@@ -7,13 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/gorilla/mux"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -122,7 +123,7 @@ func (restapi restAPI) getRecentVersions(w http.ResponseWriter, r *http.Request)
 	versions, err := version.Find(version.ByMostRecentForRequester(projectId, evergreen.RepotrackerVersionRequester).Limit(10))
 	if err != nil {
 		msg := fmt.Sprintf("Error finding recent versions of project '%v'", projectId)
-		evergreen.Logger.Logf(slogger.ERROR, "%v: %v", msg, err)
+		grip.Errorf("%v: %+v", msg, err)
 		restapi.WriteJSON(w, http.StatusInternalServerError, responseError{Message: msg})
 		return
 	}
@@ -144,7 +145,7 @@ func (restapi restAPI) getRecentVersions(w http.ResponseWriter, r *http.Request)
 			WithFields(build.BuildVariantKey, build.DisplayNameKey, build.TasksKey, build.VersionKey))
 	if err != nil {
 		msg := fmt.Sprintf("Error finding recent versions of project '%v'", projectId)
-		evergreen.Logger.Logf(slogger.ERROR, "%v: %v", msg, err)
+		grip.Errorf("%v: %+v", msg, err)
 		restapi.WriteJSON(w, http.StatusInternalServerError, responseError{Message: msg})
 		return
 	}
@@ -238,7 +239,7 @@ func (restapi restAPI) getVersionInfoViaRevision(w http.ResponseWriter, r *http.
 		statusCode := http.StatusNotFound
 
 		if err != nil {
-			evergreen.Logger.Logf(slogger.ERROR, "%v: %v", msg, err)
+			grip.Errorf("%v: %+v", msg, err)
 			statusCode = http.StatusInternalServerError
 		}
 
@@ -374,7 +375,7 @@ func (restapi *restAPI) getVersionStatusByTask(versionId string, w http.Response
 	err := db.Aggregate(build.Collection, pipeline, &tasks)
 	if err != nil {
 		msg := fmt.Sprintf("Error finding status for version '%v'", versionId)
-		evergreen.Logger.Logf(slogger.ERROR, "%v: %v", msg, err)
+		grip.Errorf("%v: %+v", msg, err)
 		restapi.WriteJSON(w, http.StatusInternalServerError, responseError{Message: msg})
 		return
 	}
@@ -413,7 +414,7 @@ func (restapi restAPI) getVersionStatusByBuild(versionId string, w http.Response
 	)
 	if err != nil {
 		msg := fmt.Sprintf("Error finding status for version '%v'", versionId)
-		evergreen.Logger.Logf(slogger.ERROR, "%v: %v", msg, err)
+		grip.Errorf("%v: %+v", msg, err)
 		restapi.WriteJSON(w, http.StatusInternalServerError, responseError{Message: msg})
 		return
 	}

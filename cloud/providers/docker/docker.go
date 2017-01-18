@@ -2,19 +2,20 @@ package docker
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/cloud"
 	"github.com/evergreen-ci/evergreen/db/bsonutil"
 	"github.com/evergreen-ci/evergreen/hostutil"
 	"github.com/evergreen-ci/evergreen/model/distro"
 	"github.com/evergreen-ci/evergreen/model/host"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/mitchellh/mapstructure"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -147,7 +148,9 @@ func populateHostConfig(hostConfig *docker.HostConfig, d *distro.Distro) error {
 
 	// If map is empty, no ports were available.
 	if len(hostConfig.PortBindings) == 0 {
-		return evergreen.Logger.Errorf(slogger.ERROR, "No available ports in specified range.")
+		err := errors.New("No available ports in specified range.")
+		grip.Error(err)
+		return err
 	}
 	return nil
 }
@@ -290,7 +293,9 @@ func (dockerMgr *DockerManager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 
 	err = intentHost.Insert()
 	if err != nil {
-		return nil, evergreen.Logger.Errorf(slogger.ERROR, "Failed to insert new host '%s': %v", intentHost.Id, err)
+		err = fmt.Errorf("Failed to insert new host '%s': %+v", intentHost.Id, err)
+		grip.Error(err)
+		return nil, err
 	}
 
 	evergreen.Logger.Logf(slogger.DEBUG, "Successfully inserted new host '%v' for distro '%v'", intentHost.Id, d.Id)
@@ -362,7 +367,9 @@ func (dockerMgr *DockerManager) TerminateInstance(host *host.Host) error {
 
 	err = dockerClient.StopContainer(host.Id, TimeoutSeconds)
 	if err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "Failed to stop container '%v': %v", host.Id, err)
+		err = fmt.Errorf("Failed to stop container '%v': %+v", host.Id, err)
+		grip.Error(err)
+		return err
 	}
 
 	err = dockerClient.RemoveContainer(
@@ -371,7 +378,9 @@ func (dockerMgr *DockerManager) TerminateInstance(host *host.Host) error {
 		},
 	)
 	if err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "Failed to remove container '%v': %v", host.Id, err)
+		err = fmt.Errorf("Failed to remove container '%v': %+v", host.Id, err)
+		grip.Error(err)
+		return err
 	}
 
 	return host.Terminate()

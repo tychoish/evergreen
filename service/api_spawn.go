@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/alerts"
 	"github.com/evergreen-ci/evergreen/cloud/providers"
@@ -16,6 +15,8 @@ import (
 	"github.com/evergreen-ci/evergreen/spawn"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/gorilla/mux"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 type spawnRequest struct {
@@ -90,11 +91,11 @@ func (as *APIServer) requestHost(w http.ResponseWriter, r *http.Request) {
 
 	err = spawner.CreateHost(opts, user)
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, err.Error())
+		grip.Error(err)
 		mailErr := notify.TrySendNotificationToUser(opts.UserName, "Spawning failed", err.Error(),
 			notify.ConstructMailer(as.Settings.Notify))
 		if mailErr != nil {
-			evergreen.Logger.Logf(slogger.ERROR, "Failed to send notification: %v", mailErr)
+			grip.Errorln("Failed to send notification:", mailErr)
 		}
 		return
 	}

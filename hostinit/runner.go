@@ -1,11 +1,13 @@
 package hostinit
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 // Runner executes the hostinit process.
@@ -31,7 +33,9 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 	init := &HostInit{config}
 
 	if err := init.setupReadyHosts(); err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "Error running hostinit: %v", err)
+		err = fmt.Errorf("Error running hostinit: %+v", err)
+		grip.Error(err)
+		return err
 	}
 
 	runtime := time.Now().Sub(startTime)

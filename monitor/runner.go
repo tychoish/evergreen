@@ -1,11 +1,13 @@
 package monitor
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 type Runner struct{}
@@ -28,7 +30,9 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 	evergreen.Logger.Logf(slogger.INFO, "Starting monitor at time %v", startTime)
 
 	if err := RunAllMonitoring(config); err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "error running monitor: %v", err)
+		err = fmt.Errorf("error running monitor: %v", err)
+		grip.Error(err)
+		return err
 	}
 
 	runtime := time.Now().Sub(startTime)

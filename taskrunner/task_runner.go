@@ -6,12 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/model/task"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 type TaskRunner struct {
@@ -75,14 +76,17 @@ func (self *TaskRunner) processDistro(distroId string) error {
 	time.Sleep(time.Second)
 	lockAcquired, err := db.WaitTillAcquireGlobalLock(lockKey, db.LockTimeout)
 	if err != nil {
-		return evergreen.Logger.Errorf(slogger.ERROR, "error acquiring global lock for %v: %v", lockKey, err)
+		err = fmt.Errorf("error acquiring global lock for %v: %+v", lockKey, err)
+		grip.Error(err)
+		return err
 	}
 	if !lockAcquired {
-		return evergreen.Logger.Errorf(slogger.ERROR, "timed out acquiring global lock for %v", lockKey)
+		err = fmt.Errorf("timed out acquiring global lock for %v", lockKey)
+		grip.Error(err)
+		return err
 	}
 	defer func() {
-		err := db.ReleaseGlobalLock(lockKey)
-		if err != nil {
+		if err = db.ReleaseGlobalLock(lockKey); err != nil {
 			evergreen.Logger.Errorf(slogger.ERROR, "error releasing global lock for %v: %v", lockKey, err)
 		}
 	}()

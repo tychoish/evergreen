@@ -34,6 +34,7 @@ import (
 	"github.com/evergreen-ci/render"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/tychoish/grip"
 	"github.com/tychoish/grip/slogger"
 )
 
@@ -441,7 +442,7 @@ func (as *APIServer) taskFinished(w http.ResponseWriter, t *task.Task, finishTim
 	if err != nil {
 		message := fmt.Sprintf("Error locating host for task %v - set to %v: %v", t.Id,
 			t.HostId, err)
-		evergreen.Logger.Logf(slogger.ERROR, message)
+		grip.Error(message)
 		taskEndResponse.Message = message
 		as.WriteJSON(w, http.StatusInternalServerError, taskEndResponse)
 		return
@@ -449,7 +450,7 @@ func (as *APIServer) taskFinished(w http.ResponseWriter, t *task.Task, finishTim
 	if host == nil {
 		message := fmt.Sprintf("Error finding host running for task %v - set to %v", t.Id,
 			t.HostId)
-		evergreen.Logger.Logf(slogger.ERROR, message)
+		grip.Error(message)
 		taskEndResponse.Message = message
 		as.WriteJSON(w, http.StatusInternalServerError, taskEndResponse)
 		return
@@ -458,7 +459,7 @@ func (as *APIServer) taskFinished(w http.ResponseWriter, t *task.Task, finishTim
 		markHostRunningTaskFinished(host, t, "")
 		message := fmt.Sprintf("Host %v - running %v - is in state '%v'. Agent will terminate",
 			t.HostId, t.Id, host.Status)
-		evergreen.Logger.Logf(slogger.INFO, message)
+		grip.Info(message)
 		taskEndResponse.Message = message
 		as.WriteJSON(w, http.StatusOK, taskEndResponse)
 		return
@@ -490,7 +491,7 @@ func (as *APIServer) taskFinished(w http.ResponseWriter, t *task.Task, finishTim
 	nextTask, err := getNextDistroTask(t, host)
 	if err != nil {
 		markHostRunningTaskFinished(host, t, "")
-		evergreen.Logger.Logf(slogger.ERROR, err.Error())
+		grip.Error(err)
 		taskEndResponse.Message = err.Error()
 		as.WriteJSON(w, http.StatusOK, taskEndResponse)
 		return
@@ -772,7 +773,7 @@ func getHostFromRequest(r *http.Request) (*host.Host, error) {
 func (as *APIServer) hostReady(w http.ResponseWriter, r *http.Request) {
 	hostObj, err := getHostFromRequest(r)
 	if err != nil {
-		evergreen.Logger.Errorf(slogger.ERROR, err.Error())
+		grip.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

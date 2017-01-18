@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/cloud"
 	"github.com/evergreen-ci/evergreen/hostutil"
@@ -15,6 +14,8 @@ import (
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/ec2"
 	"github.com/mitchellh/mapstructure"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 // EC2Manager implements the CloudManager interface for Amazon EC2
@@ -147,8 +148,9 @@ func (cloudManager *EC2Manager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 
 	// record this 'intent host'
 	if err := intentHost.Insert(); err != nil {
-		return nil, evergreen.Logger.Errorf(slogger.ERROR, "Could not insert intent "+
-			"host “%v”: %v", intentHost.Id, err)
+		err = fmt.Errorf("Could not insert intent host “%s”: %+v", intentHost.Id, err)
+		grip.Error(err)
+		return nil, err
 	}
 
 	evergreen.Logger.Logf(slogger.DEBUG, "Successfully inserted intent host “%v” "+
@@ -178,9 +180,10 @@ func (cloudManager *EC2Manager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 	newHost, resp, err := startEC2Instance(ec2Handle, &options, intentHost)
 
 	if err != nil {
-		return nil, evergreen.Logger.Errorf(slogger.ERROR, "Could not start new "+
-			"instance for distro “%v”. Accompanying host record is “%v”: %v",
-			d.Id, intentHost.Id, err)
+		err = fmt.Errorf("Could not start new instance for distro '%v.'"+
+			"Accompanying host record is '%v': %+v", d.Id, intentHost.Id, err)
+		grip.Error(err)
+		return nil, err
 	}
 
 	instance := resp.Instances[0]
@@ -252,10 +255,10 @@ func (cloudManager *EC2Manager) StopInstance(host *host.Host) error {
 func (cloudManager *EC2Manager) TerminateInstance(host *host.Host) error {
 	// terminate the instance
 	if host.Status == evergreen.HostTerminated {
-		errMsg := fmt.Errorf("Can not terminate %v - already marked as "+
+		err := fmt.Errorf("Can not terminate %v - already marked as "+
 			"terminated!", host.Id)
-		evergreen.Logger.Errorf(slogger.ERROR, errMsg.Error())
-		return errMsg
+		grip.Error(err)
+		return err
 	}
 
 	ec2Handle := getUSEast(*cloudManager.awsCredentials)
@@ -290,8 +293,10 @@ func startEC2Instance(ec2Handle *ec2.EC2, options *ec2.RunInstancesOptions,
 			evergreen.Logger.Errorf(slogger.ERROR, "Could not remove intent host "+
 				"“%v”: %v", intentHost.Id, rmErr)
 		}
-		return nil, nil, evergreen.Logger.Errorf(slogger.ERROR,
-			"EC2 RunInstances API call returned error: %v", err)
+		err = fmt.Errorf("EC2 RunInstances API call returned error: %v", err)
+		grip.Error(err)
+		return nil, nil, err
+
 	}
 
 	evergreen.Logger.Logf(slogger.DEBUG, "Spawned %v instance", len(resp.Instances))
@@ -304,30 +309,35 @@ func startEC2Instance(ec2Handle *ec2.EC2, options *ec2.RunInstancesOptions,
 	// find old intent host
 	host, err := host.FindOne(host.ById(intentHost.Id))
 	if host == nil {
-		return nil, nil, evergreen.Logger.Errorf(slogger.ERROR, "Can't locate "+
-			"record inserted for intended host “%v”", intentHost.Id)
+		err = fmt.Errorf("Can't locate record inserted for intended host '%s'",
+			intentHost.Id)
+		grip.Error(err)
+		return nil, nil, err
 	}
 	if err != nil {
-		return nil, nil, evergreen.Logger.Errorf(slogger.ERROR, "Can't locate "+
-			"record inserted for intended host “%v” due to error: %v",
-			intentHost.Id, err)
+		err = fmt.Errorf("Can't locate record inserted for intended host '%v' "+
+			"due to error: %+v", intentHost.Id, err)
+		grip.Error(err)
+		return nil, nil, err
 	}
 
 	// we found the old document now we can insert the new one
 	host.Id = instance.InstanceId
 	err = host.Insert()
 	if err != nil {
-		return nil, nil, evergreen.Logger.Errorf(slogger.ERROR, "Could not insert "+
-			"updated host information for “%v” with “%v”: %v", intentHost.Id,
-			host.Id, err)
+		err = fmt.Errorf("Could not insert updated host information for '%v' with '%v': %+v",
+			intentHost.Id, host.Id, err)
+		grip.Error(err)
+		return nil, nil, err
 	}
 
 	// remove the intent host document
 	err = intentHost.Remove()
 	if err != nil {
-		return nil, nil, evergreen.Logger.Errorf(slogger.ERROR, "Could not remove "+
-			"insert host “%v” (replaced by “%v”): %v", intentHost.Id, host.Id,
-			err)
+		err = fmt.Errorf("Could not remove insert host '%v' (replaced by '%v'): %+v",
+			intentHost.Id, host.Id, err)
+		grip.Error(err)
+		return nil, nil, err
 	}
 
 	var infoResp *ec2.DescribeInstancesResp

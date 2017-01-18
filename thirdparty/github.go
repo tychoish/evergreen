@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/util"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 const (
@@ -41,12 +42,12 @@ func GetGithubCommits(oauthToken, commitsURL string) (
 	}
 	if resp == nil {
 		errMsg := fmt.Sprintf("nil response from url ‘%v’", commitsURL)
-		evergreen.Logger.Logf(slogger.ERROR, errMsg)
+		grip.Error(errMsg)
 		return nil, nil, APIResponseError{errMsg}
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("error querying ‘%v’: %v", commitsURL, err)
-		evergreen.Logger.Logf(slogger.ERROR, errMsg)
+		grip.Error(errMsg)
 		return nil, nil, APIResponseError{errMsg}
 	}
 
@@ -80,14 +81,14 @@ func GetGithubFile(oauthToken, fileURL string) (
 	resp, err := tryGithubGet(oauthToken, fileURL)
 	if resp == nil {
 		errMsg := fmt.Sprintf("nil response from url ‘%v’", fileURL)
-		evergreen.Logger.Logf(slogger.ERROR, errMsg)
+		grip.Error(errMsg)
 		return nil, APIResponseError{errMsg}
 	}
 	defer resp.Body.Close()
 
 	if err != nil {
 		errMsg := fmt.Sprintf("error querying ‘%v’: %v", fileURL, err)
-		evergreen.Logger.Logf(slogger.ERROR, errMsg)
+		grip.Error(errMsg)
 		return nil, APIResponseError{errMsg}
 	}
 
@@ -141,7 +142,7 @@ func GetGitHubMergeBaseRevision(oauthToken, repoOwner, repo, baseRevision string
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting merge base commit response for url, %v: %v", url, err)
-		evergreen.Logger.Logf(slogger.ERROR, errMsg)
+		grip.Error(errMsg)
 		return "", APIResponseError{errMsg}
 	}
 	respBody, err := ioutil.ReadAll(resp.Body)
@@ -179,7 +180,7 @@ func GetCommitEvent(oauthToken, repoOwner, repo, githash string) (*CommitEvent,
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("error querying ‘%v’: %v", commitURL, err)
-		evergreen.Logger.Logf(slogger.ERROR, errMsg)
+		grip.Error(errMsg)
 		return nil, APIResponseError{errMsg}
 	}
 
@@ -224,7 +225,7 @@ func GetBranchEvent(oauthToken, repoOwner, repo, branch string) (*BranchEvent,
 
 	if err != nil {
 		errMsg := fmt.Sprintf("error querying ‘%v’: %v", branchURL, err)
-		evergreen.Logger.Logf(slogger.ERROR, errMsg)
+		grip.Error(errMsg)
 		return nil, APIResponseError{errMsg}
 	}
 
