@@ -15,7 +15,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/gorilla/mux"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 )
 
 // ui version of a task queue item
@@ -164,7 +163,7 @@ func (uis *UIServer) allTaskQueues(w http.ResponseWriter, r *http.Request) {
 		tasks, err := task.Find(task.ByIds(taskIds).WithFields(task.VersionKey, task.BuildIdKey))
 		if err != nil {
 			msg := fmt.Sprintf("Error finding tasks: %v", err)
-			evergreen.Logger.Errorf(slogger.ERROR, msg)
+			grip.Error(msg)
 			http.Error(w, msg, http.StatusInternalServerError)
 			return
 		}

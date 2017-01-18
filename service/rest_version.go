@@ -14,7 +14,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/gorilla/mux"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -204,7 +203,7 @@ func (restapi restAPI) getVersionInfo(w http.ResponseWriter, r *http.Request) {
 	copyVersion(srcVersion, destVersion)
 	for _, buildStatus := range srcVersion.BuildVariants {
 		destVersion.BuildVariants = append(destVersion.BuildVariants, buildStatus.BuildVariant)
-		evergreen.Logger.Logf(slogger.ERROR, "adding BuildVariant %v", buildStatus.BuildVariant)
+		grip.Errorln("adding BuildVariant", buildStatus.BuildVariant)
 	}
 
 	restapi.WriteJSON(w, http.StatusOK, destVersion)
@@ -252,7 +251,7 @@ func (restapi restAPI) getVersionInfoViaRevision(w http.ResponseWriter, r *http.
 
 	for _, buildStatus := range srcVersion.BuildVariants {
 		destVersion.BuildVariants = append(destVersion.BuildVariants, buildStatus.BuildVariant)
-		evergreen.Logger.Logf(slogger.ERROR, "adding BuildVariant %v", buildStatus.BuildVariant)
+		grip.Errorln("adding BuildVariant", buildStatus.BuildVariant)
 	}
 
 	restapi.WriteJSON(w, http.StatusOK, destVersion)

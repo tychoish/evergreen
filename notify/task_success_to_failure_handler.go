@@ -3,11 +3,12 @@ package notify
 import (
 	"fmt"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/web"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 // Handler for notifications generated specifically when a task fails and the
@@ -38,9 +39,9 @@ func (self *TaskSuccessToFailureHandler) GetNotifications(ae *web.App, configNam
 		// get previous task for this project/build variant
 		previousTask, err := currentTask.PreviousCompletedTask(key.Project, []string{})
 		if previousTask == nil {
-			evergreen.Logger.Logf(slogger.DEBUG,
-				"No previous completed task found for ”%v” on %v %v notification",
-				currentTask.Id, key.Project, key.NotificationName)
+			grip.Debugf("No previous completed task found for %s in %s "+
+				"with %s notification", currentTask.Id, key.Project,
+				key.NotificationName)
 			continue
 		} else if err != nil {
 			return nil, err

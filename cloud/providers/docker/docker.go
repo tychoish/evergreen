@@ -15,7 +15,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/mitchellh/mapstructure"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -298,7 +297,7 @@ func (dockerMgr *DockerManager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 		return nil, err
 	}
 
-	evergreen.Logger.Logf(slogger.DEBUG, "Successfully inserted new host '%v' for distro '%v'", intentHost.Id, d.Id)
+	grip.Debugf("Successfully inserted new host '%s' for distro '%s'", intentHost.Id, d.Id)
 
 	return intentHost, nil
 }

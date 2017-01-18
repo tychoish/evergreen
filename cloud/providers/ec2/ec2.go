@@ -15,7 +15,6 @@ import (
 	"github.com/goamz/goamz/ec2"
 	"github.com/mitchellh/mapstructure"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 )
 
 // EC2Manager implements the CloudManager interface for Amazon EC2
@@ -153,9 +152,8 @@ func (cloudManager *EC2Manager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 		return nil, err
 	}
 
-	evergreen.Logger.Logf(slogger.DEBUG, "Successfully inserted intent host “%v” "+
-		"for distro “%v” to signal cloud instance spawn intent", instanceName,
-		d.Id)
+	grip.Debugf("Inserted intent host '%v' for distro '%v' to signal instance spawn intent",
+		instanceName, d.Id)
 
 	options := ec2.RunInstancesOptions{
 		MinCount:       1,
@@ -195,11 +193,9 @@ func (cloudManager *EC2Manager) SpawnInstance(d *distro.Distro, hostOpts cloud.H
 	err = attachTags(ec2Handle, tags, instance.InstanceId)
 
 	if err != nil {
-		evergreen.Logger.Errorf(slogger.ERROR, "Unable to attach tags for %v: %v",
-			instance.InstanceId, err)
+		grip.Errorf("Unable to attach tags for %s: %+v", instance.InstanceId, err)
 	} else {
-		evergreen.Logger.Logf(slogger.DEBUG, "Attached tag name “%v” for “%v”",
-			instanceName, instance.InstanceId)
+		grip.Debugf("Attached tag name “%s” for “%s”", instanceName, instance.InstanceId)
 	}
 	return newHost, nil
 }
@@ -240,7 +236,7 @@ func (cloudManager *EC2Manager) StopInstance(host *host.Host) error {
 	}
 
 	for _, stateChange := range resp.StateChanges {
-		evergreen.Logger.Logf(slogger.INFO, "Stopped %v", stateChange.InstanceId)
+		grip.Infoln("Stopped", stateChange.InstanceId)
 	}
 
 	err = host.ClearRunningTask()
@@ -269,7 +265,7 @@ func (cloudManager *EC2Manager) TerminateInstance(host *host.Host) error {
 	}
 
 	for _, stateChange := range resp.StateChanges {
-		evergreen.Logger.Logf(slogger.INFO, "Terminated %v", stateChange.InstanceId)
+		grip.Infoln("Terminated", stateChange.InstanceId)
 	}
 
 	// set the host status as terminated and update its termination time
@@ -290,8 +286,7 @@ func startEC2Instance(ec2Handle *ec2.EC2, options *ec2.RunInstancesOptions,
 		// remove the intent host document
 		rmErr := intentHost.Remove()
 		if rmErr != nil {
-			evergreen.Logger.Errorf(slogger.ERROR, "Could not remove intent host "+
-				"“%v”: %v", intentHost.Id, rmErr)
+			grip.Errorf("Could not remove intent host '%s': %+v", intentHost.Id, rmErr)
 		}
 		err = fmt.Errorf("EC2 RunInstances API call returned error: %v", err)
 		grip.Error(err)
@@ -299,12 +294,12 @@ func startEC2Instance(ec2Handle *ec2.EC2, options *ec2.RunInstancesOptions,
 
 	}
 
-	evergreen.Logger.Logf(slogger.DEBUG, "Spawned %v instance", len(resp.Instances))
+	grip.Debugf("Spawned %d instance", len(resp.Instances))
 
 	// the instance should have been successfully spawned
 	instance := resp.Instances[0]
-	evergreen.Logger.Logf(slogger.DEBUG, "Started %v", instance.InstanceId)
-	evergreen.Logger.Logf(slogger.DEBUG, "Key name: %v", string(options.KeyName))
+	grip.Debugln("Started", instance.InstanceId)
+	grip.Debugln("Key name:", options.KeyName)
 
 	// find old intent host
 	host, err := host.FindOne(host.ById(intentHost.Id))
@@ -348,14 +343,12 @@ func startEC2Instance(ec2Handle *ec2.EC2, options *ec2.RunInstancesOptions,
 		if err != nil {
 			instanceInfoRetryCount++
 			if instanceInfoRetryCount == instanceInfoMaxRetries {
-				evergreen.Logger.Errorf(slogger.ERROR, "There was an error querying for the "+
-					"instance's information and retries are exhausted. The insance may "+
-					"be up.")
+				grip.Errorln("There was an error querying for the instance's ",
+					"information and retries are exhausted. The instance may be up.")
 				return nil, resp, err
 			}
-
-			evergreen.Logger.Errorf(slogger.DEBUG, "There was an error querying for the "+
-				"instance's information. Retrying in 30 seconds. Error: %v", err)
+			grip.Debugf("There was an error querying for the instance's information. "+
+				"Retrying in 30 seconds. Error: %v", err)
 			time.Sleep(30 * time.Second)
 			continue
 		}

@@ -7,7 +7,6 @@ import (
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 )
 
 // Runner runs the scheduler process.
@@ -28,7 +27,7 @@ func (r *Runner) Description() string {
 
 func (r *Runner) Run(config *evergreen.Settings) error {
 	startTime := time.Now()
-	evergreen.Logger.Logf(slogger.INFO, "Starting scheduler at time %v", startTime)
+	grip.Infoln("Starting scheduler at time:", startTime)
 
 	schedulerInstance := &Scheduler{
 		config,
@@ -47,8 +46,8 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 
 	runtime := time.Now().Sub(startTime)
 	if err := model.SetProcessRuntimeCompleted(RunnerName, runtime); err != nil {
-		evergreen.Logger.Errorf(slogger.ERROR, "Error updating process status: %v", err)
+		grip.Errorln("Error updating process status:", err)
 	}
-	evergreen.Logger.Logf(slogger.INFO, "Scheduler took %v to run", runtime)
+	grip.Infof("Scheduler took %s to run", runtime)
 	return nil
 }

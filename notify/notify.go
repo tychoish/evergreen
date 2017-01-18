@@ -215,7 +215,7 @@ func Run(settings *evergreen.Settings) error {
 
 // This function is responsible for reading the notifications file
 func ParseNotifications(configName string) (*MCINotification, error) {
-	evergreen.Logger.Logf(slogger.INFO, "Parsing notifications...")
+	grip.Info("Parsing notifications...")
 	configRoot, err := evergreen.FindConfig(configName)
 	if err != nil {
 		return nil, err
@@ -239,7 +239,7 @@ func ParseNotifications(configName string) (*MCINotification, error) {
 
 // This function is responsible for validating the notifications file
 func ValidateNotifications(configName string, mciNotification *MCINotification) error {
-	evergreen.Logger.Logf(slogger.INFO, "Validating notifications...")
+	grip.Info("Validating notifications...")
 	allNotifications := []string{}
 
 	projectNameToBuildVariants, err := findProjectBuildVariants(configName)
@@ -335,7 +335,7 @@ func ProcessNotifications(ae *web.App, configName string, mciNotification *MCINo
 		}
 	}
 
-	evergreen.Logger.Logf(slogger.INFO, "Processing notifications...")
+	grip.Info("Processing notifications...")
 
 	emails := make(map[NotificationKey][]Email)
 	for _, key := range allNotificationsSlice {
@@ -353,7 +353,7 @@ func ProcessNotifications(ae *web.App, configName string, mciNotification *MCINo
 // This function is responsible for managing the sending triggered email notifications
 func SendNotifications(settings *evergreen.Settings, mciNotification *MCINotification,
 	emails map[NotificationKey][]Email, mailer Mailer) (err error) {
-	evergreen.Logger.Logf(slogger.INFO, "Sending notifications...")
+	grip.Info("Sending notifications...")
 
 	// parse all notifications, sending it to relevant recipients
 	for _, notification := range mciNotification.Notifications {
@@ -461,7 +461,7 @@ func SendNotifications(settings *evergreen.Settings, mciNotification *MCINotific
 // This stores the last time threshold after which
 // we search for possible new notification events
 func UpdateNotificationTimes() (err error) {
-	evergreen.Logger.Logf(slogger.INFO, "Updating notification times...")
+	grip.Info("Updating notification times...")
 	for project, time := range newProjectNotificationTime {
 		evergreen.Logger.Logf(slogger.INFO, "Updating %v notification time...", project)
 		err = model.SetLastNotificationsEventTime(project, time)

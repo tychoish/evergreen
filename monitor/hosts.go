@@ -14,7 +14,6 @@ import (
 	"github.com/evergreen-ci/evergreen/notify"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 )
 
 // responsible for running regular monitoring of hosts
@@ -135,13 +134,13 @@ func terminateHost(host *host.Host, settings *evergreen.Settings) error {
 
 	// run teardown script if we have one, sending notifications if things go awry
 	if host.Distro.Teardown != "" && host.Provisioned {
-		evergreen.Logger.Logf(slogger.ERROR, "Running teardown script for host %v", host.Id)
+		grip.Errorln("Running teardown script for host:", host.Id)
 		if err := runHostTeardown(host, cloudHost); err != nil {
-			evergreen.Logger.Logf(slogger.ERROR, "Error running teardown script for %v: %v", host.Id, err)
+			grip.Errorf("Error running teardown script for %s: %+v", host.Id, err)
 			subj := fmt.Sprintf("%v Error running teardown for host %v",
 				notify.TeardownFailurePreface, host.Id)
 			if err := notify.NotifyAdmins(subj, err.Error(), settings); err != nil {
-				evergreen.Logger.Errorf(slogger.ERROR, "Error sending email: %v", err)
+				grip.Errorln("Error sending email:", err)
 			}
 		}
 	}

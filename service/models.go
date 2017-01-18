@@ -16,7 +16,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -172,9 +171,7 @@ func getTimelineData(projectName, requester string, versionsToSkip, versionsPerP
 
 		buildIds := version.BuildIds
 		dbBuilds, err := build.Find(build.ByIds(buildIds))
-		if err != nil {
-			evergreen.Logger.Errorf(slogger.ERROR, "Ids: %v", buildIds)
-		}
+		grip.ErrorWhenln(err != nil, "Ids:", buildIds)
 
 		buildsMap := make(map[string]build.Build)
 		for _, dbBuild := range dbBuilds {
@@ -344,10 +341,8 @@ func getHostsData(includeSpawnedHosts bool) (*hostsData, error) {
 			if err != nil {
 				return nil, err
 			}
-			if task == nil {
-				evergreen.Logger.Logf(slogger.ERROR,
-					"Hosts page could not find task %v for host %v", dbHost.RunningTask, dbHost.Id)
-			}
+			grip.ErrorWhenf(task == nil, "Hosts page could not find task %s for host %s",
+				dbHost.RunningTask, dbHost.Id)
 			uiHosts[idx].RunningTask = task
 		}
 	}

@@ -17,7 +17,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 )
 
 const (
@@ -185,10 +184,7 @@ func (agbh *AgentHostGateway) prepRemoteHost(hostObj host.Host, sshOptions []str
 
 	// get the agent's revision before scp'ing over the executable
 	preSCPAgentRevision, err := agbh.GetAgentRevision()
-	if err != nil {
-		evergreen.Logger.Errorf(slogger.ERROR, "Error getting pre scp agent "+
-			"revision: %v", err)
-	}
+	grip.ErrorWhenln(err != nil, "Error getting pre scp agent revision:", err)
 
 	// run the command to scp the agent with a timeout
 	err = util.RunFunctionWithTimeout(scpAgentCmd.Run, SCPTimeout)
@@ -203,17 +199,11 @@ func (agbh *AgentHostGateway) prepRemoteHost(hostObj host.Host, sshOptions []str
 
 	// get the agent's revision after scp'ing over the executable
 	postSCPAgentRevision, err := agbh.GetAgentRevision()
-	if err != nil {
-		evergreen.Logger.Errorf(slogger.ERROR, "Error getting post scp agent "+
-			"revision: %v", err)
-	}
+	grip.ErrorWhenln(err != nil, "Error getting post scp agent revision:", err)
 
-	if preSCPAgentRevision != postSCPAgentRevision {
-		evergreen.Logger.Logf(slogger.WARN, "Agent revision was %v before scp "+
-			"but is now %v. Using previous revision %v for host %v",
-			preSCPAgentRevision, postSCPAgentRevision, preSCPAgentRevision,
-			hostObj.Id)
-	}
+	grip.WarningWhenf(preSCPAgentRevision != postSCPAgentRevision,
+		"Agent revision was %v before scp but is now %v. Using previous revision %v for host %v",
+		preSCPAgentRevision, postSCPAgentRevision, preSCPAgentRevision, hostObj.Id)
 
 	return preSCPAgentRevision, nil
 }

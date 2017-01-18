@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tychoish/grip/slogger"
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/cloud"
 	"github.com/evergreen-ci/evergreen/cloud/providers"
@@ -17,6 +16,8 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/util"
+	"github.com/tychoish/grip"
+	"github.com/tychoish/grip/slogger"
 )
 
 // Responsible for prioritizing and scheduling tasks to be run, on a per-distro
@@ -42,7 +43,7 @@ type versionBuildVariant struct {
 // for each distro, and spins them up.
 func (s *Scheduler) Schedule() error {
 	// make sure the correct static hosts are in the database
-	evergreen.Logger.Logf(slogger.INFO, "Updating static hosts...")
+	grip.Info("Updating static hosts...")
 
 	err := model.UpdateStaticHosts(s.Settings)
 	if err != nil {
@@ -50,14 +51,14 @@ func (s *Scheduler) Schedule() error {
 	}
 
 	// find all tasks ready to be run
-	evergreen.Logger.Logf(slogger.INFO, "Finding runnable tasks...")
+	grip.Info("Finding runnable tasks...")
 
 	runnableTasks, err := s.FindRunnableTasks()
 	if err != nil {
 		return fmt.Errorf("Error finding runnable tasks: %v", err)
 	}
 
-	evergreen.Logger.Logf(slogger.INFO, "There are %v tasks ready to be run", len(runnableTasks))
+	grip.Infoln("There are %v tasks ready to be run", len(runnableTasks))
 
 	// split the tasks by distro
 	tasksByDistro, taskRunDistros, err := s.splitTasksByDistro(runnableTasks)
@@ -113,7 +114,7 @@ func (s *Scheduler) Schedule() error {
 				// schedule the distro
 				res := s.scheduleDistro(d.distroId, d.runnableTasksForDistro, taskExpectedDuration)
 				if res.err != nil {
-					evergreen.Logger.Logf(slogger.ERROR, "%v", err)
+					grip.Error(err)
 				}
 
 				// write the results out to a results channel

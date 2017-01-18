@@ -481,7 +481,7 @@ func (as *APIServer) taskFinished(w http.ResponseWriter, t *task.Task, finishTim
 	if host.AgentRevision != agentRevision {
 		markHostRunningTaskFinished(host, t, "")
 		message := fmt.Sprintf("Remote agent needs to be rebuilt")
-		evergreen.Logger.Logf(slogger.INFO, message)
+		grip.Error(message)
 		taskEndResponse.Message = message
 		as.WriteJSON(w, http.StatusOK, taskEndResponse)
 		return
@@ -621,14 +621,14 @@ func (as *APIServer) AttachFiles(w http.ResponseWriter, r *http.Request) {
 	err := util.ReadJSONInto(r.Body, &entry.Files)
 	if err != nil {
 		message := fmt.Sprintf("Error reading file definitions for task  %v: %v", t.Id, err)
-		evergreen.Logger.Errorf(slogger.ERROR, message)
+		grip.Error(message)
 		as.WriteJSON(w, http.StatusBadRequest, message)
 		return
 	}
 
 	if err := entry.Upsert(); err != nil {
 		message := fmt.Sprintf("Error updating artifact file info for task %v: %v", t.Id, err)
-		evergreen.Logger.Errorf(slogger.ERROR, message)
+		grip.Error(message)
 		as.WriteJSON(w, http.StatusInternalServerError, message)
 		return
 	}

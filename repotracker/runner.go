@@ -10,7 +10,6 @@ import (
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 )
 
 type Runner struct{}
@@ -44,12 +43,12 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 
 	defer func() {
 		if err := db.ReleaseGlobalLock(RunnerName); err != nil {
-			evergreen.Logger.Errorf(slogger.ERROR, "Error releasing global lock: %v", err)
+			grip.Errorln("Error releasing global lock:", err)
 		}
 	}()
 
 	startTime := time.Now()
-	evergreen.Logger.Logf(slogger.INFO, "Running repository tracker with db “%v”", config.Database.DB)
+	grip.Infoln("Running repository tracker with db:", config.Database.DB)
 
 	allProjects, err := model.FindAllTrackedProjectRefs()
 	if err != nil {
@@ -77,7 +76,7 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 
 			err = tracker.FetchRevisions(numNewRepoRevisionsToFetch)
 			if err != nil {
-				evergreen.Logger.Errorf(slogger.ERROR, "Error fetching revisions: %v", err)
+				grip.Errorln("Error fetching revisions:", err)
 			}
 		}(projectRef)
 	}
@@ -89,6 +88,6 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 		grip.Error(err)
 		return err
 	}
-	evergreen.Logger.Logf(slogger.INFO, "Repository tracker took %v to run", runtime)
+	grip.Infof("Repository tracker took %s to run", runtime)
 	return nil
 }

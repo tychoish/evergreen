@@ -155,7 +155,7 @@ func runProcessByName(name string, settings *evergreen.Settings) error {
 		if r.Name() == name {
 			evergreen.Logger.Logf(slogger.INFO, "Running standalone %v process", name)
 			if err := r.Run(settings); err != nil {
-				evergreen.Logger.Logf(slogger.ERROR, "Error: %v", err)
+				grip.Error(err)
 			}
 			return nil
 		}

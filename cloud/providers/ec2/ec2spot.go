@@ -21,7 +21,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/tychoish/grip"
-	"github.com/tychoish/grip/slogger"
 )
 
 const (
@@ -173,7 +172,7 @@ func (cloudManager *EC2SpotManager) GetInstanceStatus(host *host.Host) (cloud.Cl
 		ec2Handle := getUSEast(*cloudManager.awsCredentials)
 		instanceInfo, err := getInstanceInfo(ec2Handle, spotDetails.InstanceId)
 		if err != nil {
-			evergreen.Logger.Logf(slogger.ERROR, "Got an error checking spot details %v", err)
+			grip.Errorf("Got an error checking spot details %+v", err)
 			return cloud.StatusUnknown, err
 		}
 		return ec2StatusToEvergreenStatus(instanceInfo.State.Name), nil
@@ -193,7 +192,7 @@ func (cloudManager *EC2SpotManager) GetInstanceStatus(host *host.Host) (cloud.Cl
 	case SpotStatusFailed:
 		return cloud.StatusFailed, nil
 	default:
-		evergreen.Logger.Logf(slogger.ERROR, "Unexpected status code in spot req: %v", spotDetails.State)
+		grip.Errorf("Unexpected status code in spot req: %v", spotDetails.State)
 		return cloud.StatusUnknown, nil
 	}
 }
@@ -256,10 +255,9 @@ func (cloudManager *EC2SpotManager) SpawnInstance(d *distro.Distro, hostOpts clo
 		return nil, err
 	}
 
-	evergreen.Logger.Logf(slogger.DEBUG, "Successfully inserted intent host “%v” "+
-		"for distro “%v” to signal cloud instance spawn intent", instanceName,
-		d.Id)
-
+	grip.Debugf("Inserted intent host '%v' for distro '%v' to signal instance spawn intent",
+		instanceName, d.Id)
+	o
 	spotRequest := &ec2.RequestSpotInstances{
 		SpotPrice:      fmt.Sprintf("%v", ec2Settings.BidPrice),
 		InstanceCount:  1,
@@ -281,7 +279,7 @@ func (cloudManager *EC2SpotManager) SpawnInstance(d *distro.Distro, hostOpts clo
 	if err != nil {
 		//Remove the intent host if the API call failed
 		if err := intentHost.Remove(); err != nil {
-			evergreen.Logger.Logf(slogger.ERROR, "Failed to remove intent host %v: %v", intentHost.Id, err)
+			grip.Errorf("Failed to remove intent host %s: %+v", intentHost.Id, err)
 		}
 		err = fmt.Errorf("Failed starting spot instance for distro '%s' on intent host %s: %+v",
 			d.Id, intentHost.Id, err)
@@ -324,8 +322,7 @@ func (cloudManager *EC2SpotManager) SpawnInstance(d *distro.Distro, hostOpts clo
 
 	err = oldIntenthost.Remove()
 	if err != nil {
-		evergreen.Logger.Logf(slogger.ERROR, "Could not remove intent host "+
-			"“%v”: %v", oldIntenthost.Id, err)
+		grip.Errorf("Could not remove intent host '%s': %+v", oldIntenthost.Id, err)
 		return nil, err
 	}
 
@@ -336,11 +333,9 @@ func (cloudManager *EC2SpotManager) SpawnInstance(d *distro.Distro, hostOpts clo
 	err = attachTags(ec2Handle, tags, intentHost.Id)
 
 	if err != nil {
-		evergreen.Logger.Errorf(slogger.ERROR, "Unable to attach tags for %v: %v",
-			intentHost.Id, err)
+		grip.Errorf("Unable to attach tags for %s: %+v", intentHost.Id, err)
 	} else {
-		evergreen.Logger.Logf(slogger.DEBUG, "Attached tag name “%v” for “%v”",
-			instanceName, intentHost.Id)
+		grip.Debugf("Attached tag name '%s' for '%s'", instanceName, intentHost.Id)
 	}
 	return intentHost, nil
 }
@@ -360,8 +355,7 @@ func (cloudManager *EC2SpotManager) TerminateInstance(host *host.Host) error {
 		if ok && ec2err.Code == EC2ErrorSpotRequestNotFound {
 			// EC2 says the spot request is not found - assume this means amazon
 			// terminated our spot instance
-			evergreen.Logger.Logf(slogger.WARN, "EC2 could not find spot instance '%v', "+
-				"marking as terminated", host.Id)
+			grip.Warning("EC2 could not find spot instance '%s', marking as terminated", host.Id)
 			return host.Terminate()
 		}
 		err = fmt.Errorf("Couldn't terminate, failed to get spot request info for %v: %+v",
@@ -370,7 +364,7 @@ func (cloudManager *EC2SpotManager) TerminateInstance(host *host.Host) error {
 		return err
 	}
 
-	evergreen.Logger.Logf(slogger.INFO, "Canceling spot request %v", host.Id)
+	grip.Infoln("Canceling spot request", host.Id)
 	//First cancel the spot request
 	ec2Handle := getUSEast(*cloudManager.awsCredentials)
 	_, err = ec2Handle.CancelSpotRequests([]string{host.Id})
@@ -383,7 +377,7 @@ func (cloudManager *EC2SpotManager) TerminateInstance(host *host.Host) error {
 	//Canceling the spot request doesn't terminate the instance that fulfilled it,
 	// if it was fulfilled. We need to terminate the instance explicitly
 	if spotDetails.InstanceId != "" {
-		evergreen.Logger.Logf(slogger.INFO, "Spot request %v canceled, now terminating instance %v",
+		grip.Infof("Spot request %s canceled, now terminating instance %s",
 			spotDetails.InstanceId, host.Id)
 		resp, err := ec2Handle.TerminateInstances([]string{spotDetails.InstanceId})
 		if err != nil {
@@ -393,10 +387,10 @@ func (cloudManager *EC2SpotManager) TerminateInstance(host *host.Host) error {
 		}
 
 		for _, stateChange := range resp.StateChanges {
-			evergreen.Logger.Logf(slogger.INFO, "Terminated %v", stateChange.InstanceId)
+			grip.Infof("Terminated %s", stateChange.InstanceId)
 		}
 	} else {
-		evergreen.Logger.Logf(slogger.INFO, "Spot request %v canceled (no instances have fulfilled it)", host.Id)
+		grip.Infof("Spot request %s canceled (no instances have fulfilled it)", host.Id)
 	}
 
 	// set the host status as terminated and update its termination time
