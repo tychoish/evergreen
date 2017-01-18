@@ -120,10 +120,7 @@ var (
 	}
 
 	// Logger is our global logger. It can be changed for testing.
-	Logger = slogger.Logger{
-		Name:      "evg",
-		Appenders: []send.Sender{slogger.StdOutAppender()},
-	}
+	Logger slogger.Logger
 
 	// database and config directory, set to the testing version by default for safety
 	NotificationsFile = "mci-notifications.yml"
@@ -138,19 +135,11 @@ var (
 	CompletedStatuses = []string{TaskSucceeded, TaskFailed}
 )
 
-// SetLogger sets the global logger to write to the given path.
-func SetLogger(logPath string) {
-	sender, err := send.MakeFileLogger(logPath)
-	if err != nil {
-		panic(fmt.Sprintf("Cannot create log file %v: %v", logPath, err))
-	}
-
-	grip.SetName("evg")
-	grip.SetSender(sender)
-
+// SetLegacyLogger sets the global (s)logger instance to wrap the current grip Logger.
+func SetLegacyLogger() {
 	Logger = slogger.Logger{
-		Name:      grip.Name(),
-		Appenders: []send.Sender{sender},
+		Name:      fmt.Sprintf("evg-gloal.%s", grip.Name()),
+		Appenders: []send.Sender{grip.GetSender()},
 	}
 }
 

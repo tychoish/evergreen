@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/tychoish/grip/slogger"
-	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/gorilla/mux"
+	"github.com/tychoish/grip"
 )
 
 const (
@@ -30,7 +29,7 @@ func (restapi restAPI) getTaskHistory(w http.ResponseWriter, r *http.Request) {
 	chunk, err := iter.GetChunk(nil, MaxRestNumRevisions, NoRevisions, false)
 	if err != nil {
 		msg := fmt.Sprintf("Error finding history for task '%v'", taskName)
-		evergreen.Logger.Logf(slogger.ERROR, "%v: %v", msg, err)
+		grip.Errorf("%v: %+v", msg, err)
 		restapi.WriteJSON(w, http.StatusInternalServerError, responseError{Message: msg})
 		return
 	}
