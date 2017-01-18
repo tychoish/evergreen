@@ -56,13 +56,7 @@ func NewXMPPLogger(name, target string, info XMPPConnectionInfo, l LevelInfo) (S
 		return nil, err
 	}
 
-	if err := s.SetLevel(l); err != nil {
-		return nil, err
-	}
-
-	s.SetName(name)
-
-	return s, nil
+	return setup(s, name, l)
 }
 
 // MakeXMPP constructs an XMPP logging backend that reads the
@@ -136,7 +130,7 @@ func (s *xmppLogger) Send(m message.Composer) {
 		c := xmpp.Chat{
 			Remote: s.target,
 			Type:   "chat",
-			Text:   fmt.Sprintf("[%s] (p=%s)  %s", s.name, m.Priority(), m.Resolve()),
+			Text:   fmt.Sprintf("[%s] (p=%s)  %s", s.name, m.Priority(), m.String()),
 		}
 		s.RUnlock()
 
