@@ -34,7 +34,7 @@ func TestLoggingTaskEvents(t *testing.T) {
 			time.Sleep(1 * time.Millisecond)
 			LogTaskFinished(taskId, hostId, evergreen.TaskSucceeded)
 
-			eventsForTask, err := Find(TaskEventsInOrder(taskId))
+			eventsForTask, err := Find(Collection, TaskEventsInOrder(taskId))
 			So(err, ShouldEqual, nil)
 
 			event := eventsForTask[0]

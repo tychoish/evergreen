@@ -46,7 +46,7 @@ func TestLoggingHostEvents(t *testing.T) {
 			// fetch all the events from the database, make sure they are
 			// persisted correctly
 
-			eventsForHost, err := Find(HostEventsInOrder(hostId))
+			eventsForHost, err := Find(Collection, HostEventsInOrder(hostId))
 			So(err, ShouldBeNil)
 
 			event := eventsForHost[0]

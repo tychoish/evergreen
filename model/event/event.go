@@ -11,7 +11,8 @@ import (
 
 const (
 	// db constants
-	Collection = "event_log"
+	Collection     = "event_log"
+	TaskCollection = "task_event_log"
 )
 
 type Event struct {
@@ -51,6 +52,10 @@ func (dw DataWrapper) MarshalJSON() ([]byte, error) {
 	case *SchedulerEventData:
 		return json.Marshal(event)
 	case *DistroEventData:
+		return json.Marshal(event)
+	case *TaskSystemResourceData:
+		return json.Marshal(event)
+	case *TaskProcessResourceData:
 		return json.Marshal(event)
 	default:
 		return nil, fmt.Errorf("cannot marshal data of type %T", dw.Data)

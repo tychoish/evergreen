@@ -34,6 +34,7 @@ import (
 	"github.com/evergreen-ci/render"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/tychoish/grip/message"
 	"github.com/tychoish/grip/slogger"
 )
 
@@ -710,6 +711,30 @@ func (as *APIServer) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	as.WriteJSON(w, http.StatusOK, heartbeatResponse)
 }
 
+func (as *APIServer) TaskSystemInfo(w http.ResponseWriter, r *http.Request) {
+	t := MustHaveTask(r)
+
+	info := &message.SystemInfo{}
+	if err := util.ReadJSONInto(r.Body, info); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	event.LogTaskSystemData(t.Id, info)
+	as.WriteJSON(w, http.StatusOK, struct{})
+}
+
+func (as *APIServer) TaskProcessInfo(w http.ResponseWriter, r *http.Request) {
+	t := MustHaveTask(r)
+
+	procs := make([]*message.ProcessInfo)
+	if err := util.ReadJSONInto(r.Body, procs); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	event.LogTaskProcessData(t.Id, procs)
+	as.WriteJSON(w, http.StatusOK, struct{})
+}
+
 func home(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Welcome to the API server's home :)\n")
 }
@@ -1053,6 +1078,8 @@ func (as *APIServer) Handler() (http.Handler, error) {
 	taskRouter.HandleFunc("/results", as.checkTask(true, as.checkHost(as.AttachResults))).Methods("POST")
 	taskRouter.HandleFunc("/test_logs", as.checkTask(true, as.checkHost(as.AttachTestLog))).Methods("POST")
 	taskRouter.HandleFunc("/files", as.checkTask(false, as.checkHost(as.AttachFiles))).Methods("POST")
+	taskRouter.HandleFunc("/system_info", as.checkTask(true, as.checkHost(as.TaskSystemInfo))).Methods("POST")
+	taskRouter.HandleFunc("/process_info", as.checkTask(true, as.checkHost(as.TaskProcessInfo))).Methods("POST")
 	taskRouter.HandleFunc("/distro", as.checkTask(false, as.GetDistro)).Methods("GET")
 	taskRouter.HandleFunc("/", as.checkTask(true, as.FetchTask)).Methods("GET")
 	taskRouter.HandleFunc("/version", as.checkTask(false, as.GetVersion)).Methods("GET")

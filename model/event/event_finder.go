@@ -6,11 +6,18 @@ import (
 )
 
 // === DB Logic ===
-
-func Find(query db.Q) ([]Event, error) {
+func Find(coll string, query db.Q) ([]Event, error) {
 	events := []Event{}
-	err := db.FindAllQ(Collection, query, &events)
+	err := db.FindAllQ(coll, query, &events)
 	return events, err
+}
+
+func FindTaskEvent(query db.Q) ([]Event, error) {
+	return Find(TaskCollection, query)
+}
+
+func FindSystemEvent(query db.Q) ([]Event, error) {
+	return Find(Collection, query)
 }
 
 // === Queries ===
@@ -73,4 +80,21 @@ func SchedulerEventsForId(distroId string) db.Q {
 
 func RecentSchedulerEvents(distroId string, n int) db.Q {
 	return SchedulerEventsForId(distroId).Sort([]string{"-" + TimestampKey}).Limit(n)
+}
+
+// TaskRessource Events
+func TaskSystemInfoEvents(taskid string, n int) db.Q {
+	return db.Query(bson.D{
+		{Data + "." + ResourceTypeKey, ResourceTypeResourceInfo},
+		{ResourceIdKey, taskId},
+		{TypeKey, EventTaskProcessInfo},
+	}).Limit(n)
+}
+
+func TaskProcessInfoEvents(taskId string, n int) db.Q {
+	return db.Query(bson.D{
+		{Data + "." + ResourceTypeKey, ResourceTypeResourceInfo},
+		{ResourceIdKey, taskId},
+		{TypeKey, EventTaskProcessInfo},
+	}).Limit(n)
 }

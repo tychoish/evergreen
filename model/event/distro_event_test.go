@@ -33,7 +33,7 @@ func TestLoggingDistroEvents(t *testing.T) {
 			// fetch all the events from the database, make sure they are
 			// persisted correctly
 
-			eventsForDistro, err := Find(DistroEventsInOrder(distroId))
+			eventsForDistro, err := Find(Collection, DistroEventsInOrder(distroId))
 			So(err, ShouldBeNil)
 
 			event := eventsForDistro[0]
