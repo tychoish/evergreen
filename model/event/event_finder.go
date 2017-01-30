@@ -83,17 +83,17 @@ func RecentSchedulerEvents(distroId string, n int) db.Q {
 }
 
 // TaskRessource Events
-func TaskSystemInfoEvents(taskid string, n int) db.Q {
+func TaskSystemInfoEvents(taskId string, n int) db.Q {
 	return db.Query(bson.D{
-		{Data + "." + ResourceTypeKey, ResourceTypeResourceInfo},
+		{DataKey + "." + ResourceTypeKey, EventTaskSystemInfo},
 		{ResourceIdKey, taskId},
-		{TypeKey, EventTaskProcessInfo},
+		{TypeKey, EventTaskSystemInfo},
 	}).Limit(n)
 }
 
 func TaskProcessInfoEvents(taskId string, n int) db.Q {
 	return db.Query(bson.D{
-		{Data + "." + ResourceTypeKey, ResourceTypeResourceInfo},
+		{DataKey + "." + ResourceTypeKey, EventTaskProcessInfo},
 		{ResourceIdKey, taskId},
 		{TypeKey, EventTaskProcessInfo},
 	}).Limit(n)

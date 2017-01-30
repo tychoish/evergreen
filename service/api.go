@@ -720,19 +720,19 @@ func (as *APIServer) TaskSystemInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	event.LogTaskSystemData(t.Id, info)
-	as.WriteJSON(w, http.StatusOK, struct{})
+	as.WriteJSON(w, http.StatusOK, struct{}{})
 }
 
 func (as *APIServer) TaskProcessInfo(w http.ResponseWriter, r *http.Request) {
 	t := MustHaveTask(r)
 
-	procs := make([]*message.ProcessInfo)
+	procs := []*message.ProcessInfo{}
 	if err := util.ReadJSONInto(r.Body, procs); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
 	event.LogTaskProcessData(t.Id, procs)
-	as.WriteJSON(w, http.StatusOK, struct{})
+	as.WriteJSON(w, http.StatusOK, struct{}{})
 }
 
 func home(w http.ResponseWriter, r *http.Request) {

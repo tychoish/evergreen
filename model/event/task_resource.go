@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	ResourceTypeTaskInfo = "RESOURCE_INFO"
 	EventTaskSystemInfo  = "TASK_SYSTEM_INFO"
 	EventTaskProcessInfo = "TASK_PROCESS_INFO"
 )
@@ -31,13 +30,14 @@ func LogTaskSystemData(taskId string, info *message.SystemInfo) {
 
 	info.Base = message.Base{}
 	data := TaskSystemResourceData{
-		ResourceType: ResourceTypeTaskInfo,
+		ResourceType: EventTaskSystemInfo,
 		SystemInfo:   info,
 	}
 	event.Data = DataWrapper{data}
 
 	if err := NewDBEventLogger(TaskCollection).LogEvent(event); err != nil {
-		grip.Error(message.NewErrorWrap(err, "problem system info event"))
+		grip.Error(err)
+		//	grip.Error(message.NewErrorWrap(err, "problem system info event"))
 	}
 }
 
@@ -62,8 +62,8 @@ func LogTaskProcessData(taskId string, procs []*message.ProcessInfo) {
 	}
 
 	data := TaskProcessResourceData{
-		ResourceType: ResourceTypeTaskInfo,
-		Processes:    proces,
+		ResourceType: EventTaskProcessInfo,
+		Processes:    procs,
 	}
 
 	event := Event{
@@ -74,6 +74,7 @@ func LogTaskProcessData(taskId string, procs []*message.ProcessInfo) {
 	}
 
 	if err := NewDBEventLogger(TaskCollection).LogEvent(event); err != nil {
-		grip.Error(message.NewErrorWrap(err, "problem logging task process info event"))
+		grip.Error(err)
+		//	grip.Error(message.NewErrorWrap(err, "problem logging task process info event"))
 	}
 }
