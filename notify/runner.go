@@ -1,12 +1,12 @@
 package notify
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 type Runner struct{}
@@ -29,7 +29,7 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 	grip.Infoln("Starting notifications at time", startTime)
 
 	if err := Run(config); err != nil {
-		err = fmt.Errorf("error running notify: %+v", err)
+		err = errors.Errorf("error running notify: %+v", err)
 		grip.Error(err)
 		return err
 	}

@@ -1,10 +1,9 @@
 package scheduler
 
 import (
-	"fmt"
-
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
+	"github.com/pkg/errors"
 )
 
 // TaskDurationEstimator is responsible for fetching the expected duration for a
@@ -49,7 +48,7 @@ func (self *DBTaskDurationEstimator) GetExpectedDurations(
 				t.Project, t.BuildVariant,
 				model.TaskCompletionEstimateWindow)
 			if err != nil {
-				return durations, fmt.Errorf("Error fetching "+
+				return durations, errors.Errorf("Error fetching "+
 					"expected task duration for %v on %v: %v",
 					t.BuildVariant, t.Project, err)
 			}

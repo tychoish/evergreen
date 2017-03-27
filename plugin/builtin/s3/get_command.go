@@ -3,7 +3,6 @@ package s3
 import (
 	"archive/tar"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"github.com/goamz/goamz/aws"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip/slogger"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -61,12 +61,12 @@ func (self *S3GetCommand) Plugin() string {
 // S3GetCommand-specific implementation of ParseParams.
 func (self *S3GetCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, self); err != nil {
-		return fmt.Errorf("error decoding %v params: %v", self.Name(), err)
+		return errors.Errorf("error decoding %v params: %v", self.Name(), err)
 	}
 
 	// make sure the command params are valid
 	if err := self.validateParams(); err != nil {
-		return fmt.Errorf("error validating %v params: %v", self.Name(), err)
+		return errors.Errorf("error validating %v params: %v", self.Name(), err)
 	}
 
 	return nil
@@ -76,29 +76,29 @@ func (self *S3GetCommand) ParseParams(params map[string]interface{}) error {
 // local_file and extract_to is specified.
 func (self *S3GetCommand) validateParams() error {
 	if self.AwsKey == "" {
-		return fmt.Errorf("aws_key cannot be blank")
+		return errors.Errorf("aws_key cannot be blank")
 	}
 	if self.AwsSecret == "" {
-		return fmt.Errorf("aws_secret cannot be blank")
+		return errors.Errorf("aws_secret cannot be blank")
 	}
 	if self.RemoteFile == "" {
-		return fmt.Errorf("remote_file cannot be blank")
+		return errors.Errorf("remote_file cannot be blank")
 	}
 
 	// make sure the bucket is valid
 	if err := validateS3BucketName(self.Bucket); err != nil {
-		return fmt.Errorf("%v is an invalid bucket name: %v", self.Bucket, err)
+		return errors.Errorf("%v is an invalid bucket name: %v", self.Bucket, err)
 	}
 
 	// make sure local file and extract-to dir aren't both specified
 	if self.LocalFile != "" && self.ExtractTo != "" {
-		return fmt.Errorf("cannot specify both local_file and extract_to" +
+		return errors.Errorf("cannot specify both local_file and extract_to" +
 			" directory")
 	}
 
 	// make sure one is specified
 	if self.LocalFile == "" && self.ExtractTo == "" {
-		return fmt.Errorf("must specify either local_file or extract_to")
+		return errors.Errorf("must specify either local_file or extract_to")
 	}
 	return nil
 }
@@ -132,7 +132,7 @@ func (self *S3GetCommand) Execute(pluginLogger plugin.Logger,
 
 	// validate the params
 	if err := self.validateParams(); err != nil {
-		return fmt.Errorf("expanded params are not valid: %v", err)
+		return errors.Errorf("expanded params are not valid: %v", err)
 	}
 
 	if !self.shouldRunForVariant(conf.BuildVariant.Name) {
@@ -208,7 +208,7 @@ func (self *S3GetCommand) Get() error {
 	// get a reader for the bucket
 	reader, err := bucket.GetReader(self.RemoteFile)
 	if err != nil {
-		return fmt.Errorf("error getting bucket reader for file %v: %v",
+		return errors.Errorf("error getting bucket reader for file %v: %v",
 			self.RemoteFile, err)
 	}
 	defer reader.Close()
@@ -219,12 +219,12 @@ func (self *S3GetCommand) Get() error {
 		// remove the file, if it exists
 		exists, err := util.FileExists(self.LocalFile)
 		if err != nil {
-			return fmt.Errorf("error checking existence of local file %v: %v",
+			return errors.Errorf("error checking existence of local file %v: %v",
 				self.LocalFile, err)
 		}
 		if exists {
 			if err := os.RemoveAll(self.LocalFile); err != nil {
-				return fmt.Errorf("error clearing local file %v: %v",
+				return errors.Errorf("error clearing local file %v: %v",
 					self.LocalFile, err)
 			}
 		}
@@ -232,7 +232,7 @@ func (self *S3GetCommand) Get() error {
 		// open the local file
 		file, err := os.Create(self.LocalFile)
 		if err != nil {
-			return fmt.Errorf("error opening local file %v: %v", self.LocalFile,
+			return errors.Errorf("error opening local file %v: %v", self.LocalFile,
 				err)
 		}
 		defer file.Close()
@@ -245,14 +245,14 @@ func (self *S3GetCommand) Get() error {
 		// wrap the reader in a gzip reader and a tar reader
 		gzipReader, err := gzip.NewReader(reader)
 		if err != nil {
-			return fmt.Errorf("error creating gzip reader for %v: %v",
+			return errors.Errorf("error creating gzip reader for %v: %v",
 				self.RemoteFile, err)
 		}
 
 		tarReader := tar.NewReader(gzipReader)
 		err = archive.Extract(tarReader, self.ExtractTo)
 		if err != nil {
-			return fmt.Errorf("error extracting %v to %v: %v", self.RemoteFile,
+			return errors.Errorf("error extracting %v to %v: %v", self.RemoteFile,
 				self.ExtractTo, err)
 		}
 	}

@@ -1,14 +1,13 @@
 package scheduler
 
 import (
-	"fmt"
-
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/cloud/providers"
 	"github.com/evergreen-ci/evergreen/model/distro"
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 // DeficitBasedHostAllocator uses the difference between the number of free hosts
@@ -28,11 +27,11 @@ func (self *DeficitBasedHostAllocator) NewHostsNeeded(
 	for distroId := range hostAllocatorData.taskQueueItems {
 		distro, ok := hostAllocatorData.distros[distroId]
 		if !ok {
-			return nil, fmt.Errorf("No distro info available for distro %v",
+			return nil, errors.Errorf("No distro info available for distro %v",
 				distroId)
 		}
 		if distro.Id != distroId {
-			return nil, fmt.Errorf("Bad mapping between task queue distro "+
+			return nil, errors.Errorf("Bad mapping between task queue distro "+
 				"name and host allocator distro data: %v != %v", distro.Id,
 				distroId)
 		}

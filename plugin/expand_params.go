@@ -1,12 +1,12 @@
 package plugin
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/evergreen-ci/evergreen/command"
 	"github.com/evergreen-ci/evergreen/util"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -23,7 +23,7 @@ func ExpandValues(input interface{}, expansions *command.Expansions) error {
 
 	// make sure the input is a pointer to a map or struct
 	if reflect.ValueOf(input).Type().Kind() != reflect.Ptr {
-		return fmt.Errorf("input to expand must be a pointer")
+		return errors.Errorf("input to expand must be a pointer")
 	}
 	inputVal := reflect.Indirect(reflect.ValueOf(input))
 
@@ -31,14 +31,14 @@ func ExpandValues(input interface{}, expansions *command.Expansions) error {
 	switch inputVal.Type().Kind() {
 	case reflect.Struct:
 		if err := expandStruct(inputVal, expansions); err != nil {
-			return fmt.Errorf("error expanding struct: %v", err)
+			return errors.Errorf("error expanding struct: %v", err)
 		}
 	case reflect.Map:
 		if err := expandMap(inputVal, expansions); err != nil {
-			return fmt.Errorf("error expanding map: %v", err)
+			return errors.Errorf("error expanding map: %v", err)
 		}
 	default:
-		return fmt.Errorf("input to expand must be a pointer to a struct or map")
+		return errors.Errorf("input to expand must be a pointer to a struct or map")
 	}
 
 	return nil
@@ -49,14 +49,14 @@ func ExpandValues(input interface{}, expansions *command.Expansions) error {
 func expandMap(inputMap reflect.Value, expansions *command.Expansions) error {
 
 	if inputMap.Type().Key().Kind() != reflect.String {
-		return fmt.Errorf("input map to expand must have keys of string type")
+		return errors.Errorf("input map to expand must have keys of string type")
 	}
 
 	// iterate through keys and value, expanding them
 	for _, key := range inputMap.MapKeys() {
 		expandedKeyString, err := expansions.ExpandString(key.String())
 		if err != nil {
-			return fmt.Errorf("could not expand key %v: %v", key.String(), err)
+			return errors.Errorf("could not expand key %v: %v", key.String(), err)
 		}
 
 		// expand and set new value
@@ -66,16 +66,16 @@ func expandMap(inputMap reflect.Value, expansions *command.Expansions) error {
 		case reflect.String:
 			expandedValString, err := expansions.ExpandString(val.String())
 			if err != nil {
-				return fmt.Errorf("could not expand value %v: %v", val.String(), err)
+				return errors.Errorf("could not expand value %v: %v", val.String(), err)
 			}
 			expandedVal = reflect.ValueOf(expandedValString)
 		case reflect.Map:
 			if err := expandMap(val, expansions); err != nil {
-				return fmt.Errorf("could not expand value %v: %v", val.String(), err)
+				return errors.Errorf("could not expand value %v: %v", val.String(), err)
 			}
 			expandedVal = val
 		default:
-			return fmt.Errorf(
+			return errors.Errorf(
 				"could not expand value %v: must be string, map, or struct",
 				val.String())
 		}
@@ -115,7 +115,7 @@ func expandStruct(inputVal reflect.Value, expansions *command.Expansions) error 
 		if field.Type.Kind() == reflect.Struct {
 			err := expandStruct(inputVal.FieldByName(field.Name), expansions)
 			if err != nil {
-				return fmt.Errorf("error expanding struct in field %v: %v",
+				return errors.Errorf("error expanding struct in field %v: %v",
 					field.Name, err)
 			}
 			continue
@@ -126,7 +126,7 @@ func expandStruct(inputVal reflect.Value, expansions *command.Expansions) error 
 			inputMap := inputVal.FieldByName(field.Name)
 			err := expandMap(inputMap, expansions)
 			if err != nil {
-				return fmt.Errorf("error expanding map in field %v: %v",
+				return errors.Errorf("error expanding map in field %v: %v",
 					field.Name, err)
 			}
 			continue
@@ -147,7 +147,7 @@ func expandStruct(inputVal reflect.Value, expansions *command.Expansions) error 
 					err = expandStruct(slice.Index(i), expansions)
 				}
 				if err != nil {
-					return fmt.Errorf("error expanding struct in field %v: %v",
+					return errors.Errorf("error expanding struct in field %v: %v",
 						field.Name, err)
 				}
 			}
@@ -156,7 +156,7 @@ func expandStruct(inputVal reflect.Value, expansions *command.Expansions) error 
 
 		// make sure the field is a string
 		if field.Type.Kind() != reflect.String {
-			return fmt.Errorf("cannot expand non-string field '%v' "+
+			return errors.Errorf("cannot expand non-string field '%v' "+
 				"which is of type %v", field.Name, field.Type.Kind())
 		}
 
@@ -164,7 +164,7 @@ func expandStruct(inputVal reflect.Value, expansions *command.Expansions) error 
 		fieldOfElem := inputVal.FieldByName(field.Name)
 		err := expandString(fieldOfElem, expansions)
 		if err != nil {
-			return fmt.Errorf("error applying expansions to field %v with"+
+			return errors.Errorf("error applying expansions to field %v with"+
 				" value %v: %v", field.Name, fieldOfElem.String(), err)
 		}
 	}

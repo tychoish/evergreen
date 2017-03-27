@@ -1,7 +1,6 @@
 package attach
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip/slogger"
+	"github.com/pkg/errors"
 )
 
 // AttachResultsCommand is used to attach MCI test results in json
@@ -34,11 +34,11 @@ func (self *AttachResultsCommand) Plugin() string {
 // to satisfy the 'Command' interface
 func (self *AttachResultsCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, self); err != nil {
-		return fmt.Errorf("error decoding '%v' params: %v", self.Name(), err)
+		return errors.Errorf("error decoding '%v' params: %v", self.Name(), err)
 	}
 
 	if err := self.validateAttachResultsParams(); err != nil {
-		return fmt.Errorf("error validating '%v' params: %v", self.Name(), err)
+		return errors.Errorf("error validating '%v' params: %v", self.Name(), err)
 	}
 	return nil
 }
@@ -47,7 +47,7 @@ func (self *AttachResultsCommand) ParseParams(params map[string]interface{}) err
 // the fields necessary for attaching a results are present
 func (self *AttachResultsCommand) validateAttachResultsParams() (err error) {
 	if self.FileLoc == "" {
-		return fmt.Errorf("file_location cannot be blank")
+		return errors.Errorf("file_location cannot be blank")
 	}
 	return nil
 }
@@ -56,7 +56,7 @@ func (self *AttachResultsCommand) expandAttachResultsParams(
 	taskConfig *model.TaskConfig) (err error) {
 	self.FileLoc, err = taskConfig.Expansions.ExpandString(self.FileLoc)
 	if err != nil {
-		return fmt.Errorf("error expanding file_location: %v", err)
+		return errors.Errorf("error expanding file_location: %v", err)
 	}
 	return nil
 }
@@ -82,13 +82,13 @@ func (self *AttachResultsCommand) Execute(pluginLogger plugin.Logger,
 		// attempt to open the file
 		reportFile, err := os.Open(reportFileLoc)
 		if err != nil {
-			errChan <- fmt.Errorf("Couldn't open report file: '%v'", err)
+			errChan <- errors.Errorf("Couldn't open report file: '%v'", err)
 			return
 		}
 
 		results := &task.TestResults{}
 		if err = util.ReadJSONInto(reportFile, results); err != nil {
-			errChan <- fmt.Errorf("Couldn't read report file: '%v'", err)
+			errChan <- errors.Errorf("Couldn't read report file: '%v'", err)
 			return
 		}
 		if err := reportFile.Close(); err != nil {

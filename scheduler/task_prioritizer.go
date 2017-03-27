@@ -7,6 +7,7 @@ import (
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 // TaskPrioritizer is responsible for taking in a slice of tasks, and ordering them
@@ -83,7 +84,7 @@ func (prioritizer *CmpBasedTaskPrioritizer) PrioritizeTasks(
 
 		err := comparator.setupForSortingTasks()
 		if err != nil {
-			return nil, fmt.Errorf("Error running setup for sorting tasks: %v",
+			return nil, errors.Errorf("Error running setup for sorting tasks: %v",
 				err)
 		}
 
@@ -94,7 +95,7 @@ func (prioritizer *CmpBasedTaskPrioritizer) PrioritizeTasks(
 			for _, e := range comparator.errsDuringSort {
 				errString += fmt.Sprintf("\n    %v", e)
 			}
-			return nil, fmt.Errorf(errString)
+			return nil, errors.Errorf(errString)
 		}
 
 		prioritizedTaskLists = append(prioritizedTaskLists, comparator.tasks)
@@ -115,7 +116,7 @@ func (prioritizer *CmpBasedTaskPrioritizer) PrioritizeTasks(
 func (self *CmpBasedTaskComparator) setupForSortingTasks() error {
 	for _, setupFunc := range self.setupFuncs {
 		if err := setupFunc(self); err != nil {
-			return fmt.Errorf("Error running setup for sorting: %v", err)
+			return errors.Errorf("Error running setup for sorting: %v", err)
 		}
 	}
 	return nil

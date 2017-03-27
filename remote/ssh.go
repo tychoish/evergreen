@@ -1,15 +1,16 @@
 package remote
 
 import (
-	"fmt"
 	"io"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"golang.org/x/crypto/ssh"
 )
 
 var (
-	ErrCmdTimedOut = fmt.Errorf("ssh command timed out")
+	ErrCmdTimedOut = errors.Errorf("ssh command timed out")
 )
 
 // SSHCommand abstracts a single command to be run via ssh, on a remote machine.
@@ -40,19 +41,19 @@ func (cmd *SSHCommand) Run() ([]byte, error) {
 	// configure appropriately
 	clientConfig, err := createClientConfig(cmd.User, cmd.Keyfile)
 	if err != nil {
-		return nil, fmt.Errorf("error configuring ssh: %v", err)
+		return nil, errors.Errorf("error configuring ssh: %v", err)
 	}
 
 	// open a connection to the ssh server
 	conn, err := ssh.Dial("tcp", cmd.Host, clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error connecting to ssh server at `%v`: %v", cmd.Host, err)
+		return nil, errors.Errorf("error connecting to ssh server at `%v`: %v", cmd.Host, err)
 	}
 
 	// initiate a session for running an ssh command
 	session, err := conn.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("error creating an ssh session to `%v`: %v", cmd.Host, err)
+		return nil, errors.Errorf("error creating an ssh session to `%v`: %v", cmd.Host, err)
 	}
 	defer session.Close()
 
@@ -68,7 +69,7 @@ func (cmd *SSHCommand) Run() ([]byte, error) {
 
 	// request a pseudo terminal
 	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
-		return nil, fmt.Errorf("error requesting pty: %v", err)
+		return nil, errors.Errorf("error requesting pty: %v", err)
 	}
 
 	// kick the ssh command off

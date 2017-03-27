@@ -2,11 +2,11 @@ package notify
 
 import (
 	"bytes"
-	"fmt"
 	"path/filepath"
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/web"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -20,7 +20,7 @@ func createEnvironment(settings *evergreen.Settings, globals map[string]interfac
 
 	funcs, err := web.MakeCommonFunctionMap(settings)
 	if err != nil {
-		return nil, fmt.Errorf("error creating templating functions: %v", err)
+		return nil, errors.Wrap(err, "error creating templating functions")
 	}
 	// Overwrite globals
 	funcs["Global"] = func(input string) interface{} {
@@ -43,7 +43,7 @@ func TemplateEmailBody(ae *web.App, name string, data interface{}) (string, erro
 	err := templateResponse.TemplateSet.ExecuteTemplate(&buf, templateResponse.TemplateName,
 		templateResponse.Data)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return buf.String(), nil

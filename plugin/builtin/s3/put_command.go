@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/goamz/goamz/aws"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip/slogger"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -93,12 +93,12 @@ func (s3pc *S3PutCommand) Plugin() string {
 // S3PutCommand-specific implementation of ParseParams.
 func (s3pc *S3PutCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, s3pc); err != nil {
-		return fmt.Errorf("error decoding %v params: %v", s3pc.Name(), err)
+		return errors.Errorf("error decoding %v params: %v", s3pc.Name(), err)
 	}
 
 	// make sure the command params are valid
 	if err := s3pc.validateParams(); err != nil {
-		return fmt.Errorf("error validating %v params: %v", s3pc.Name(), err)
+		return errors.Errorf("error validating %v params: %v", s3pc.Name(), err)
 	}
 
 	return nil
@@ -107,38 +107,38 @@ func (s3pc *S3PutCommand) ParseParams(params map[string]interface{}) error {
 // Validate that all necessary params are set and valid.
 func (s3pc *S3PutCommand) validateParams() error {
 	if s3pc.AwsKey == "" {
-		return fmt.Errorf("aws_key cannot be blank")
+		return errors.Errorf("aws_key cannot be blank")
 	}
 	if s3pc.AwsSecret == "" {
-		return fmt.Errorf("aws_secret cannot be blank")
+		return errors.Errorf("aws_secret cannot be blank")
 	}
 	if s3pc.LocalFile == "" && len(s3pc.LocalFilesIncludeFilter) == 0 {
-		return fmt.Errorf("local_file and local_files_include_filter cannot both be blank")
+		return errors.Errorf("local_file and local_files_include_filter cannot both be blank")
 	}
 	if s3pc.LocalFile != "" && len(s3pc.LocalFilesIncludeFilter) != 0 {
-		return fmt.Errorf("local_file and local_files_include_filter cannot both be specified")
+		return errors.Errorf("local_file and local_files_include_filter cannot both be specified")
 	}
 	if s3pc.Optional && len(s3pc.LocalFilesIncludeFilter) != 0 {
-		return fmt.Errorf("cannot use optional upload with local_files_include_filter")
+		return errors.Errorf("cannot use optional upload with local_files_include_filter")
 	}
 	if s3pc.RemoteFile == "" {
-		return fmt.Errorf("remote_file cannot be blank")
+		return errors.Errorf("remote_file cannot be blank")
 	}
 	if s3pc.ContentType == "" {
-		return fmt.Errorf("content_type cannot be blank")
+		return errors.Errorf("content_type cannot be blank")
 	}
 	if !util.SliceContains(artifact.ValidVisibilities, s3pc.Visibility) {
-		return fmt.Errorf("invalid visibility setting: %v", s3pc.Visibility)
+		return errors.Errorf("invalid visibility setting: %v", s3pc.Visibility)
 	}
 
 	// make sure the bucket is valid
 	if err := validateS3BucketName(s3pc.Bucket); err != nil {
-		return fmt.Errorf("%v is an invalid bucket name: %v", s3pc.Bucket, err)
+		return errors.Errorf("%v is an invalid bucket name: %v", s3pc.Bucket, err)
 	}
 
 	// make sure the s3 permissions are valid
 	if !validS3Permissions(s3pc.Permissions) {
-		return fmt.Errorf("permissions '%v' are not valid", s3pc.Permissions)
+		return errors.Errorf("permissions '%v' are not valid", s3pc.Permissions)
 	}
 
 	return nil
@@ -179,7 +179,7 @@ func (s3pc *S3PutCommand) Execute(log plugin.Logger,
 
 	// validate the params
 	if err := s3pc.validateParams(); err != nil {
-		return fmt.Errorf("expanded params are not valid: %v", err)
+		return errors.Errorf("expanded params are not valid: %v", err)
 	}
 
 	if !s3pc.shouldRunForVariant(conf.BuildVariant.Name) {
@@ -323,7 +323,7 @@ func (s3pc *S3PutCommand) AttachTaskFiles(log plugin.Logger,
 
 	err := com.PostTaskFiles([]*artifact.File{file})
 	if err != nil {
-		return fmt.Errorf("Attach files failed: %v", err)
+		return errors.Errorf("Attach files failed: %v", err)
 	}
 	log.LogExecution(slogger.INFO, "API attach files call succeeded")
 	return nil

@@ -122,7 +122,7 @@ func (self *S3CopyPlugin) Configure(map[string]interface{}) error {
 // 'Plugin' interface
 func (scp *S3CopyPlugin) NewCommand(cmdName string) (plugin.Command, error) {
 	if cmdName != s3CopyCmd {
-		return nil, fmt.Errorf("No such %v command: %v",
+		return nil, errors.Errorf("No such %v command: %v",
 			s3CopyPluginName, cmdName)
 	}
 	return &S3CopyCommand{}, nil
@@ -141,10 +141,10 @@ func (scc *S3CopyCommand) Plugin() string {
 // to satisfy the 'Command' interface
 func (scc *S3CopyCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, scc); err != nil {
-		return fmt.Errorf("error decoding %v params: %v", scc.Name(), err)
+		return errors.Errorf("error decoding %v params: %v", scc.Name(), err)
 	}
 	if err := scc.validateParams(); err != nil {
-		return fmt.Errorf("error validating %v params: %v", scc.Name(), err)
+		return errors.Errorf("error validating %v params: %v", scc.Name(), err)
 	}
 	return nil
 }
@@ -153,23 +153,23 @@ func (scc *S3CopyCommand) ParseParams(params map[string]interface{}) error {
 // the fields necessary for carrying out an S3 copy operation are present
 func (scc *S3CopyCommand) validateParams() (err error) {
 	if scc.AwsKey == "" {
-		return fmt.Errorf("s3 AWS key cannot be blank")
+		return errors.Errorf("s3 AWS key cannot be blank")
 	}
 	if scc.AwsSecret == "" {
-		return fmt.Errorf("s3 AWS secret cannot be blank")
+		return errors.Errorf("s3 AWS secret cannot be blank")
 	}
 	for _, s3CopyFile := range scc.S3CopyFiles {
 		if s3CopyFile.Source.Bucket == "" {
-			return fmt.Errorf("s3 source bucket cannot be blank")
+			return errors.Errorf("s3 source bucket cannot be blank")
 		}
 		if s3CopyFile.Destination.Bucket == "" {
-			return fmt.Errorf("s3 destination bucket cannot be blank")
+			return errors.Errorf("s3 destination bucket cannot be blank")
 		}
 		if s3CopyFile.Source.Path == "" {
-			return fmt.Errorf("s3 source path cannot be blank")
+			return errors.Errorf("s3 source path cannot be blank")
 		}
 		if s3CopyFile.Destination.Path == "" {
-			return fmt.Errorf("s3 destination path cannot be blank")
+			return errors.Errorf("s3 destination path cannot be blank")
 		}
 	}
 
@@ -185,13 +185,13 @@ func (scc *S3CopyCommand) validateS3CopyParams() (err error) {
 	for _, s3CopyFile := range scc.S3CopyFiles {
 		err := validateS3BucketName(s3CopyFile.Source.Bucket)
 		if err != nil {
-			return fmt.Errorf("source bucket '%v' is invalid: %v",
+			return errors.Errorf("source bucket '%v' is invalid: %v",
 				s3CopyFile.Source.Bucket, err)
 		}
 
 		err = validateS3BucketName(s3CopyFile.Destination.Bucket)
 		if err != nil {
-			return fmt.Errorf("destination bucket '%v' is invalid: %v",
+			return errors.Errorf("destination bucket '%v' is invalid: %v",
 				s3CopyFile.Destination.Bucket, err)
 		}
 	}
@@ -262,7 +262,7 @@ func (scc *S3CopyCommand) S3Copy(taskConfig *model.TaskConfig,
 
 		if resp != nil && resp.StatusCode != http.StatusOK {
 			body, _ := ioutil.ReadAll(resp.Body)
-			err := fmt.Errorf("S3 push copy failed (%v): %v",
+			err := errors.Errorf("S3 push copy failed (%v): %v",
 				resp.StatusCode, string(body))
 			if s3CopyFile.Optional {
 				pluginLogger.LogExecution(slogger.ERROR,
@@ -291,9 +291,9 @@ func (scc *S3CopyCommand) S3Copy(taskConfig *model.TaskConfig,
 		if err != nil {
 			body, readAllErr := ioutil.ReadAll(resp.Body)
 			if readAllErr != nil {
-				return fmt.Errorf("Error: %v", err)
+				return errors.Errorf("Error: %v", err)
 			}
-			return fmt.Errorf("Error: %v, (%v): %v",
+			return errors.Errorf("Error: %v, (%v): %v",
 				resp.StatusCode, err, string(body))
 		}
 	}
@@ -424,7 +424,7 @@ func (c *S3CopyCommand) AttachTaskFiles(pluginLogger plugin.Logger,
 
 	err := pluginCom.PostTaskFiles(files)
 	if err != nil {
-		return fmt.Errorf("Attach files failed: %v", err)
+		return errors.Errorf("Attach files failed: %v", err)
 	}
 	pluginLogger.LogExecution(slogger.INFO, "API attach files call succeeded")
 	return nil

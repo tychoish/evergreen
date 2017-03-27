@@ -1,12 +1,12 @@
 package scheduler
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 // Runner runs the scheduler process.
@@ -39,7 +39,7 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 	}
 
 	if err := schedulerInstance.Schedule(); err != nil {
-		err = fmt.Errorf("Error running scheduler: %+v", err)
+		err = errors.Errorf("Error running scheduler: %+v", err)
 		grip.Error(err)
 		return err
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/evergreen-ci/evergreen/validator"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
@@ -81,7 +82,7 @@ func (repoTracker *RepoTracker) FetchRevisions(numNewRepoRevisionsToFetch int) (
 
 	repository, err := model.FindRepository(projectIdentifier)
 	if err != nil {
-		return fmt.Errorf("error finding repository '%v': %v",
+		return errors.Errorf("error finding repository '%v': %v",
 			projectIdentifier, err)
 	}
 
@@ -223,13 +224,13 @@ func (repoTracker *RepoTracker) sendFailureNotification(lastRevision string,
 func sanityCheckOrderNum(revOrderNum int, projectId string) error {
 	latest, err := version.FindOne(version.ByMostRecentForRequester(projectId, evergreen.RepotrackerVersionRequester))
 	if err != nil {
-		return fmt.Errorf("Error getting latest version: %v", err.Error())
+		return errors.Errorf("Error getting latest version: %v", err.Error())
 	}
 
 	// When there are no versions in the db yet, sanity check is moot
 	if latest != nil {
 		if revOrderNum <= latest.RevisionOrderNumber {
-			return fmt.Errorf("Commit order number isn't greater than last stored version's: %v <= %v",
+			return errors.Errorf("Commit order number isn't greater than last stored version's: %v <= %v",
 				revOrderNum, latest.RevisionOrderNumber)
 		}
 	}
@@ -306,7 +307,7 @@ func (repoTracker *RepoTracker) StoreRevisions(revisions []model.Revision) (newe
 		// We have a config, so turn it into a usable yaml string to store with the version doc
 		projectYamlBytes, err := yaml.Marshal(project)
 		if err != nil {
-			return nil, fmt.Errorf("Error marshaling config: %v", err)
+			return nil, errors.Errorf("Error marshaling config: %v", err)
 		}
 		v.Config = string(projectYamlBytes)
 
@@ -314,7 +315,7 @@ func (repoTracker *RepoTracker) StoreRevisions(revisions []model.Revision) (newe
 		if len(project.Ignore) > 0 {
 			filenames, err := repoTracker.GetChangedFiles(revision)
 			if err != nil {
-				return nil, fmt.Errorf("error checking GitHub for ignored files: %v", err)
+				return nil, errors.Errorf("error checking GitHub for ignored files: %v", err)
 			}
 			if project.IgnoresAllFiles(filenames) {
 				v.Ignored = true

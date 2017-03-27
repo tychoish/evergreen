@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip/slogger"
+	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -135,17 +136,17 @@ func (tjsc *TaskJSONSendCommand) Plugin() string {
 
 func (tjsc *TaskJSONSendCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, tjsc); err != nil {
-		return fmt.Errorf("error decoding '%v' params: %v", tjsc.Name(), err)
+		return errors.Errorf("error decoding '%v' params: %v", tjsc.Name(), err)
 	}
 	return nil
 }
 
 func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
 	if tjsc.File == "" {
-		return fmt.Errorf("'file' param must not be blank")
+		return errors.Errorf("'file' param must not be blank")
 	}
 	if tjsc.DataName == "" {
-		return fmt.Errorf("'name' param must not be blank")
+		return errors.Errorf("'name' param must not be blank")
 	}
 
 	errChan := make(chan error)
@@ -154,14 +155,14 @@ func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCom
 		fileLoc := filepath.Join(conf.WorkDir, tjsc.File)
 		jsonFile, err := os.Open(fileLoc)
 		if err != nil {
-			errChan <- fmt.Errorf("Couldn't open json file: '%v'", err)
+			errChan <- errors.Errorf("Couldn't open json file: '%v'", err)
 			return
 		}
 
 		jsonData := map[string]interface{}{}
 		err = util.ReadJSONInto(jsonFile, &jsonData)
 		if err != nil {
-			errChan <- fmt.Errorf("File contained invalid json: %v", err)
+			errChan <- errors.Errorf("File contained invalid json: %v", err)
 			return
 		}
 
@@ -176,7 +177,7 @@ func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCom
 					return util.RetriableError{err}
 				}
 				if resp.StatusCode != http.StatusOK {
-					return util.RetriableError{fmt.Errorf("unexpected status code %v", resp.StatusCode)}
+					return util.RetriableError{errors.Errorf("unexpected status code %v", resp.StatusCode)}
 				}
 				return nil
 			},
@@ -230,20 +231,20 @@ func (jgc *TaskJSONHistoryCommand) Plugin() string {
 
 func (jgc *TaskJSONGetCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, jgc); err != nil {
-		return fmt.Errorf("error decoding '%v' params: %v", jgc.Name(), err)
+		return errors.Errorf("error decoding '%v' params: %v", jgc.Name(), err)
 	}
 	if jgc.File == "" {
-		return fmt.Errorf("JSON 'get' command must not have blank 'file' parameter")
+		return errors.Errorf("JSON 'get' command must not have blank 'file' parameter")
 	}
 	return nil
 }
 
 func (jgc *TaskJSONHistoryCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, jgc); err != nil {
-		return fmt.Errorf("error decoding '%v' params: %v", jgc.Name(), err)
+		return errors.Errorf("error decoding '%v' params: %v", jgc.Name(), err)
 	}
 	if jgc.File == "" {
-		return fmt.Errorf("JSON 'history' command must not have blank 'file' parameter")
+		return errors.Errorf("JSON 'history' command must not have blank 'file' parameter")
 	}
 	return nil
 }
@@ -256,13 +257,13 @@ func (jgc *TaskJSONGetCommand) Execute(log plugin.Logger, com plugin.PluginCommu
 	}
 
 	if jgc.File == "" {
-		return fmt.Errorf("'file' param must not be blank")
+		return errors.Errorf("'file' param must not be blank")
 	}
 	if jgc.DataName == "" {
-		return fmt.Errorf("'name' param must not be blank")
+		return errors.Errorf("'name' param must not be blank")
 	}
 	if jgc.TaskName == "" {
-		return fmt.Errorf("'task' param must not be blank")
+		return errors.Errorf("'task' param must not be blank")
 	}
 
 	if jgc.File != "" && !filepath.IsAbs(jgc.File) {
@@ -294,9 +295,9 @@ func (jgc *TaskJSONGetCommand) Execute(log plugin.Logger, com plugin.PluginCommu
 			}
 			if resp.StatusCode != http.StatusOK {
 				if resp.StatusCode == http.StatusNotFound {
-					return fmt.Errorf("No JSON data found")
+					return errors.Errorf("No JSON data found")
 				}
-				return util.RetriableError{fmt.Errorf("unexpected status code %v", resp.StatusCode)}
+				return util.RetriableError{errors.Errorf("unexpected status code %v", resp.StatusCode)}
 			}
 			return nil
 		},
@@ -312,13 +313,13 @@ func (jgc *TaskJSONHistoryCommand) Execute(log plugin.Logger, com plugin.PluginC
 	}
 
 	if jgc.File == "" {
-		return fmt.Errorf("'file' param must not be blank")
+		return errors.Errorf("'file' param must not be blank")
 	}
 	if jgc.DataName == "" {
-		return fmt.Errorf("'name' param must not be blank")
+		return errors.Errorf("'name' param must not be blank")
 	}
 	if jgc.TaskName == "" {
-		return fmt.Errorf("'task' param must not be blank")
+		return errors.Errorf("'task' param must not be blank")
 	}
 
 	if jgc.File != "" && !filepath.IsAbs(jgc.File) {
@@ -351,9 +352,9 @@ func (jgc *TaskJSONHistoryCommand) Execute(log plugin.Logger, com plugin.PluginC
 			}
 			if resp.StatusCode != http.StatusOK {
 				if resp.StatusCode == http.StatusNotFound {
-					return fmt.Errorf("No JSON data found")
+					return errors.Errorf("No JSON data found")
 				}
-				return util.RetriableError{fmt.Errorf("unexpected status code %v", resp.StatusCode)}
+				return util.RetriableError{errors.Errorf("unexpected status code %v", resp.StatusCode)}
 			}
 			return nil
 		},

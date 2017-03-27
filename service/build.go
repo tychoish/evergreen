@@ -17,6 +17,7 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/gorilla/mux"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 // getUiTaskCache takes a build object and returns a slice of
@@ -45,7 +46,7 @@ func (uis *UIServer) buildPage(w http.ResponseWriter, r *http.Request) {
 	projCtx := MustHaveProjectContext(r)
 
 	if projCtx.Build == nil {
-		uis.LoggedError(w, r, http.StatusNotFound, fmt.Errorf("not found"))
+		uis.LoggedError(w, r, http.StatusNotFound, errors.Errorf("not found"))
 		return
 	}
 

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/evergreen-ci/evergreen/model/version"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -256,7 +256,7 @@ func getVersionsAndVariants(skip, numVersionElements int, project *model.Project
 			fetchVersionsAndAssociatedBuilds(project, skip, numVersionElements)
 
 		if err != nil {
-			return versionVariantData{}, fmt.Errorf("error fetching versions and builds:"+
+			return versionVariantData{}, errors.Errorf("error fetching versions and builds:"+
 				" %v", err)
 		}
 
@@ -390,7 +390,7 @@ func getVersionsAndVariants(skip, numVersionElements int, project *model.Project
 
 		failedAndStartedTasks, err := task.Find(task.ByIds(failedAndStartedTaskIds))
 		if err != nil {
-			return versionVariantData{}, fmt.Errorf("error fetching failed tasks:"+
+			return versionVariantData{}, errors.Errorf("error fetching failed tasks:"+
 				" %v", err)
 
 		}
@@ -474,7 +474,7 @@ func fetchVersionsAndAssociatedBuilds(project *model.Project, skip int, numVersi
 		).Sort([]string{"-" + version.RevisionOrderNumberKey}).Skip(skip).Limit(numVersions))
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("error fetching versions from database: %v", err)
+		return nil, nil, errors.Errorf("error fetching versions from database: %v", err)
 	}
 
 	// create a slice of the version ids (used to fetch the builds)
@@ -488,7 +488,7 @@ func fetchVersionsAndAssociatedBuilds(project *model.Project, skip int, numVersi
 		build.ByVersions(versionIds).
 			WithFields(build.BuildVariantKey, build.TasksKey, build.VersionKey))
 	if err != nil {
-		return nil, nil, fmt.Errorf("error fetching builds from database: %v", err)
+		return nil, nil, errors.Errorf("error fetching builds from database: %v", err)
 	}
 
 	// group the builds by version
@@ -549,7 +549,7 @@ func countOnPreviousPage(skip int, numVersionElements int,
 			fetchVersionsAndAssociatedBuilds(project, stepBack, toFetch)
 
 		if err != nil {
-			return 0, fmt.Errorf("error fetching versions and builds: %v", err)
+			return 0, errors.Errorf("error fetching versions and builds: %v", err)
 		}
 
 		// for each of the versions fetched (iterating backwards), calculate

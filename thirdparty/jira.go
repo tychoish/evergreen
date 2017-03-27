@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"math"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 // JiraTickets marshal to and unmarshal from the json issue
@@ -114,12 +116,12 @@ func (jiraHandler *JiraHandler) CreateTicket(fields map[string]interface{}) (*Ji
 	}
 	if res.StatusCode >= 300 || res.StatusCode < 200 {
 		msg, _ := ioutil.ReadAll(res.Body)
-		return nil, fmt.Errorf("HTTP request returned unexpected status `%v`: %v", res.Status, string(msg))
+		return nil, errors.Errorf("HTTP request returned unexpected status `%v`: %v", res.Status, string(msg))
 	}
 
 	ticketInfo := &JiraCreateTicketResponse{}
 	if err := json.NewDecoder(res.Body).Decode(ticketInfo); err != nil {
-		return nil, fmt.Errorf("Unable to decode http body: %v", err.Error())
+		return nil, errors.Errorf("Unable to decode http body: %v", err.Error())
 	}
 	return ticketInfo, nil
 }
@@ -139,7 +141,7 @@ func (jiraHandler *JiraHandler) UpdateTicket(key string, fields map[string]inter
 	}
 	if res.StatusCode >= 300 || res.StatusCode < 200 {
 		msg, _ := ioutil.ReadAll(res.Body)
-		return fmt.Errorf("HTTP request returned unexpected status `%v`: %v", res.Status, string(msg))
+		return errors.Errorf("HTTP request returned unexpected status `%v`: %v", res.Status, string(msg))
 	}
 
 	return nil
@@ -158,16 +160,16 @@ func (jiraHandler *JiraHandler) GetJIRATicket(key string) (*JiraTicket, error) {
 	}
 
 	if res == nil {
-		return nil, fmt.Errorf("HTTP results are nil even though err was nil")
+		return nil, errors.Errorf("HTTP results are nil even though err was nil")
 	}
 
 	if res.StatusCode >= 300 || res.StatusCode < 200 {
-		return nil, fmt.Errorf("HTTP request returned unexpected status `%v`", res.Status)
+		return nil, errors.Errorf("HTTP request returned unexpected status `%v`", res.Status)
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read http body: %v", err.Error())
+		return nil, errors.Errorf("Unable to read http body: %v", err.Error())
 	}
 
 	ticket := &JiraTicket{}
@@ -189,18 +191,18 @@ func (jiraHandler *JiraHandler) JQLSearch(query string, startAt, maxResults int)
 		return nil, err
 	}
 	if res == nil {
-		return nil, fmt.Errorf("HTTP results are nil even though err was not nil")
+		return nil, errors.Errorf("HTTP results are nil even though err was not nil")
 	}
 
 	if res.StatusCode >= 300 || res.StatusCode < 200 {
-		return nil, fmt.Errorf("HTTP request returned unexpected status `%v`", res.Status)
+		return nil, errors.Errorf("HTTP request returned unexpected status `%v`", res.Status)
 	}
 
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read http body: %v", err.Error())
+		return nil, errors.Errorf("Unable to read http body: %v", err.Error())
 	}
 
 	results := &JiraSearchResults{}

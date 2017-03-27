@@ -2,11 +2,12 @@ package gotest
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -108,7 +109,7 @@ func (vp *VanillaParser) Parse(testOutput io.Reader) error {
 	vp.tests = map[string]*TestResult{}
 	for testScanner.Scan() {
 		if err := testScanner.Err(); err != nil {
-			return fmt.Errorf("error reading test output: %v", err)
+			return errors.Errorf("error reading test output: %v", err)
 		}
 		// logs are appended at the start of the loop, allowing
 		// len(vp.logs) to represent the current line number [1...]
@@ -142,7 +143,7 @@ func (vp *VanillaParser) handleLine(line string) error {
 func (vp *VanillaParser) handleEnd(line string, rgx *regexp.Regexp) error {
 	name, status, duration, err := endInfoFromLogLine(line, rgx)
 	if err != nil {
-		return fmt.Errorf("error parsing end line '%v': %v", line, err)
+		return errors.Errorf("error parsing end line '%v': %v", line, err)
 	}
 	t := vp.tests[name]
 	if t == nil || t.Name == "" {
@@ -162,7 +163,7 @@ func (vp *VanillaParser) handleEnd(line string, rgx *regexp.Regexp) error {
 func (vp *VanillaParser) handleStart(line string, rgx *regexp.Regexp, defaultFail bool) error {
 	name, err := startInfoFromLogLine(line, rgx)
 	if err != nil {
-		return fmt.Errorf("error parsing start line '%v': %v", line, err)
+		return errors.Errorf("error parsing start line '%v': %v", line, err)
 	}
 	t := vp.newTestResult(name)
 
@@ -198,7 +199,7 @@ func startInfoFromLogLine(line string, rgx *regexp.Regexp) (string, error) {
 	if len(matches) < 2 {
 		// futureproofing -- this can't happen as long as we
 		// check Match() before calling startInfoFromLogLine
-		return "", fmt.Errorf(
+		return "", errors.Errorf(
 			"unable to match start line regular expression on line: %v", line)
 	}
 	return matches[1], nil
@@ -212,7 +213,7 @@ func endInfoFromLogLine(line string, rgx *regexp.Regexp) (string, string, time.D
 	if len(matches) < 4 {
 		// this block should never be reached if we call endRegex.Match()
 		// before entering this function
-		return "", "", 0, fmt.Errorf(
+		return "", "", 0, errors.Errorf(
 			"unable to match end line regular expression on line: %v", line)
 	}
 	status := matches[1]
@@ -222,7 +223,7 @@ func endInfoFromLogLine(line string, rgx *regexp.Regexp) (string, string, time.D
 		var err error
 		duration, err = time.ParseDuration(strings.Replace(matches[3], " ", "", -1))
 		if err != nil {
-			return "", "", 0, fmt.Errorf("error parsing test runtime: %v", err)
+			return "", "", 0, errors.Errorf("error parsing test runtime: %v", err)
 		}
 	}
 	return name, status, duration, nil

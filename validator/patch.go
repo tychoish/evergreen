@@ -8,13 +8,14 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/thirdparty"
+	"github.com/pkg/errors"
 )
 
 // GetPatchedProject creates and validates a project created by fetching latest commit information from GitHub
 // and applying the patch to the latest remote configuration. The error returned can be a validation error.
 func GetPatchedProject(p *patch.Patch, settings *evergreen.Settings) (*model.Project, error) {
 	if p.Version != "" {
-		return nil, fmt.Errorf("Patch %v already finalized", p.Version)
+		return nil, errors.Errorf("Patch %v already finalized", p.Version)
 	}
 	projectRef, err := model.FindOneProjectRef(p.Project)
 	if err != nil {
@@ -35,13 +36,13 @@ func GetPatchedProject(p *patch.Patch, settings *evergreen.Settings) (*model.Pro
 		// we try to apply the diff and proceed.
 		if !(p.ConfigChanged(projectRef.RemotePath) && thirdparty.IsFileNotFound(err)) {
 			// return an error if the github error is network/auth-related or we aren't patching the config
-			return nil, fmt.Errorf("Could not get github file at %v: %v", projectFileURL, err)
+			return nil, errors.Errorf("Could not get github file at %v: %v", projectFileURL, err)
 		}
 	} else {
 		// we successfully got the project file in base64, so we decode it
 		projectFileBytes, err = base64.StdEncoding.DecodeString(githubFile.Content)
 		if err != nil {
-			return nil, fmt.Errorf("Could not decode github file at %v: %v", projectFileURL, err)
+			return nil, errors.Errorf("Could not decode github file at %v: %v", projectFileURL, err)
 		}
 	}
 
@@ -56,7 +57,7 @@ func GetPatchedProject(p *patch.Patch, settings *evergreen.Settings) (*model.Pro
 	if p.ConfigChanged(projectRef.RemotePath) && p.PatchedConfig == "" {
 		project, err = model.MakePatchedConfig(p, projectRef.RemotePath, string(projectFileBytes))
 		if err != nil {
-			return nil, fmt.Errorf("Could not patch remote configuration file: %v", err)
+			return nil, errors.Errorf("Could not patch remote configuration file: %v", err)
 		}
 		// overwrite project fields with the project ref to disallow tracking a
 		// different project or doing other crazy things via config patches
@@ -70,7 +71,7 @@ func GetPatchedProject(p *patch.Patch, settings *evergreen.Settings) (*model.Pro
 			for _, err := range verrs {
 				message += fmt.Sprintf("\n\t=> %v", err)
 			}
-			return nil, fmt.Errorf(message)
+			return nil, errors.Errorf(message)
 		}
 	} else {
 		// configuration is not patched

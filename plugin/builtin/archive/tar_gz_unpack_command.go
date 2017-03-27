@@ -1,7 +1,6 @@
 package archive
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/evergreen-ci/evergreen/archive"
@@ -9,6 +8,7 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip/slogger"
+	"github.com/pkg/errors"
 )
 
 // Plugin command responsible for unpacking a tgz archive.
@@ -30,10 +30,10 @@ func (self *TarGzUnpackCommand) Plugin() string {
 // Implementation of ParseParams.
 func (self *TarGzUnpackCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, self); err != nil {
-		return fmt.Errorf("error parsing '%v' params: %v", self.Name(), err)
+		return errors.Errorf("error parsing '%v' params: %v", self.Name(), err)
 	}
 	if err := self.validateParams(); err != nil {
-		return fmt.Errorf("error validating '%v' params: %v", self.Name(), err)
+		return errors.Errorf("error validating '%v' params: %v", self.Name(), err)
 	}
 	return nil
 }
@@ -42,10 +42,10 @@ func (self *TarGzUnpackCommand) ParseParams(params map[string]interface{}) error
 func (self *TarGzUnpackCommand) validateParams() error {
 
 	if self.Source == "" {
-		return fmt.Errorf("source cannot be blank")
+		return errors.Errorf("source cannot be blank")
 	}
 	if self.DestDir == "" {
-		return fmt.Errorf("dest_dir cannot be blank")
+		return errors.Errorf("dest_dir cannot be blank")
 	}
 
 	return nil
@@ -58,7 +58,7 @@ func (self *TarGzUnpackCommand) Execute(pluginLogger plugin.Logger,
 	stop chan bool) error {
 
 	if err := plugin.ExpandValues(self, conf.Expansions); err != nil {
-		return fmt.Errorf("error expanding params: %v", err)
+		return errors.Errorf("error expanding params: %v", err)
 	}
 
 	errChan := make(chan error)
@@ -83,14 +83,14 @@ func (self *TarGzUnpackCommand) UnpackArchive() error {
 	// get a reader for the source file
 	f, _, tarReader, err := archive.TarGzReader(self.Source)
 	if err != nil {
-		return fmt.Errorf("error opening tar file %v for reading: %v",
+		return errors.Errorf("error opening tar file %v for reading: %v",
 			self.Source, err)
 	}
 	defer f.Close()
 
 	// extract the actual tarball into the destination directory
 	if err := os.MkdirAll(self.DestDir, 0755); err != nil {
-		return fmt.Errorf("error creating destination dir %v: %v", self.DestDir,
+		return errors.Errorf("error creating destination dir %v: %v", self.DestDir,
 			err)
 	}
 

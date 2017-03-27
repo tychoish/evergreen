@@ -17,6 +17,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -54,18 +55,18 @@ func (agbh *AgentHostGateway) RunTaskOnHost(settings *evergreen.Settings, taskTo
 	// get the host's SSH options
 	cloudHost, err := providers.GetCloudHost(&hostObj, settings)
 	if err != nil {
-		return "", fmt.Errorf("Failed to get cloud host for %v: %v", hostObj.Id, err)
+		return "", errors.Errorf("Failed to get cloud host for %v: %v", hostObj.Id, err)
 	}
 	sshOptions, err := cloudHost.GetSSHOptions()
 	if err != nil {
-		return "", fmt.Errorf("Error getting ssh options for host %v: %v", hostObj.Id, err)
+		return "", errors.Errorf("Error getting ssh options for host %v: %v", hostObj.Id, err)
 	}
 
 	// prep the remote host
 	grip.Infof("Prepping remote host %v...", hostObj.Id)
 	agentRevision, err := agbh.prepRemoteHost(hostObj, sshOptions)
 	if err != nil {
-		return "", fmt.Errorf("error prepping remote host %v: %v", hostObj.Id, err)
+		return "", errors.Errorf("error prepping remote host %v: %v", hostObj.Id, err)
 	}
 	grip.Infof("Prepping host %v finished successfully", hostObj.Id)
 
@@ -75,7 +76,7 @@ func (agbh *AgentHostGateway) RunTaskOnHost(settings *evergreen.Settings, taskTo
 	// generate the host secret if none exists
 	if hostObj.Secret == "" {
 		if err := hostObj.CreateSecret(); err != nil {
-			return "", fmt.Errorf("creating secret for %v: %v", hostObj.Id, err)
+			return "", errors.Errorf("creating secret for %v: %v", hostObj.Id, err)
 		}
 	}
 
@@ -94,7 +95,7 @@ func (agbh *AgentHostGateway) GetAgentRevision() (string, error) {
 	versionFile := filepath.Join(agbh.ExecutablesDir, "version")
 	hashBytes, err := ioutil.ReadFile(versionFile)
 	if err != nil {
-		return "", fmt.Errorf("error reading agent version file: %v", err)
+		return "", errors.Errorf("error reading agent version file: %v", err)
 	}
 
 	return strings.TrimSpace(string(hashBytes)), nil
@@ -106,7 +107,7 @@ func executableSubPath(id string) (string, error) {
 	// get the full distro info, so we can figure out the architecture
 	d, err := distro.FindOne(distro.ById(id))
 	if err != nil {
-		return "", fmt.Errorf("error finding distro %v: %v", id, err)
+		return "", errors.Errorf("error finding distro %v: %v", id, err)
 	}
 
 	mainName := "main"
@@ -134,7 +135,7 @@ func (agbh *AgentHostGateway) prepRemoteHost(hostObj host.Host, sshOptions []str
 	// compute any info necessary to ssh into the host
 	hostInfo, err := util.ParseSSHInfo(hostObj.Host)
 	if err != nil {
-		return "", fmt.Errorf("error parsing ssh info %v: %v", hostObj.Host, err)
+		return "", errors.Errorf("error parsing ssh info %v: %v", hostObj.Host, err)
 	}
 
 	// first, create the necessary sandbox of directories on the remote machine
@@ -158,16 +159,16 @@ func (agbh *AgentHostGateway) prepRemoteHost(hostObj host.Host, sshOptions []str
 		// if it timed out, kill the command
 		if err == util.ErrTimedOut {
 			makeShellCmd.Stop()
-			return "", fmt.Errorf("creating remote directories timed out: %v", mkdirOutput.String())
+			return "", errors.Errorf("creating remote directories timed out: %v", mkdirOutput.String())
 		}
-		return "", fmt.Errorf(
+		return "", errors.Errorf(
 			"error creating directories on remote machine (%v): %v", err, mkdirOutput.String())
 	}
 
 	// third, copy over the correct agent binary to the remote machine
 	execSubPath, err := executableSubPath(hostObj.Distro.Id)
 	if err != nil {
-		return "", fmt.Errorf("error computing subpath to executable: %v", err)
+		return "", errors.Errorf("error computing subpath to executable: %v", err)
 	}
 
 	scpAgentOutput := newCappedOutputLog()
@@ -191,9 +192,9 @@ func (agbh *AgentHostGateway) prepRemoteHost(hostObj host.Host, sshOptions []str
 	if err != nil {
 		if err == util.ErrTimedOut {
 			scpAgentCmd.Stop()
-			return "", fmt.Errorf("scp-ing agent binary timed out: %v", scpAgentOutput.String())
+			return "", errors.Errorf("scp-ing agent binary timed out: %v", scpAgentOutput.String())
 		}
-		return "", fmt.Errorf(
+		return "", errors.Errorf(
 			"error copying agent binary to remote machine (%v): %v", err, scpAgentOutput.String())
 	}
 
@@ -223,7 +224,7 @@ func startAgentOnRemote(apiURL string, task *task.Task, hostObj *host.Host, sshO
 	// compute any info necessary to ssh into the host
 	hostInfo, err := util.ParseSSHInfo(hostObj.Host)
 	if err != nil {
-		return fmt.Errorf("error parsing ssh info %v: %v", hostObj.Host, err)
+		return errors.Errorf("error parsing ssh info %v: %v", hostObj.Host, err)
 	}
 
 	// run the command to kick off the agent remotely
@@ -247,9 +248,9 @@ func startAgentOnRemote(apiURL string, task *task.Task, hostObj *host.Host, sshO
 	if err != nil {
 		if err == util.ErrTimedOut {
 			startAgentCmd.Stop()
-			return fmt.Errorf("starting agent timed out")
+			return errors.Errorf("starting agent timed out")
 		}
-		return fmt.Errorf("error starting agent (%v): %v", hostObj.Id, err, startAgentLog.String())
+		return errors.Errorf("error starting agent (%v): %v", hostObj.Id, err, startAgentLog.String())
 	}
 
 	return nil

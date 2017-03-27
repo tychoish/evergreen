@@ -3,12 +3,12 @@ package thirdparty
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 type CrowdUser struct {
@@ -78,12 +78,12 @@ func (self *RESTCrowdService) GetUser(username string) (*CrowdUser, error) {
 	values.Add("username", username)
 	subUrl, err := self.apiRoot.Parse("/crowd/rest/usermanagement/latest/user?" + values.Encode())
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %v", err)
+		return nil, errors.Errorf("invalid URL: %v", err)
 	}
 
 	req, err := http.NewRequest("GET", subUrl.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("Could not create request: %v", err)
+		return nil, errors.Errorf("Could not create request: %v", err)
 	}
 
 	req.Header.Add("Accept", "application/json")
@@ -93,23 +93,23 @@ func (self *RESTCrowdService) GetUser(username string) (*CrowdUser, error) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error making http request: %v", err)
+		return nil, errors.Errorf("Error making http request: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Received unexpected status code from crowd: %v", resp.StatusCode)
+		return nil, errors.Errorf("Received unexpected status code from crowd: %v", resp.StatusCode)
 	}
 	result := CrowdUser{}
 
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Error occurred reading data from response: %v", resp.StatusCode)
+		return nil, errors.Errorf("Error occurred reading data from response: %v", resp.StatusCode)
 	}
 
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing json from crowd: %v", err)
+		return nil, errors.Errorf("Error parsing json from crowd: %v", err)
 	}
 
 	return &result, nil
@@ -120,12 +120,12 @@ func (self *RESTCrowdService) GetUserFromToken(token string) (*CrowdUser, error)
 
 	subUrl, err := self.apiRoot.Parse("/crowd/rest/usermanagement/latest/session/" + token)
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %v", err)
+		return nil, errors.Errorf("invalid URL: %v", err)
 	}
 
 	req, err := http.NewRequest("GET", subUrl.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("Could not create request: %v", err)
+		return nil, errors.Errorf("Could not create request: %v", err)
 	}
 
 	req.Header.Add("Accept", "application/json")
@@ -134,24 +134,24 @@ func (self *RESTCrowdService) GetUserFromToken(token string) (*CrowdUser, error)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Error making http request: %v", err)
+		return nil, errors.Errorf("Error making http request: %v", err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Received unexpected status code from crowd: %v", resp.StatusCode)
+		return nil, errors.Errorf("Received unexpected status code from crowd: %v", resp.StatusCode)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Error occurred reading data from response: %v", resp.StatusCode)
+		return nil, errors.Errorf("Error occurred reading data from response: %v", resp.StatusCode)
 	}
 
 	result := WrapCrowdUser{}
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing json from crowd: %v", err)
+		return nil, errors.Errorf("Error parsing json from crowd: %v", err)
 	}
 
 	return &(result.User), nil
@@ -161,7 +161,7 @@ func (self *RESTCrowdService) CreateSession(username, password string) (*Session
 	grip.Debugf("Requesting user session for '%v' from crowd", username)
 	subUrl, err := self.apiRoot.Parse("/crowd/rest/usermanagement/latest/session")
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %v", err)
+		return nil, errors.Errorf("invalid URL: %v", err)
 	}
 	postData := map[string]string{
 		"username": username,
@@ -173,7 +173,7 @@ func (self *RESTCrowdService) CreateSession(username, password string) (*Session
 	}
 	req, err := http.NewRequest("POST", subUrl.String(), ioutil.NopCloser(bytes.NewReader(jsonBytes)))
 	if err != nil {
-		return nil, fmt.Errorf("Could not create request: %v", err)
+		return nil, errors.Errorf("Could not create request: %v", err)
 	}
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
@@ -182,26 +182,26 @@ func (self *RESTCrowdService) CreateSession(username, password string) (*Session
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error making http request: %v", err)
+		return nil, errors.Errorf("error making http request: %v", err)
 	}
 	if resp == nil {
-		return nil, fmt.Errorf("received nil response from %v", subUrl.String())
+		return nil, errors.Errorf("received nil response from %v", subUrl.String())
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("(%v) received unexpected status code from crowd",
+		return nil, errors.Errorf("(%v) received unexpected status code from crowd",
 			resp.StatusCode)
 	}
 	session := &Session{}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("(%v) error occurred reading data from response: %v",
+		return nil, errors.Errorf("(%v) error occurred reading data from response: %v",
 			resp.StatusCode, err)
 	}
 
 	if err = json.Unmarshal(body, session); err != nil {
-		return nil, fmt.Errorf("error parsing json from crowd: %v", err)
+		return nil, errors.Errorf("error parsing json from crowd: %v", err)
 	}
 	return session, nil
 }

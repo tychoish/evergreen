@@ -16,6 +16,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -201,7 +202,7 @@ func getBuildVariantHistory(buildId string, before int, after int) ([]build.Buil
 		return nil, err
 	}
 	if b == nil {
-		return nil, fmt.Errorf("no build with id %v", buildId)
+		return nil, errors.Errorf("no build with id %v", buildId)
 	}
 
 	lessRecentBuilds, err := build.Find(
@@ -245,7 +246,7 @@ func getVersionHistory(versionId string, N int) ([]version.Version, error) {
 	if err != nil {
 		return nil, err
 	} else if v == nil {
-		return nil, fmt.Errorf("Version '%v' not found", versionId)
+		return nil, errors.Errorf("Version '%v' not found", versionId)
 	}
 
 	// Versions in the same push event, assuming that no two push events happen at the exact same time
@@ -357,7 +358,7 @@ func getHostData(hostId string) (*uiHost, error) {
 		return nil, err
 	}
 	if dbHost == nil {
-		return nil, fmt.Errorf("Could not find host")
+		return nil, errors.Errorf("Could not find host")
 	}
 	hostAsUI.Host = *dbHost
 	return hostAsUI, nil

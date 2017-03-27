@@ -13,6 +13,7 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip/slogger"
+	"github.com/pkg/errors"
 )
 
 // ParseFilesCommand is a struct implementing plugin.Command. It is used to parse a file or
@@ -36,11 +37,11 @@ func (pfCmd *ParseFilesCommand) Plugin() string {
 // validates that at least one file pattern is specified.
 func (pfCmd *ParseFilesCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, pfCmd); err != nil {
-		return fmt.Errorf("error decoding '%v' params: %v", pfCmd.Name(), err)
+		return errors.Errorf("error decoding '%v' params: %v", pfCmd.Name(), err)
 	}
 
 	if len(pfCmd.Files) == 0 {
-		return fmt.Errorf("error validating '%v' params:" +
+		return errors.Errorf("error validating '%v' params:" +
 			" must specify at least one file pattern to parse")
 	}
 	return nil
@@ -55,7 +56,7 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 	if err := plugin.ExpandValues(pfCmd, taskConfig.Expansions); err != nil {
 		msg := fmt.Sprintf("error expanding params: %v", err)
 		pluginLogger.LogTask(slogger.ERROR, "Error parsing gotest files: %v", msg)
-		return fmt.Errorf(msg)
+		return errors.Errorf(msg)
 	}
 
 	// make sure the file patterns are relative to the task's working directory
@@ -66,18 +67,18 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 	// will be all files containing test results
 	outputFiles, err := pfCmd.AllOutputFiles()
 	if err != nil {
-		return fmt.Errorf("error obtaining names of output files: %v", err)
+		return errors.Errorf("error obtaining names of output files: %v", err)
 	}
 
 	// make sure we're parsing something
 	if len(outputFiles) == 0 {
-		return fmt.Errorf("no files found to be parsed")
+		return errors.Errorf("no files found to be parsed")
 	}
 
 	// parse all of the files
 	logs, results, err := ParseTestOutputFiles(outputFiles, stop, pluginLogger, taskConfig)
 	if err != nil {
-		return fmt.Errorf("error parsing output results: %v", err)
+		return errors.Errorf("error parsing output results: %v", err)
 	}
 
 	// ship all of the test logs off to the server
@@ -107,7 +108,7 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 	// ship the parsed results off to the server
 	pluginLogger.LogTask(slogger.INFO, "Sending parsed results to server...")
 	if err := pluginCom.TaskPostResults(&resultsAsModel); err != nil {
-		return fmt.Errorf("error posting parsed results to server: %v", err)
+		return errors.Errorf("error posting parsed results to server: %v", err)
 	}
 	pluginLogger.LogTask(slogger.INFO, "Successfully sent parsed results to server")
 
@@ -125,7 +126,7 @@ func (pfCmd *ParseFilesCommand) AllOutputFiles() ([]string, error) {
 	for _, pattern := range pfCmd.Files {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
-			return nil, fmt.Errorf("error expanding file patterns: %v", err)
+			return nil, errors.Errorf("error expanding file patterns: %v", err)
 		}
 		outputFiles = append(outputFiles, matches...)
 	}
@@ -158,7 +159,7 @@ func ParseTestOutputFiles(outputFiles []string, stop chan bool,
 		// kill the execution if API server requests
 		select {
 		case <-stop:
-			return nil, nil, fmt.Errorf("command was stopped")
+			return nil, nil, errors.Errorf("command was stopped")
 		default:
 			// no stop signal
 		}

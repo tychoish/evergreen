@@ -14,6 +14,7 @@ import (
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -89,7 +90,7 @@ func GetGithubAPIStatus() (string, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("github request failed: %v", err)
+		return "", errors.Errorf("github request failed: %v", err)
 	}
 
 	gitStatus := struct {
@@ -99,7 +100,7 @@ func GetGithubAPIStatus() (string, error) {
 
 	err = util.ReadJSONInto(resp.Body, &gitStatus)
 	if err != nil {
-		return "", fmt.Errorf("json read failed: %v", err)
+		return "", errors.Errorf("json read failed: %v", err)
 
 	}
 	return gitStatus.Status, nil
@@ -128,7 +129,7 @@ func GetGithubFile(oauthToken, fileURL string) (
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, FileNotFoundError{fileURL}
 		}
-		return nil, fmt.Errorf("github API returned status '%v'", resp.Status)
+		return nil, errors.Errorf("github API returned status '%v'", resp.Status)
 	}
 
 	respBody, err := ioutil.ReadAll(resp.Body)
@@ -154,7 +155,7 @@ func GetGithubFile(oauthToken, fileURL string) (
 
 func GetGitHubMergeBaseRevision(oauthToken, repoOwner, repo, baseRevision string, currentCommit *GithubCommit) (string, error) {
 	if currentCommit == nil {
-		return "", fmt.Errorf("no recent commit found")
+		return "", errors.Errorf("no recent commit found")
 	}
 	url := fmt.Sprintf("%v/repos/%v/%v/compare/%v:%v...%v:%v",
 		GithubAPIBase,
@@ -297,7 +298,7 @@ func githubRequest(method string, url string, oauthToken string, data interface{
 	// check if there is an oauth token, if there is make sure it is a valid oauthtoken
 	if len(oauthToken) > 0 {
 		if !strings.HasPrefix(oauthToken, "token ") {
-			return nil, fmt.Errorf("Invalid oauth token given")
+			return nil, errors.Errorf("Invalid oauth token given")
 		}
 		req.Header.Add("Authorization", oauthToken)
 	}
@@ -318,12 +319,12 @@ func tryGithubGet(oauthToken, url string) (resp *http.Response, err error) {
 				return util.RetriableError{err}
 			}
 			if resp.StatusCode == http.StatusUnauthorized {
-				err = fmt.Errorf("Calling github GET on %v failed: got 'unauthorized' response", url)
+				err = errors.Errorf("Calling github GET on %v failed: got 'unauthorized' response", url)
 				grip.Error(err)
 				return err
 			}
 			if resp.StatusCode != http.StatusOK {
-				err = fmt.Errorf("Calling github GET on %v got a bad response code: %v", url, resp.StatusCode)
+				err = errors.Errorf("Calling github GET on %v got a bad response code: %v", url, resp.StatusCode)
 			}
 			// read the results
 			rateMessage, _ := getGithubRateLimit(resp.Header)
@@ -355,12 +356,12 @@ func tryGithubPost(url string, oauthToken string, data interface{}) (resp *http.
 				return util.RetriableError{err}
 			}
 			if resp.StatusCode == http.StatusUnauthorized {
-				err = fmt.Errorf("Calling github POST on %v failed: got 'unauthorized' response", url)
+				err = errors.Errorf("Calling github POST on %v failed: got 'unauthorized' response", url)
 				grip.Error(err)
 				return err
 			}
 			if resp.StatusCode != http.StatusOK {
-				err = fmt.Errorf("Calling github POST on %v got a bad response code: %v", url, resp.StatusCode)
+				err = errors.Errorf("Calling github POST on %v got a bad response code: %v", url, resp.StatusCode)
 			}
 			// read the results
 			rateMessage, loglevel := getGithubRateLimit(resp.Header)
@@ -475,10 +476,10 @@ func GithubAuthenticate(code, clientId, clientSecret string) (githubResponse *Gi
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return nil, fmt.Errorf("could not authenticate for token %v", err.Error())
+		return nil, errors.Errorf("could not authenticate for token %v", err.Error())
 	}
 	if resp == nil {
-		return nil, fmt.Errorf("invalid github response")
+		return nil, errors.Errorf("invalid github response")
 	}
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -523,7 +524,7 @@ func GetGithubUser(token string) (githubUser *GithubLoginUser, githubOrganizatio
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get user from token: %v", err)
+		return nil, nil, errors.Errorf("Could not get user from token: %v", err)
 	}
 	respBody, err = ioutil.ReadAll(resp.Body)
 	if err != nil {

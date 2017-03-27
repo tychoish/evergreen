@@ -12,6 +12,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
 const distroSleep = 10 * time.Second
@@ -52,7 +53,7 @@ func (self *TaskRunner) Run() error {
 	// find all hosts available to take a task
 	availableHosts, err := self.FindAvailableHosts()
 	if err != nil {
-		return fmt.Errorf("error finding available hosts: %v", err)
+		return errors.Errorf("error finding available hosts: %v", err)
 	}
 	grip.Infof("Found %d host(s) available to take a task", len(availableHosts))
 	hostsByDistro := self.splitHostsByDistro(availableHosts)
@@ -87,12 +88,12 @@ func (self *TaskRunner) processDistro(distroId string) error {
 	lockStartTime := time.Now()
 	lockAcquired, err := db.WaitTillAcquireGlobalLock(lockKey, db.LockTimeout)
 	if err != nil {
-		err = fmt.Errorf("error acquiring global lock for %v: %+v", lockKey, err)
+		err = errors.Errorf("error acquiring global lock for %v: %+v", lockKey, err)
 		grip.Error(err)
 		return err
 	}
 	if !lockAcquired {
-		err = fmt.Errorf("timed out acquiring global lock for %v", lockKey)
+		err = errors.Errorf("timed out acquiring global lock for %v", lockKey)
 		grip.Error(err)
 		return err
 	}
@@ -107,7 +108,7 @@ func (self *TaskRunner) processDistro(distroId string) error {
 
 	freeHostsForDistro, err := self.FindAvailableHostsForDistro(distroId)
 	if err != nil {
-		return fmt.Errorf("loading available %v hosts: %v", distroId, err)
+		return errors.Errorf("loading available %v hosts: %v", distroId, err)
 	}
 
 	grip.Infof("Found %d %s host(s) available for tasks", len(freeHostsForDistro), distroId)
@@ -115,7 +116,7 @@ func (self *TaskRunner) processDistro(distroId string) error {
 
 	taskQueue, err := self.FindTaskQueue(distroId)
 	if err != nil {
-		return fmt.Errorf("error finding task queue for distro %v: %v",
+		return errors.Errorf("error finding task queue for distro %v: %v",
 			distroId, err)
 	}
 	if taskQueue == nil {
@@ -176,7 +177,7 @@ func (self *TaskRunner) processDistro(distroId string) error {
 func DispatchTaskForHost(taskQueue *model.TaskQueue, assignedHost *host.Host) (
 	nextTask *task.Task, err error) {
 	if assignedHost == nil {
-		return nil, fmt.Errorf("can not assign task to a nil host")
+		return nil, errors.Errorf("can not assign task to a nil host")
 	}
 
 	// only proceed if there are pending tasks left
@@ -186,17 +187,17 @@ func DispatchTaskForHost(taskQueue *model.TaskQueue, assignedHost *host.Host) (
 		// the database
 		nextTask, err = task.FindOne(task.ById(queueItem.Id))
 		if err != nil {
-			return nil, fmt.Errorf("error finding task with id %v: %v",
+			return nil, errors.Errorf("error finding task with id %v: %v",
 				queueItem.Id, err)
 		}
 		if nextTask == nil {
-			return nil, fmt.Errorf("refusing to move forward because queued "+
+			return nil, errors.Errorf("refusing to move forward because queued "+
 				"task with id %v does not exist", queueItem.Id)
 		}
 
 		// dequeue the task from the queue
 		if err = taskQueue.DequeueTask(nextTask.Id); err != nil {
-			return nil, fmt.Errorf("error pulling task with id %v from "+
+			return nil, errors.Errorf("error pulling task with id %v from "+
 				"queue for distro %v: %v", nextTask.Id,
 				nextTask.DistroId, err)
 		}
