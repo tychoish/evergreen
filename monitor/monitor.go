@@ -107,7 +107,7 @@ func RunAllMonitoring(settings *evergreen.Settings) error {
 		func() []error { return hostMonitor.CleanupHosts(distros, settings) })
 
 	for _, err := range errs {
-		grip.Errorf("Error cleaning up hosts:", err)
+		grip.Errorln("Error cleaning up hosts:", err.Error())
 	}
 
 	// run monitoring checks
@@ -157,6 +157,7 @@ func withGlobalLock(name string, f func() []error) (errs []error) {
 		grip.Errorf("problem acquiring global lock for monitor %s: %+v", name, err)
 		return []error{errors.Errorf("error acquiring global lock for %s: %v", name, err)}
 	}
+
 	if !acquired {
 		grip.Errorln("Timed out attempting to acquire global lock for monitor:", name)
 		return []error{errors.Errorf("timed out acquiring global lock for monitor %s", name)}

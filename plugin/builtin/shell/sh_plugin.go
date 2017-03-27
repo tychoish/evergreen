@@ -138,7 +138,7 @@ func (_ *ShellExecCommand) Plugin() string {
 func (sec *ShellExecCommand) ParseParams(params map[string]interface{}) error {
 	err := mapstructure.Decode(params, sec)
 	if err != nil {
-		return errors.Errorf("error decoding %v params: %v", sec.Name(), err)
+		return errors.Wrapf(err, "error decoding %v params", sec.Name())
 	}
 	return nil
 }
@@ -176,7 +176,7 @@ func (sec *ShellExecCommand) Execute(pluginLogger plugin.Logger,
 
 	err := localCmd.PrepToRun(conf.Expansions)
 	if err != nil {
-		return errors.Errorf("Failed to apply expansions: %v", err)
+		return errors.Wrap(err, "Failed to apply expansions")
 	}
 	if sec.Silent {
 		pluginLogger.LogExecution(slogger.INFO, "Executing script with %s (source hidden)...",
@@ -238,7 +238,7 @@ func (sec *ShellExecCommand) Execute(pluginLogger plugin.Logger,
 			}
 		}
 
-		return errors.Errorf("Shell command interrupted.")
+		return errors.New("Shell command interrupted.")
 	}
 
 	return nil

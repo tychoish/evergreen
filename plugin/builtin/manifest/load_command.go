@@ -71,7 +71,7 @@ func (mfc *ManifestLoadCommand) Load(log plugin.Logger, pluginCom plugin.PluginC
 		return err
 	}
 	if loadedManifest == nil {
-		return errors.Errorf("Manifest is empty")
+		return errors.New("Manifest is empty")
 	}
 	mfc.updateExpansions(loadedManifest, conf)
 	return nil

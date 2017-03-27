@@ -35,13 +35,21 @@ func createEnvironment(settings *evergreen.Settings, globals map[string]interfac
 }
 
 func TemplateEmailBody(ae *web.App, name string, data interface{}) (string, error) {
-	templateResponse := ae.RespondTemplate(
+	templateResponse, ok := ae.RespondTemplate(
 		[]string{name, "email_layout_base.html"},
 		"base",
 		data).(*web.TemplateResponse)
+
+	if !ok {
+		return "", errors.Errorf("problem converting template response for %s with data type %T",
+			name, data)
+	}
+
 	var buf bytes.Buffer
+
 	err := templateResponse.TemplateSet.ExecuteTemplate(&buf, templateResponse.TemplateName,
 		templateResponse.Data)
+
 	if err != nil {
 		return "", errors.WithStack(err)
 	}

@@ -103,7 +103,7 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 	select {
 	case err := <-errChan:
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	case <-stop:
 		pluginLogger.LogExecution(slogger.INFO, "Got kill signal")
@@ -113,7 +113,7 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 				pluginLogger.LogExecution(slogger.ERROR, "Error occurred stopping process: %v", err)
 			}
 		}
-		return errors.Errorf("Fetch command interrupted.")
+		return errors.New("Fetch command interrupted")
 	}
 
 	// Fetch source for the modules
@@ -134,12 +134,12 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 
 		err = os.MkdirAll(moduleDir, 0755)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		// clear the destination
 		err = os.RemoveAll(moduleDir)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		revision := ggpc.Revisions[moduleName]
@@ -183,7 +183,7 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 					pluginLogger.LogExecution(slogger.ERROR, "Error occurred stopping process: %v", err)
 				}
 			}
-			return errors.Errorf("Fetch module command interrupted.")
+			return errors.New("Fetch module command interrupted.")
 		}
 
 	}
@@ -197,17 +197,17 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 		patch, err := ggpc.GetPatch(conf, pluginCom, pluginLogger)
 		if err != nil {
 			pluginLogger.LogExecution(slogger.ERROR, "Failed to get patch: %v", err)
-			errChan <- errors.Errorf("Failed to get patch: %v", err)
+			errChan <- errors.Wrap(err, "Failed to get patch")
 		}
 		err = ggpc.getPatchContents(conf, pluginCom, pluginLogger, patch)
 		if err != nil {
 			pluginLogger.LogExecution(slogger.ERROR, "Failed to get patch contents: %v", err)
-			errChan <- errors.Errorf("Failed to get patch contents: %v", err)
+			errChan <- errors.Wrap(err, "Failed to get patch contents")
 		}
 		err = ggpc.applyPatch(conf, patch, pluginLogger)
 		if err != nil {
 			pluginLogger.LogExecution(slogger.INFO, "Failed to apply patch: %v", err)
-			errChan <- errors.Errorf("Failed to apply patch: %v", err)
+			errChan <- errors.Wrap(err, "Failed to apply patch")
 		}
 		errChan <- nil
 	}()
@@ -216,7 +216,7 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 	case err := <-errChan:
 		return err
 	case <-stop:
-		return errors.Errorf("Patch command interrupted.")
+		return errors.New("Patch command interrupted")
 	}
 
 }

@@ -54,22 +54,22 @@ func validateS3BucketName(bucket string) error {
 		return nil
 	}
 	if len(bucket) < 3 {
-		return errors.Errorf("must be at least 3 characters")
+		return errors.New("must be at least 3 characters")
 	}
 	if len(bucket) > 63 {
-		return errors.Errorf("must be no more than 63 characters")
+		return errors.New("must be no more than 63 characters")
 	}
 	if strings.HasPrefix(bucket, ".") || strings.HasPrefix(bucket, "-") {
-		return errors.Errorf("must not begin with a period or hyphen")
+		return errors.New("must not begin with a period or hyphen")
 	}
 	if strings.HasSuffix(bucket, ".") || strings.HasSuffix(bucket, "-") {
-		return errors.Errorf("must not end with a period or hyphen")
+		return errors.New("must not end with a period or hyphen")
 	}
 	if strings.Contains(bucket, "..") {
-		return errors.Errorf("must not have two consecutive periods")
+		return errors.New("must not have two consecutive periods")
 	}
 	if !BucketNameRegex.MatchString(bucket) {
-		return errors.Errorf("must contain only combinations of uppercase/lowercase " +
+		return errors.New("must contain only combinations of uppercase/lowercase " +
 			"letters, numbers, hyphens, underscores and periods")
 	}
 	return nil

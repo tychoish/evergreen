@@ -41,10 +41,10 @@ func (self *TarGzPackCommand) Plugin() string {
 // ParseParams reads in the given parameters for the command.
 func (self *TarGzPackCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, self); err != nil {
-		return errors.Errorf("error parsing '%v' params: %v", self.Name(), err)
+		return errors.Wrapf(err, "error parsing '%v' params", self.Name())
 	}
 	if err := self.validateParams(); err != nil {
-		return errors.Errorf("error validating '%v' params: %v", self.Name(), err)
+		return errors.Wrapf("error validating '%v' params", self.Name())
 	}
 	return nil
 }
@@ -53,13 +53,13 @@ func (self *TarGzPackCommand) ParseParams(params map[string]interface{}) error {
 // included.
 func (self *TarGzPackCommand) validateParams() error {
 	if self.Target == "" {
-		return errors.Errorf("target cannot be blank")
+		return errors.New("target cannot be blank")
 	}
 	if self.SourceDir == "" {
-		return errors.Errorf("source_dir cannot be blank")
+		return errors.New("source_dir cannot be blank")
 	}
 	if len(self.Include) == 0 {
-		return errors.Errorf("include cannot be empty")
+		return errors.New("include cannot be empty")
 	}
 
 	return nil
@@ -72,7 +72,7 @@ func (self *TarGzPackCommand) Execute(pluginLogger plugin.Logger,
 	stop chan bool) error {
 
 	if err := plugin.ExpandValues(self, conf.Expansions); err != nil {
-		return errors.Errorf("error expanding params: %v", err)
+		return errors.Wrap(err, "error expanding params")
 	}
 
 	// if the source dir is a relative path, join it to the working dir
@@ -90,13 +90,13 @@ func (self *TarGzPackCommand) Execute(pluginLogger plugin.Logger,
 	go func() {
 		var err error
 		filesArchived, err = self.BuildArchive(conf.WorkDir, pluginLogger)
-		errChan <- err
+		errChan <- errors.WithStack(err)
 	}()
 
 	select {
 	case err := <-errChan:
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		if filesArchived == 0 {
 			deleteErr := os.Remove(self.Target)
@@ -145,7 +145,7 @@ func (self *TarGzPackCommand) BuildArchive(workDir string, pluginLogger plugin.L
 	// create a targz writer for the target file
 	f, gz, tarWriter, err := archive.TarGzWriter(self.Target)
 	if err != nil {
-		return -1, errors.Errorf("error opening target archive file %v: %v", self.Target, err)
+		return -1, errors.Wrapf(err, "error opening target archive file %s", self.Target)
 	}
 	defer func() {
 		tarWriter.Close()
@@ -154,6 +154,7 @@ func (self *TarGzPackCommand) BuildArchive(workDir string, pluginLogger plugin.L
 	}()
 
 	// Build the archive
-	return archive.BuildArchive(tarWriter, self.SourceDir, self.Include,
+	out, err := archive.BuildArchive(tarWriter, self.SourceDir, self.Include,
 		self.ExcludeFiles, log)
+	return out, errors.WithStack(err)
 }

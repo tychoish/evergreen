@@ -136,17 +136,17 @@ func (tjsc *TaskJSONSendCommand) Plugin() string {
 
 func (tjsc *TaskJSONSendCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, tjsc); err != nil {
-		return errors.Errorf("error decoding '%v' params: %v", tjsc.Name(), err)
+		return errors.Wrap(err, "error decoding '%v' params: %v", tjsc.Name())
 	}
 	return nil
 }
 
 func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
 	if tjsc.File == "" {
-		return errors.Errorf("'file' param must not be blank")
+		return errors.New("'file' param must not be blank")
 	}
 	if tjsc.DataName == "" {
-		return errors.Errorf("'name' param must not be blank")
+		return errors.New("'name' param must not be blank")
 	}
 
 	errChan := make(chan error)
@@ -155,14 +155,14 @@ func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCom
 		fileLoc := filepath.Join(conf.WorkDir, tjsc.File)
 		jsonFile, err := os.Open(fileLoc)
 		if err != nil {
-			errChan <- errors.Errorf("Couldn't open json file: '%v'", err)
+			errChan <- errors.Wrap(err, "Couldn't open json file")
 			return
 		}
 
 		jsonData := map[string]interface{}{}
 		err = util.ReadJSONInto(jsonFile, &jsonData)
 		if err != nil {
-			errChan <- errors.Errorf("File contained invalid json: %v", err)
+			errChan <- errors.Wrap(err, "File contained invalid json")
 			return
 		}
 
@@ -173,6 +173,7 @@ func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCom
 				if resp != nil {
 					defer resp.Body.Close()
 				}
+				err = errors.WithStack(err)
 				if err != nil {
 					return util.RetriableError{err}
 				}
@@ -184,7 +185,7 @@ func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCom
 		)
 
 		_, err = util.Retry(retriablePost, 10, 3*time.Second)
-		errChan <- err
+		errChan <- errors.WithStack(err)
 	}()
 
 	select {
@@ -192,7 +193,7 @@ func (tjsc *TaskJSONSendCommand) Execute(log plugin.Logger, com plugin.PluginCom
 		if err != nil {
 			log.LogTask(slogger.ERROR, "Sending json data failed: %v", err)
 		}
-		return err
+		return errors.WithStack(err)
 	case <-stop:
 		log.LogExecution(slogger.INFO, "Received abort signal, stopping.")
 		return nil
@@ -231,39 +232,38 @@ func (jgc *TaskJSONHistoryCommand) Plugin() string {
 
 func (jgc *TaskJSONGetCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, jgc); err != nil {
-		return errors.Errorf("error decoding '%v' params: %v", jgc.Name(), err)
+		return errors.Wrapf(err, "error decoding '%v' params", jgc.Name())
 	}
 	if jgc.File == "" {
-		return errors.Errorf("JSON 'get' command must not have blank 'file' parameter")
+		return errors.New("JSON 'get' command must not have blank 'file' parameter")
 	}
 	return nil
 }
 
 func (jgc *TaskJSONHistoryCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, jgc); err != nil {
-		return errors.Errorf("error decoding '%v' params: %v", jgc.Name(), err)
+		return errors.Wrapf(err, "error decoding '%v' params", jgc.Name())
 	}
 	if jgc.File == "" {
-		return errors.Errorf("JSON 'history' command must not have blank 'file' parameter")
+		return errors.New("JSON 'history' command must not have blank 'file' parameter")
 	}
 	return nil
 }
 
 func (jgc *TaskJSONGetCommand) Execute(log plugin.Logger, com plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
-
-	err := plugin.ExpandValues(jgc, conf.Expansions)
+	err := errors.WithStack(plugin.ExpandValues(jgc, conf.Expansions))
 	if err != nil {
 		return err
 	}
 
 	if jgc.File == "" {
-		return errors.Errorf("'file' param must not be blank")
+		return errors.New("'file' param must not be blank")
 	}
 	if jgc.DataName == "" {
-		return errors.Errorf("'name' param must not be blank")
+		return errors.New("'name' param must not be blank")
 	}
 	if jgc.TaskName == "" {
-		return errors.Errorf("'task' param must not be blank")
+		return errors.New("'task' param must not be blank")
 	}
 
 	if jgc.File != "" && !filepath.IsAbs(jgc.File) {
@@ -295,7 +295,7 @@ func (jgc *TaskJSONGetCommand) Execute(log plugin.Logger, com plugin.PluginCommu
 			}
 			if resp.StatusCode != http.StatusOK {
 				if resp.StatusCode == http.StatusNotFound {
-					return errors.Errorf("No JSON data found")
+					return errors.New("No JSON data found")
 				}
 				return util.RetriableError{errors.Errorf("unexpected status code %v", resp.StatusCode)}
 			}
@@ -303,23 +303,23 @@ func (jgc *TaskJSONGetCommand) Execute(log plugin.Logger, com plugin.PluginCommu
 		},
 	)
 	_, err = util.Retry(retriableGet, 10, 3*time.Second)
-	return err
+	return errors.WithStack(err)
 }
 
 func (jgc *TaskJSONHistoryCommand) Execute(log plugin.Logger, com plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
-	err := plugin.ExpandValues(jgc, conf.Expansions)
+	err := errors.WithStack(plugin.ExpandValues(jgc, conf.Expansions))
 	if err != nil {
 		return err
 	}
 
 	if jgc.File == "" {
-		return errors.Errorf("'file' param must not be blank")
+		return errors.New("'file' param must not be blank")
 	}
 	if jgc.DataName == "" {
-		return errors.Errorf("'name' param must not be blank")
+		return errors.New("'name' param must not be blank")
 	}
 	if jgc.TaskName == "" {
-		return errors.Errorf("'task' param must not be blank")
+		return errors.New("'task' param must not be blank")
 	}
 
 	if jgc.File != "" && !filepath.IsAbs(jgc.File) {
@@ -352,7 +352,7 @@ func (jgc *TaskJSONHistoryCommand) Execute(log plugin.Logger, com plugin.PluginC
 			}
 			if resp.StatusCode != http.StatusOK {
 				if resp.StatusCode == http.StatusNotFound {
-					return errors.Errorf("No JSON data found")
+					return errors.New("No JSON data found")
 				}
 				return util.RetriableError{errors.Errorf("unexpected status code %v", resp.StatusCode)}
 			}
@@ -360,5 +360,5 @@ func (jgc *TaskJSONHistoryCommand) Execute(log plugin.Logger, com plugin.PluginC
 		},
 	)
 	_, err = util.Retry(retriableGet, 10, 3*time.Second)
-	return err
+	return errors.WithStack(err)
 }

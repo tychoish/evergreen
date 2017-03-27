@@ -61,12 +61,12 @@ func (self *S3GetCommand) Plugin() string {
 // S3GetCommand-specific implementation of ParseParams.
 func (self *S3GetCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, self); err != nil {
-		return errors.Errorf("error decoding %v params: %v", self.Name(), err)
+		return errors.Wrap(err, "error decoding %v params", self.Name())
 	}
 
 	// make sure the command params are valid
 	if err := self.validateParams(); err != nil {
-		return errors.Errorf("error validating %v params: %v", self.Name(), err)
+		return errors.Wrap(err, "error validating %v params", self.Name())
 	}
 
 	return nil
@@ -76,29 +76,28 @@ func (self *S3GetCommand) ParseParams(params map[string]interface{}) error {
 // local_file and extract_to is specified.
 func (self *S3GetCommand) validateParams() error {
 	if self.AwsKey == "" {
-		return errors.Errorf("aws_key cannot be blank")
+		return errors.New("aws_key cannot be blank")
 	}
 	if self.AwsSecret == "" {
-		return errors.Errorf("aws_secret cannot be blank")
+		return errors.New("aws_secret cannot be blank")
 	}
 	if self.RemoteFile == "" {
-		return errors.Errorf("remote_file cannot be blank")
+		return errors.New("remote_file cannot be blank")
 	}
 
 	// make sure the bucket is valid
 	if err := validateS3BucketName(self.Bucket); err != nil {
-		return errors.Errorf("%v is an invalid bucket name: %v", self.Bucket, err)
+		return errors.Wrapf(err, "%v is an invalid bucket name", self.Bucket)
 	}
 
 	// make sure local file and extract-to dir aren't both specified
 	if self.LocalFile != "" && self.ExtractTo != "" {
-		return errors.Errorf("cannot specify both local_file and extract_to" +
-			" directory")
+		return errors.New("cannot specify both local_file and extract_to directory")
 	}
 
 	// make sure one is specified
 	if self.LocalFile == "" && self.ExtractTo == "" {
-		return errors.Errorf("must specify either local_file or extract_to")
+		return errors.New("must specify either local_file or extract_to")
 	}
 	return nil
 }
@@ -132,7 +131,7 @@ func (self *S3GetCommand) Execute(pluginLogger plugin.Logger,
 
 	// validate the params
 	if err := self.validateParams(); err != nil {
-		return errors.Errorf("expanded params are not valid: %v", err)
+		return errors.Wrap(err, "expanded params are not valid")
 	}
 
 	if !self.shouldRunForVariant(conf.BuildVariant.Name) {
@@ -153,12 +152,12 @@ func (self *S3GetCommand) Execute(pluginLogger plugin.Logger,
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- self.GetWithRetry(pluginLogger)
+		errChan <- errors.WithStack(self.GetWithRetry(pluginLogger))
 	}()
 
 	select {
 	case err := <-errChan:
-		return err
+		return errors.WithStack(err)
 	case <-stop:
 		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
 			" execution of S3 Get Command")
@@ -173,7 +172,7 @@ func (self *S3GetCommand) GetWithRetry(pluginLogger plugin.Logger) error {
 		func() error {
 			pluginLogger.LogTask(slogger.INFO, "Fetching %v from"+
 				" s3 bucket %v", self.RemoteFile, self.Bucket)
-			err := self.Get()
+			err := errors.WithStack(self.Get())
 			if err != nil {
 				pluginLogger.LogExecution(slogger.ERROR, "Error getting from"+
 					" s3 bucket: %v", err)
@@ -185,9 +184,9 @@ func (self *S3GetCommand) GetWithRetry(pluginLogger plugin.Logger) error {
 
 	retryFail, err := util.RetryArithmeticBackoff(retriableGet,
 		MaxS3GetAttempts, S3GetSleep)
+	err = errors.WithStack(err)
 	if retryFail {
-		pluginLogger.LogExecution(slogger.ERROR, "S3 get failed with error: %v",
-			err)
+		pluginLogger.LogExecution(slogger.ERROR, "S3 get failed with error: %v", err)
 		return err
 	}
 	return nil
@@ -195,7 +194,6 @@ func (self *S3GetCommand) GetWithRetry(pluginLogger plugin.Logger) error {
 
 // Fetch the specified resource from s3.
 func (self *S3GetCommand) Get() error {
-
 	// get the appropriate session and bucket
 	auth := &aws.Auth{
 		AccessKey: self.AwsKey,
@@ -208,53 +206,45 @@ func (self *S3GetCommand) Get() error {
 	// get a reader for the bucket
 	reader, err := bucket.GetReader(self.RemoteFile)
 	if err != nil {
-		return errors.Errorf("error getting bucket reader for file %v: %v",
-			self.RemoteFile, err)
+		return errors.Wrapf(err, "error getting bucket reader for file %v", self.RemoteFile)
 	}
 	defer reader.Close()
 
 	// either untar the remote, or just write to a file
 	if self.LocalFile != "" {
-
 		// remove the file, if it exists
 		exists, err := util.FileExists(self.LocalFile)
 		if err != nil {
-			return errors.Errorf("error checking existence of local file %v: %v",
-				self.LocalFile, err)
+			return errors.Wrapf(err, "error checking existence of local file %v",
+				self.LocalFile)
 		}
 		if exists {
 			if err := os.RemoveAll(self.LocalFile); err != nil {
-				return errors.Errorf("error clearing local file %v: %v",
-					self.LocalFile, err)
+				return errors.Wrapf(err, "error clearing local file %v", self.LocalFile)
 			}
 		}
 
 		// open the local file
 		file, err := os.Create(self.LocalFile)
 		if err != nil {
-			return errors.Errorf("error opening local file %v: %v", self.LocalFile,
-				err)
+			return errors.Wrap(err, "error opening local file %v", self.LocalFile)
 		}
 		defer file.Close()
 
 		_, err = io.Copy(file, reader)
-		return err
+		return errors.WithStack(err)
+	}
 
-	} else {
+	// wrap the reader in a gzip reader and a tar reader
+	gzipReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return errors.Wrapf(err, "error creating gzip reader for %v", self.RemoteFile)
+	}
 
-		// wrap the reader in a gzip reader and a tar reader
-		gzipReader, err := gzip.NewReader(reader)
-		if err != nil {
-			return errors.Errorf("error creating gzip reader for %v: %v",
-				self.RemoteFile, err)
-		}
-
-		tarReader := tar.NewReader(gzipReader)
-		err = archive.Extract(tarReader, self.ExtractTo)
-		if err != nil {
-			return errors.Errorf("error extracting %v to %v: %v", self.RemoteFile,
-				self.ExtractTo, err)
-		}
+	tarReader := tar.NewReader(gzipReader)
+	err = archive.Extract(tarReader, self.ExtractTo)
+	if err != nil {
+		return errors.Wrapf(err, "error extracting %v to %v", self.RemoteFile, self.ExtractTo)
 	}
 
 	return nil

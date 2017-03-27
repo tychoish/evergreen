@@ -59,7 +59,7 @@ func (ggpc GitGetProjectCommand) GetPatch(conf *model.TaskConfig,
 				}
 				msg := fmt.Sprintf("no patch found for task: %v", string(body))
 				pluginLogger.LogExecution(slogger.WARN, msg)
-				return errors.Errorf(msg)
+				return errors.New(msg)
 			}
 			if resp != nil && resp.StatusCode == http.StatusInternalServerError {
 				//something went wrong in api server
@@ -70,7 +70,7 @@ func (ggpc GitGetProjectCommand) GetPatch(conf *model.TaskConfig,
 				msg := fmt.Sprintf("error fetching patch from server: %v", string(body))
 				pluginLogger.LogExecution(slogger.WARN, msg)
 				return util.RetriableError{
-					errors.Errorf(msg),
+					errors.New(msg),
 				}
 			}
 			if resp != nil && resp.StatusCode == http.StatusConflict {
@@ -81,11 +81,11 @@ func (ggpc GitGetProjectCommand) GetPatch(conf *model.TaskConfig,
 				}
 				msg := fmt.Sprintf("secret conflict: %v", string(body))
 				pluginLogger.LogExecution(slogger.ERROR, msg)
-				return errors.Errorf(msg)
+				return errors.New(msg)
 			}
 			if resp == nil {
 				pluginLogger.LogExecution(slogger.WARN, "Empty response from API server")
-				return util.RetriableError{errors.Errorf("empty response")}
+				return util.RetriableError{errors.New("empty response")}
 			} else {
 				err = util.ReadJSONInto(resp.Body, patch)
 				if err != nil {
@@ -100,10 +100,10 @@ func (ggpc GitGetProjectCommand) GetPatch(conf *model.TaskConfig,
 
 	retryFail, err := util.RetryArithmeticBackoff(retriableGet, 5, 5*time.Second)
 	if retryFail {
-		return nil, errors.Errorf("getting patch failed after %v tries: %v", 10, err)
+		return nil, errors.Wrapf(err, "getting patch failed after %v tries", 10)
 	}
 	if err != nil {
-		return nil, errors.Errorf("getting patch failed: %v", err)
+		return nil, errors.Wrap(err, "getting patch failed: %v")
 	}
 	return patch, nil
 }
@@ -186,10 +186,10 @@ func (ggpc *GitGetProjectCommand) applyPatch(conf *model.TaskConfig,
 			// if patch is part of a module, apply patch in module root
 			module, err := conf.Project.GetModuleByName(patchPart.ModuleName)
 			if err != nil {
-				return errors.Errorf("Error getting module: %v", err)
+				return errors.Wrap(err, "Error getting module")
 			}
 			if module == nil {
-				return errors.Errorf("Module not found: %v", patchPart.ModuleName)
+				return errors.Errorf("Module '%s' not found", patchPart.ModuleName)
 			}
 
 			// skip the module if this build variant does not use it
@@ -208,12 +208,12 @@ func (ggpc *GitGetProjectCommand) applyPatch(conf *model.TaskConfig,
 		// for later use in shell script
 		tempFile, err := ioutil.TempFile("", "mcipatch_")
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		defer tempFile.Close()
 		_, err = io.WriteString(tempFile, patchPart.PatchSet.Patch)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 		tempAbsPath := tempFile.Name()
 
@@ -228,9 +228,8 @@ func (ggpc *GitGetProjectCommand) applyPatch(conf *model.TaskConfig,
 			ScriptMode:       true,
 		}
 
-		err = patchCmd.Run()
-		if err != nil {
-			return err
+		if err = patchCmd.Run(); err != nil {
+			return errors.WithStack(err)
 		}
 		pluginLogger.Flush()
 	}

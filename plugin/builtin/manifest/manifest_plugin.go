@@ -46,7 +46,7 @@ func (m *ManifestPlugin) Configure(conf map[string]interface{}) error {
 		return err
 	}
 	if mp.GithubToken == "" {
-		errors.Errorf("GitHub token is empty")
+		errors.New("GitHub token is empty")
 	}
 	m.OAuthCredentials = mp.GithubToken
 	return nil

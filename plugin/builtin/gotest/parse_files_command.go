@@ -1,7 +1,6 @@
 package gotest
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,12 +36,12 @@ func (pfCmd *ParseFilesCommand) Plugin() string {
 // validates that at least one file pattern is specified.
 func (pfCmd *ParseFilesCommand) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, pfCmd); err != nil {
-		return errors.Errorf("error decoding '%v' params: %v", pfCmd.Name(), err)
+		return errors.Wrapf(err, "error decoding '%v' params", pfCmd.Name())
 	}
 
 	if len(pfCmd.Files) == 0 {
-		return errors.Errorf("error validating '%v' params:" +
-			" must specify at least one file pattern to parse")
+		return errors.Errorf("error validating params: must specify at least one "+
+			"file pattern to parse: '%+v'", params)
 	}
 	return nil
 }
@@ -54,9 +53,9 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 	stop chan bool) error {
 
 	if err := plugin.ExpandValues(pfCmd, taskConfig.Expansions); err != nil {
-		msg := fmt.Sprintf("error expanding params: %v", err)
-		pluginLogger.LogTask(slogger.ERROR, "Error parsing gotest files: %v", msg)
-		return errors.Errorf(msg)
+		err = errors.Wrap(err, "error expanding params")
+		pluginLogger.LogTask(slogger.ERROR, "Error parsing gotest files: %+v", err)
+		return err
 	}
 
 	// make sure the file patterns are relative to the task's working directory
@@ -67,25 +66,24 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 	// will be all files containing test results
 	outputFiles, err := pfCmd.AllOutputFiles()
 	if err != nil {
-		return errors.Errorf("error obtaining names of output files: %v", err)
+		return errors.Wrap(err, "error obtaining names of output files")
 	}
 
 	// make sure we're parsing something
 	if len(outputFiles) == 0 {
-		return errors.Errorf("no files found to be parsed")
+		return errors.New("no files found to be parsed")
 	}
 
 	// parse all of the files
 	logs, results, err := ParseTestOutputFiles(outputFiles, stop, pluginLogger, taskConfig)
 	if err != nil {
-		return errors.Errorf("error parsing output results: %v", err)
+		return errors.Wrap(err, "error parsing output results")
 	}
 
 	// ship all of the test logs off to the server
 	pluginLogger.LogTask(slogger.INFO, "Sending test logs to server...")
 	allResults := []*TestResult{}
 	for idx, log := range logs {
-
 		logId := ""
 		if logId, err = pluginCom.TaskPostTestLog(&log); err != nil {
 			// continue on error to let the other logs be posted
@@ -108,7 +106,7 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 	// ship the parsed results off to the server
 	pluginLogger.LogTask(slogger.INFO, "Sending parsed results to server...")
 	if err := pluginCom.TaskPostResults(&resultsAsModel); err != nil {
-		return errors.Errorf("error posting parsed results to server: %v", err)
+		return errors.Wrap(err, "error posting parsed results to server")
 	}
 	pluginLogger.LogTask(slogger.INFO, "Successfully sent parsed results to server")
 
@@ -126,7 +124,7 @@ func (pfCmd *ParseFilesCommand) AllOutputFiles() ([]string, error) {
 	for _, pattern := range pfCmd.Files {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
-			return nil, errors.Errorf("error expanding file patterns: %v", err)
+			return nil, errors.Wrap(err, "error expanding file patterns")
 		}
 		outputFiles = append(outputFiles, matches...)
 	}
@@ -159,7 +157,7 @@ func ParseTestOutputFiles(outputFiles []string, stop chan bool,
 		// kill the execution if API server requests
 		select {
 		case <-stop:
-			return nil, nil, errors.Errorf("command was stopped")
+			return nil, nil, errors.New("command was stopped")
 		default:
 			// no stop signal
 		}
