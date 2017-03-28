@@ -100,16 +100,15 @@ func GetGithubAPIStatus() (string, error) {
 
 	err = util.ReadJSONInto(resp.Body, &gitStatus)
 	if err != nil {
-		return "", errors.Errorf("json read failed: %v", err)
-
+		return "", errors.Wrap(err, "json read failed")
 	}
+
 	return gitStatus.Status, nil
 }
 
 // GetGithubFile returns a struct that contains the contents of files within
 // a repository as Base64 encoded content.
-func GetGithubFile(oauthToken, fileURL string) (
-	githubFile *GithubFile, err error) {
+func GetGithubFile(oauthToken, fileURL string) (githubFile *GithubFile, err error) {
 	resp, err := tryGithubGet(oauthToken, fileURL)
 	if resp == nil {
 		errMsg := fmt.Sprintf("nil response from url '%v'", fileURL)
@@ -155,7 +154,7 @@ func GetGithubFile(oauthToken, fileURL string) (
 
 func GetGitHubMergeBaseRevision(oauthToken, repoOwner, repo, baseRevision string, currentCommit *GithubCommit) (string, error) {
 	if currentCommit == nil {
-		return "", errors.Errorf("no recent commit found")
+		return "", errors.New("no recent commit found")
 	}
 	url := fmt.Sprintf("%v/repos/%v/%v/compare/%v:%v...%v:%v",
 		GithubAPIBase,
@@ -298,7 +297,7 @@ func githubRequest(method string, url string, oauthToken string, data interface{
 	// check if there is an oauth token, if there is make sure it is a valid oauthtoken
 	if len(oauthToken) > 0 {
 		if !strings.HasPrefix(oauthToken, "token ") {
-			return nil, errors.Errorf("Invalid oauth token given")
+			return nil, errors.New("Invalid oauth token given")
 		}
 		req.Header.Add("Authorization", oauthToken)
 	}
@@ -476,10 +475,10 @@ func GithubAuthenticate(code, clientId, clientSecret string) (githubResponse *Gi
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return nil, errors.Errorf("could not authenticate for token %v", err.Error())
+		return nil, errors.Wrap(err, "could not authenticate for token")
 	}
 	if resp == nil {
-		return nil, errors.Errorf("invalid github response")
+		return nil, errors.New("invalid github response")
 	}
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -505,7 +504,7 @@ func GetGithubUser(token string) (githubUser *GithubLoginUser, githubOrganizatio
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -524,7 +523,7 @@ func GetGithubUser(token string) (githubUser *GithubLoginUser, githubOrganizatio
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		return nil, nil, errors.Errorf("Could not get user from token: %v", err)
+		return nil, nil, errors.Wrapf(err, "Could not get user from token")
 	}
 	respBody, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
