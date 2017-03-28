@@ -529,7 +529,7 @@ func (uis *UIServer) taskLogRaw(w http.ResponseWriter, r *http.Request) {
 
 	channel, err := model.GetRawTaskLogChannel(projCtx.Task.Id, execution, []string{}, logTypeFilter)
 	if err != nil {
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error getting log data: %s", err))
+		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error getting log data"))
 		return
 	}
 
@@ -539,12 +539,11 @@ func (uis *UIServer) taskLogRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if (r.FormValue("text") == "true") || (r.Header.Get("Content-Type") == "text/plain") {
-		err = uis.StreamText(w, http.StatusOK, logTemplateData{channel, GetUser(r)}, "base", "task_log_raw.html")
+		err = errors.WithStack(uis.StreamText(w, http.StatusOK, logTemplateData{channel, GetUser(r)}, "base", "task_log_raw.html"))
 		grip.Error(err)
 		return
 	}
-	err = uis.StreamHTML(w, http.StatusOK, logTemplateData{channel, GetUser(r)}, "base", "task_log.html")
-	grip.CatchError(err)
+	grip.CatchError(errors.WithStack(uis.StreamHTML(w, http.StatusOK, logTemplateData{channel, GetUser(r)}, "base", "task_log.html")))
 }
 
 // avoids type-checking json params for the below function

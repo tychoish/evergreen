@@ -90,7 +90,7 @@ func GetGithubAPIStatus() (string, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", errors.Errorf("github request failed: %v", err)
+		return "", errors.Wrap(err, "github request failed")
 	}
 
 	gitStatus := struct {

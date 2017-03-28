@@ -27,36 +27,36 @@ func init() {
 type MockHostFinder struct{}
 
 func (*MockHostFinder) FindAvailableHosts() ([]host.Host, error) {
-	return nil, errors.Errorf("FindAvailableHosts not implemented")
+	return nil, errors.New("FindAvailableHosts not implemented")
 }
 
 func (*MockHostFinder) FindAvailableHostsForDistro(_ string) ([]host.Host, error) {
-	return nil, errors.Errorf("FindAvailableHostsForDistro not implemented")
+	return nil, errors.New("FindAvailableHostsForDistro not implemented")
 }
 
 type MockTaskQueueFinder struct{}
 
 func (*MockTaskQueueFinder) FindTaskQueue(distroId string) (*model.TaskQueue, error) {
-	return nil, errors.Errorf("FindTaskQueue not implemented")
+	return nil, errors.New("FindTaskQueue not implemented")
 }
 
 type MockHostGateway struct{}
 
 func (self *MockHostGateway) RunSetup() error {
-	return errors.Errorf("RunSetup not implemented")
+	return errors.New("RunSetup not implemented")
 }
 
 func (self *MockHostGateway) GetAgentRevision() (string, error) {
-	return "", errors.Errorf("GetAgentRevision not implemented")
+	return "", errors.New("GetAgentRevision not implemented")
 }
 
 func (self *MockHostGateway) RunTaskOnHost(settings *evergreen.Settings,
 	taskToRun task.Task, targetHost host.Host) (string, error) {
-	return "", errors.Errorf("RunTaskOnHost not implemented")
+	return "", errors.New("RunTaskOnHost not implemented")
 }
 
 func (self *MockHostGateway) AgentNeedsBuild() (bool, error) {
-	return false, errors.Errorf("AgentNeedsBuild not implemented")
+	return false, errors.New("AgentNeedsBuild not implemented")
 }
 
 func TestSplitHostsByDistro(t *testing.T) {
