@@ -239,7 +239,7 @@ func (uis *UIServer) NewRouter() (*mux.Router, error) {
 		pluginSettings := uis.Settings.Plugins[pl.Name()]
 		err := pl.Configure(pluginSettings)
 		if err != nil {
-			return nil, errors.Errorf("Failed to configure plugin %v: %v", pl.Name(), err)
+			return nil, errors.Wrap(err, "Failed to configure plugin %v", pl.Name())
 		}
 
 		// check if a plugin is an app level plugin first

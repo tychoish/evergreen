@@ -48,9 +48,9 @@ func (self *DBTaskDurationEstimator) GetExpectedDurations(
 				t.Project, t.BuildVariant,
 				model.TaskCompletionEstimateWindow)
 			if err != nil {
-				return durations, errors.Errorf("Error fetching "+
-					"expected task duration for %v on %v: %v",
-					t.BuildVariant, t.Project, err)
+				return durations, errors.Wrapf(err, "Error fetching "+
+					"expected task duration for %v on %v",
+					t.BuildVariant, t.Project)
 			}
 			durations.TaskDurationByProject[t.Project].
 				TaskDurationByBuildVariant[t.BuildVariant] =

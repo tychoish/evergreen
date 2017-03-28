@@ -55,18 +55,18 @@ func (agbh *AgentHostGateway) RunTaskOnHost(settings *evergreen.Settings, taskTo
 	// get the host's SSH options
 	cloudHost, err := providers.GetCloudHost(&hostObj, settings)
 	if err != nil {
-		return "", errors.Errorf("Failed to get cloud host for %v: %v", hostObj.Id, err)
+		return "", errors.Wrapf(err, "Failed to get cloud host for %s", hostObj.Id)
 	}
 	sshOptions, err := cloudHost.GetSSHOptions()
 	if err != nil {
-		return "", errors.Errorf("Error getting ssh options for host %v: %v", hostObj.Id, err)
+		return "", errors.Wrapf(err, "Error getting ssh options for host %s", hostObj.Id)
 	}
 
 	// prep the remote host
 	grip.Infof("Prepping remote host %v...", hostObj.Id)
 	agentRevision, err := agbh.prepRemoteHost(hostObj, sshOptions)
 	if err != nil {
-		return "", errors.Errorf("error prepping remote host %v: %v", hostObj.Id, err)
+		return "", errors.Wrap(err, "error prepping remote host %s", hostObj.Id)
 	}
 	grip.Infof("Prepping host %v finished successfully", hostObj.Id)
 
@@ -76,13 +76,13 @@ func (agbh *AgentHostGateway) RunTaskOnHost(settings *evergreen.Settings, taskTo
 	// generate the host secret if none exists
 	if hostObj.Secret == "" {
 		if err := hostObj.CreateSecret(); err != nil {
-			return "", errors.Errorf("creating secret for %v: %v", hostObj.Id, err)
+			return "", errors.Wrap(err, "creating secret for %s", hostObj.Id)
 		}
 	}
 
 	err = startAgentOnRemote(settings.ApiUrl, &taskToRun, &hostObj, sshOptions)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	grip.Infof("Agent successfully started for task %v", taskToRun.Id)
 

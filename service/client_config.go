@@ -51,7 +51,7 @@ func getClientConfig(settings *evergreen.Settings) (*evergreen.ClientConfig, err
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Errorf("problem finding client binaries: %v", err)
+		return nil, errors.Wrap(err, "problem finding client binaries")
 	}
 
 	return c, nil

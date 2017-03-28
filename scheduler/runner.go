@@ -39,14 +39,15 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 	}
 
 	if err := schedulerInstance.Schedule(); err != nil {
-		err = errors.Errorf("Error running scheduler: %+v", err)
+		err = errors.Wrap(err, "Error running scheduler")
 		grip.Error(err)
 		return err
 	}
 
 	runtime := time.Now().Sub(startTime)
 	if err := model.SetProcessRuntimeCompleted(RunnerName, runtime); err != nil {
-		grip.Errorln("Error updating process status:", err)
+		err = errors.Wrap(err, "Error updating process status")
+		grip.Error(err)
 	}
 	grip.Infof("Scheduler took %s to run", runtime)
 	return nil

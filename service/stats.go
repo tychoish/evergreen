@@ -109,7 +109,7 @@ func (uis *UIServer) taskTimingJSON(w http.ResponseWriter, r *http.Request) {
 	request := mux.Vars(r)["request"]
 
 	if projCtx.Project == nil {
-		uis.LoggedError(w, r, http.StatusNotFound, errors.Errorf("not found"))
+		uis.LoggedError(w, r, http.StatusNotFound, errors.New("not found"))
 		return
 	}
 

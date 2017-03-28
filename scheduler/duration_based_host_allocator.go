@@ -478,16 +478,17 @@ func (self *DurationBasedHostAllocator) numNewHostsForDistro(
 
 	cloudManager, err := providers.GetCloudManager(distro.Provider, settings)
 	if err != nil {
-		err = errors.Errorf("Couldn't get cloud manager for %s (%s): %+v",
-			distro.Provider, distro.Id, err)
+		err = errors.Wrapf(err, "Couldn't get cloud manager for %s (%s)",
+			distro.Provider, distro.Id)
 		grip.Error(err)
 		return 0, err
 	}
 
 	can, err := cloudManager.CanSpawn()
 	if err != nil {
-		grip.Errorf("Problem checking if '%v' provider can spawn hosts: %+v",
-			distro.Provider, err)
+		err = errors.Wrapf(err, "Problem checking if '%v' provider can spawn hosts",
+			distro.Provider)
+		grip.Error(err)
 		return 0, nil
 	}
 	if !can {

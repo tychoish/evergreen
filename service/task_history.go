@@ -525,7 +525,7 @@ func getTaskDrawerItems(displayName string, variant string, reverseOrder bool, v
 	tasks, err := task.Find(task.ByOrderNumbersForNameAndVariant(orderNumbers, displayName, variant).Sort([]string{revisionSort}))
 
 	if err != nil {
-		return nil, errors.Errorf("error getting sibling tasks: %v", err)
+		return nil, errors.Wrap(err, "error getting sibling tasks")
 	}
 	return createSiblingTaskGroups(tasks, versions), nil
 }

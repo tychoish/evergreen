@@ -22,7 +22,7 @@ func cachePreviousTasks(comparator *CmpBasedTaskComparator) (err error) {
 		if t.Requester == evergreen.RepotrackerVersionRequester {
 			prevTask, err = t.PreviousCompletedTask(t.Project, []string{})
 			if err != nil {
-				return errors.Errorf("cachePreviousTasks: %v", err)
+				return errors.Wrap(err, "cachePreviousTasks")
 			}
 			if prevTask == nil {
 				prevTask = &task.Task{}
@@ -46,7 +46,7 @@ func cacheSimilarFailing(comparator *CmpBasedTaskComparator) (err error) {
 		if task.Requester == evergreen.RepotrackerVersionRequester {
 			numSimilarFailing, err = task.CountSimilarFailingTasks()
 			if err != nil {
-				return errors.Errorf("cacheSimilarFailing: %v", err)
+				return errors.Wrap(err, "cacheSimilarFailing")
 			}
 		}
 		comparator.similarFailingCount[task.Id] = numSimilarFailing

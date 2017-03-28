@@ -109,18 +109,18 @@ func (uis *UIServer) taskPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if projCtx.Build == nil {
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("build not found"))
+		uis.LoggedError(w, r, http.StatusInternalServerError, errors.New("build not found"))
 		return
 	}
 
 	if projCtx.Version == nil {
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("version not found"))
+		uis.LoggedError(w, r, http.StatusInternalServerError, errors.New("version not found"))
 		return
 	}
 
 	if projCtx.ProjectRef == nil {
 		grip.Error("Project ref is nil")
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("version not found"))
+		uis.LoggedError(w, r, http.StatusInternalServerError, errors.New("version not found"))
 		return
 	}
 
@@ -148,7 +148,7 @@ func (uis *UIServer) taskPage(w http.ResponseWriter, r *http.Request) {
 
 		if taskFromDb == nil {
 			if execution != projCtx.Task.Execution {
-				uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error finding old task: %v", err))
+				uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error finding old task"))
 				return
 			}
 			archived = false
@@ -167,7 +167,8 @@ func (uis *UIServer) taskPage(w http.ResponseWriter, r *http.Request) {
 		// Get total number of executions for executions drop down
 		mostRecentExecution, err := task.FindOne(task.ById(tId))
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error finding most recent execution by id %s: %v", tId, err))
+			uis.LoggedError(w, r, http.StatusInternalServerError,
+				errors.Wrapf(err, "Error finding most recent execution by id %s", tId))
 			return
 		}
 		totalExecutions = mostRecentExecution.Execution

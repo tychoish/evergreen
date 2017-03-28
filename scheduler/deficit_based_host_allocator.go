@@ -58,8 +58,9 @@ func (self *DeficitBasedHostAllocator) numNewHostsForDistro(
 
 	can, err := cloudManager.CanSpawn()
 	if err != nil {
-		grip.Errorf("Couldn't check if cloud provider %s is spawnable: %+v",
-			distro.Provider, err)
+		err = errors.Wrapf(err, "Couldn't check if cloud provider %s is spawnable",
+			distro.Provider)
+		grip.Error(err)
 		return 0
 	}
 	if !can {

@@ -79,7 +79,7 @@ func GetProjectContext(r *http.Request) (projectContext, error) {
 	if rv := context.Get(r, RequestProjectContext); rv != nil {
 		return rv.(projectContext), nil
 	}
-	return projectContext{}, errors.Errorf("No context loaded")
+	return projectContext{}, errors.New("No context loaded")
 }
 
 // MustHaveProjectContext gets the projectContext from the request,
@@ -242,7 +242,7 @@ func (uis *UIServer) loadCtx(next http.HandlerFunc) http.HandlerFunc {
 		projCtx, err := uis.LoadProjectContext(w, r)
 		if err != nil {
 			// Some database lookup failed when fetching the data - log it
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error loading project context: %v", err))
+			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error loading project context"))
 			return
 		}
 		if projCtx.ProjectRef != nil && projCtx.ProjectRef.Private && GetUser(r) == nil {

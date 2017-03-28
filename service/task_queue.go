@@ -74,7 +74,7 @@ func (uis *UIServer) taskTimeStatisticsHandler(w http.ResponseWriter, r *http.Re
 	cutoffDaysAsString := mux.Vars(r)["cutoff_days"]
 	cutoffDays, err := strconv.Atoi(cutoffDaysAsString)
 	if err != nil {
-		uis.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("Error converting cutoff_days to integer: %v", err))
+		uis.LoggedError(w, r, http.StatusBadRequest, errors.Wrap(err, "Error converting cutoff_days to integer"))
 		return
 	}
 
@@ -89,7 +89,7 @@ func (uis *UIServer) taskTimeStatisticsHandler(w http.ResponseWriter, r *http.Re
 
 	timeMap, err := task.AverageTaskTimeDifference(field1, field2, groupyBy, cutoff)
 	if err != nil {
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error computing time stats: %v", err))
+		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error computing time stats"))
 		return
 	}
 
@@ -106,7 +106,7 @@ func (uis *UIServer) allTaskQueues(w http.ResponseWriter, r *http.Request) {
 	taskQueues, err := model.FindAllTaskQueues()
 	if err != nil {
 		uis.LoggedError(w, r, http.StatusInternalServerError,
-			errors.Errorf("Error finding task queues: %v", err))
+			errors.Wrap(err, "Error finding task queues"))
 		return
 	}
 

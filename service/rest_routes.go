@@ -38,7 +38,8 @@ func (ra *restAPI) loadCtx(next http.HandlerFunc) http.HandlerFunc {
 		ctx, err := model.LoadContext(taskId, buildId, versionId, patchId, projectId)
 		if err != nil {
 			// Some database lookup failed when fetching the data - log it
-			ra.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error loading project context: %v", err))
+			ra.LoggedError(w, r, http.StatusInternalServerError,
+				errors.Wrap(err, "Error loading project context"))
 			return
 		}
 		if ctx.ProjectRef != nil && ctx.ProjectRef.Private && GetUser(r) == nil {
@@ -61,7 +62,7 @@ func GetRESTContext(r *http.Request) (*model.Context, error) {
 	if rv := context.Get(r, RestContext); rv != nil {
 		return rv.(*model.Context), nil
 	}
-	return nil, errors.Errorf("No context loaded")
+	return nil, errors.New("No context loaded")
 }
 
 // MustHaveRESTContext fetches the model.Context stored with the request, and panics if the key

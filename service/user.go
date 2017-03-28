@@ -74,7 +74,7 @@ func (uis *UIServer) newAPIKey(w http.ResponseWriter, r *http.Request) {
 	currentUser := MustHaveUser(r)
 	newKey := util.RandomString()
 	if err := model.SetUserAPIKey(currentUser.Id, newKey); err != nil {
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("failed saving key: %v", err))
+		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "failed saving key"))
 		return
 	}
 	uis.WriteJSON(w, http.StatusOK, struct {
@@ -119,7 +119,8 @@ func (uis *UIServer) userSettingsModify(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := model.SaveUserSettings(currentUser.Username(), userSettings); err != nil {
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error saving user settings: %v", err))
+		uis.LoggedError(w, r, http.StatusInternalServerError,
+			errors.Wrap(err, "Error saving user settings"))
 		return
 	}
 

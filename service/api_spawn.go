@@ -85,7 +85,7 @@ func (as *APIServer) requestHost(w http.ResponseWriter, r *http.Request) {
 		if _, ok := err.(spawn.BadOptionsErr); !ok {
 			errCode = http.StatusInternalServerError
 		}
-		as.LoggedError(w, r, errCode, errors.Errorf("Spawn request failed validation: %v", err))
+		as.LoggedError(w, r, errCode, errors.Wrap(err, "Spawn request failed validation"))
 		return
 	}
 
@@ -237,7 +237,7 @@ func (as *APIServer) modifyHost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err = cloudHost.TerminateInstance(); err != nil {
-			as.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Failed to terminate spawn host: %v", err))
+			as.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Failed to terminate spawn host"))
 			return
 		}
 		as.WriteJSON(w, http.StatusOK, spawnResponse{HostInfo: *host})

@@ -199,7 +199,7 @@ func getTimelineData(projectName, requester string, versionsToSkip, versionsPerP
 func getBuildVariantHistory(buildId string, before int, after int) ([]build.Build, error) {
 	b, err := build.FindOne(build.ById(buildId))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if b == nil {
 		return nil, errors.Errorf("no build with id %v", buildId)
@@ -210,7 +210,7 @@ func getBuildVariantHistory(buildId string, before int, after int) ([]build.Buil
 			WithFields(build.IdKey, build.TasksKey, build.StatusKey, build.VersionKey, build.ActivatedKey).
 			Limit(before))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	moreRecentBuilds, err := build.Find(
@@ -218,7 +218,7 @@ func getBuildVariantHistory(buildId string, before int, after int) ([]build.Buil
 			WithFields(build.IdKey, build.TasksKey, build.StatusKey, build.VersionKey, build.ActivatedKey).
 			Limit(after))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	builds := make([]build.Build, 0, len(lessRecentBuilds)+len(moreRecentBuilds))
@@ -233,18 +233,18 @@ func getBuildVariantHistory(buildId string, before int, after int) ([]build.Buil
 func getBuildVariantHistoryLastSuccess(buildId string) (*build.Build, error) {
 	b, err := build.FindOne(build.ById(buildId))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if b.Status == evergreen.BuildSucceeded {
 		return b, nil
 	}
-	return b.PreviousSuccessful()
+	return errors.WithStack(b.PreviousSuccessful())
 }
 
 func getVersionHistory(versionId string, N int) ([]version.Version, error) {
 	v, err := version.FindOne(version.ById(versionId))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	} else if v == nil {
 		return nil, errors.Errorf("Version '%v' not found", versionId)
 	}
@@ -259,7 +259,7 @@ func getVersionHistory(versionId string, N int) ([]version.Version, error) {
 			version.IdentifierKey:          v.Identifier,
 		}).WithoutFields(version.ConfigKey).Sort([]string{version.RevisionOrderNumberKey}).Limit(2*N + 1))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	versionIndex := -1
@@ -283,7 +283,7 @@ func getVersionHistory(versionId string, N int) ([]version.Version, error) {
 				version.IdentifierKey:          v.Identifier,
 			}).WithoutFields(version.ConfigKey).Sort([]string{version.RevisionOrderNumberKey}).Limit(N - versionIndex))
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		// Reverse the second array so we have the versions ordered "newest one first"
@@ -301,7 +301,7 @@ func getVersionHistory(versionId string, N int) ([]version.Version, error) {
 			version.IdentifierKey:          v.Identifier,
 		}).WithoutFields(version.ConfigKey).Sort([]string{fmt.Sprintf("-%v", version.RevisionOrderNumberKey)}).Limit(N))
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		versions = append(versions, previousVersions...)
 	}
@@ -322,7 +322,7 @@ func getHostsData(includeSpawnedHosts bool) (*hostsData, error) {
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// convert the hosts to the ui models
@@ -340,7 +340,7 @@ func getHostsData(includeSpawnedHosts bool) (*hostsData, error) {
 		if dbHost.RunningTask != "" {
 			task, err := task.FindOne(task.ById(dbHost.RunningTask))
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			grip.ErrorWhenf(task == nil, "Hosts page could not find task %s for host %s",
 				dbHost.RunningTask, dbHost.Id)
@@ -355,10 +355,10 @@ func getHostData(hostId string) (*uiHost, error) {
 	hostAsUI := &uiHost{}
 	dbHost, err := host.FindOne(host.ById(hostId))
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if dbHost == nil {
-		return nil, errors.Errorf("Could not find host")
+		return nil, errors.New("Could not find host")
 	}
 	hostAsUI.Host = *dbHost
 	return hostAsUI, nil

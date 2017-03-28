@@ -28,7 +28,7 @@ func (uis *UIServer) grid(w http.ResponseWriter, r *http.Request) {
 	if projCtx.Version == nil {
 		v, err := version.Find(version.ByMostRecentForRequester(projCtx.Project.Identifier, evergreen.RepotrackerVersionRequester).Limit(1))
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error finding version: %v", err))
+			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error finding version"))
 			return
 		}
 		if len(v) > 0 {
@@ -49,7 +49,7 @@ func (uis *UIServer) grid(w http.ResponseWriter, r *http.Request) {
 	} else {
 		depth, err = strconv.Atoi(d)
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("Error converting depth: %v", err))
+			uis.LoggedError(w, r, http.StatusBadRequest, errors.Wrap(err, "Error converting depth"))
 			return
 		}
 		if depth < 0 {
@@ -65,7 +65,7 @@ func (uis *UIServer) grid(w http.ResponseWriter, r *http.Request) {
 			Sort([]string{"-" + version.RevisionOrderNumberKey}).
 			Limit(depth + 1))
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error fetching versions: %v", err))
+			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error fetching versions"))
 			return
 		}
 
@@ -76,19 +76,19 @@ func (uis *UIServer) grid(w http.ResponseWriter, r *http.Request) {
 
 		cells, err = grid.FetchCells(*projCtx.Version, depth)
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error fetching builds: %v", err))
+			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error fetching builds"))
 			return
 		}
 
 		failures, err = grid.FetchFailures(*projCtx.Version, depth)
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error fetching builds: %v", err))
+			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error fetching builds"))
 			return
 		}
 
 		revisionFailures, err = grid.FetchRevisionOrderFailures(*projCtx.Version, depth)
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error fetching revision failures: %v", err))
+			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error fetching revision failures"))
 			return
 		}
 	} else {

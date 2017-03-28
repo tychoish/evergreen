@@ -43,15 +43,15 @@ func getSummaries(patchContent string) ([]patch.Summary, error) {
 	if patchContent != "" {
 		gitOutput, err := thirdparty.GitApplyNumstat(patchContent)
 		if err != nil {
-			return nil, errors.Errorf("couldn't validate patch: %v", err)
+			return nil, errors.Wrap(err, "couldn't validate patch")
 		}
 		if gitOutput == nil {
-			return nil, errors.Errorf("couldn't validate patch: git apply --numstat returned empty")
+			return nil, errors.New("couldn't validate patch: git apply --numstat returned empty")
 		}
 
 		summaries, err = thirdparty.ParseGitSummary(gitOutput)
 		if err != nil {
-			return nil, errors.Errorf("couldn't validate patch: %v", err)
+			return nil, errors.Wrap(err, "couldn't validate patch")
 		}
 	}
 	return summaries, nil
@@ -66,18 +66,18 @@ func (pr *PatchAPIRequest) CreatePatch(finalize bool, oauthToken string,
 
 	projectRef, err := model.FindOneProjectRef(pr.ProjectId)
 	if err != nil {
-		return nil, nil, errors.Errorf("Could not find project ref %v : %v", pr.ProjectId, err)
+		return nil, nil, errors.Wrap(err, "Could not find project ref %v", pr.ProjectId)
 	}
 
 	repoOwner = projectRef.Owner
 	repo = projectRef.Repo
 
 	if !projectRef.Enabled {
-		return nil, nil, errors.Errorf("project %v is disabled", projectRef.Identifier)
+		return nil, nil, errors.Wrapf(err, "project %v is disabled", projectRef.Identifier)
 	}
 
 	if len(pr.Githash) != 40 {
-		return nil, nil, errors.Errorf("invalid githash")
+		return nil, nil, errors.New("invalid githash")
 	}
 
 	gitCommit, err := thirdparty.GetCommitEvent(oauthToken, repoOwner, repo, pr.Githash)
@@ -96,7 +96,7 @@ func (pr *PatchAPIRequest) CreatePatch(finalize bool, oauthToken string,
 	}
 
 	if finalize && (len(pr.BuildVariants) == 0 || pr.BuildVariants[0] == "") {
-		return nil, nil, errors.Errorf("no buildvariants specified")
+		return nil, nil, errors.New("no buildvariants specified")
 	}
 
 	createTime := time.Now()
@@ -129,14 +129,14 @@ func (pr *PatchAPIRequest) CreatePatch(finalize bool, oauthToken string,
 	// Get and validate patched config and add it to the patch document
 	project, err := validator.GetPatchedProject(patchDoc, settings)
 	if err != nil {
-		return nil, nil, errors.Errorf("invalid patched config: %v", err)
+		return nil, nil, errors.Wrap(err, "invalid patched config")
 	}
 
 	if pr.ModuleName != "" {
 		// is there a module? validate it.
 		module, err = project.GetModuleByName(pr.ModuleName)
 		if err != nil {
-			return nil, nil, errors.Errorf("could not find module %v: %v", pr.ModuleName, err)
+			return nil, nil, errors.Wrapf(err, "could not find module %v", pr.ModuleName)
 		}
 		if module == nil {
 			return nil, nil, errors.Errorf("no module named %v", pr.ModuleName)
@@ -157,19 +157,19 @@ func (pr *PatchAPIRequest) CreatePatch(finalize bool, oauthToken string,
 	// write the patch content into a GridFS file under a new ObjectId after validating.
 	err = db.WriteGridFile(patch.GridFSPrefix, patchFileId, strings.NewReader(pr.PatchContent))
 	if err != nil {
-		return nil, nil, errors.Errorf("failed to write patch file to db: %v", err)
+		return nil, nil, errors.Wrap(err, "failed to write patch file to db")
 	}
 
 	// add the project config
 	projectYamlBytes, err := yaml.Marshal(project)
 	if err != nil {
-		return nil, nil, errors.Errorf("error marshaling patched config: %v", err)
+		return nil, nil, errors.Wrap(err, "error marshaling patched config")
 	}
 
 	// set the patch number based on patch author
 	patchDoc.PatchNumber, err = dbUser.IncPatchNumber()
 	if err != nil {
-		return nil, nil, errors.Errorf("error computing patch num %v", err)
+		return nil, nil, errors.Wrap(err, "error computing patch num")
 	}
 	patchDoc.PatchedConfig = string(projectYamlBytes)
 
@@ -187,7 +187,7 @@ func (as *APIServer) submitPatch(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		patchContent := r.FormValue("patch")
 		if patchContent == "" {
-			as.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("Error: Patch must not be empty"))
+			as.LoggedError(w, r, http.StatusBadRequest, errors.New("Error: Patch must not be empty"))
 			return
 		}
 		apiRequest = PatchAPIRequest{
@@ -214,7 +214,7 @@ func (as *APIServer) submitPatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if len(data.Patch) > patch.SizeLimit {
-			as.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("Patch is too large."))
+			as.LoggedError(w, r, http.StatusBadRequest, errors.New("Patch is too large."))
 		}
 		finalize = data.Finalize
 
@@ -232,7 +232,7 @@ func (as *APIServer) submitPatch(w http.ResponseWriter, r *http.Request) {
 	project, patchDoc, err := apiRequest.CreatePatch(
 		finalize, as.Settings.Credentials["github"], dbUser, &as.Settings)
 	if err != nil {
-		as.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("Invalid patch: %v", err))
+		as.LoggedError(w, r, http.StatusBadRequest, errors.Wrap(err, "Invalid patch"))
 		return
 	}
 
@@ -272,7 +272,7 @@ func (as *APIServer) submitPatch(w http.ResponseWriter, r *http.Request) {
 	patchDoc.SyncVariantsTasks(model.TVPairsToVariantTasks(pairs))
 
 	if err = patchDoc.Insert(); err != nil {
-		as.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("error inserting patch: %v", err))
+		as.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "error inserting patch"))
 		return
 	}
 
@@ -292,7 +292,7 @@ func getPatchFromRequest(r *http.Request) (*patch.Patch, error) {
 	vars := mux.Vars(r)
 	patchIdStr := vars["patchId"]
 	if len(patchIdStr) == 0 {
-		return nil, errors.Errorf("no patch id supplied")
+		return nil, errors.New("no patch id supplied")
 	}
 	if !patch.IsValidId(patchIdStr) {
 		return nil, errors.Errorf("patch id '%v' is not valid object id", patchIdStr)
@@ -336,12 +336,12 @@ func (as *APIServer) updatePatchModule(w http.ResponseWriter, r *http.Request) {
 
 	projectRef, err := model.FindOneProjectRef(p.Project)
 	if err != nil {
-		as.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error getting project ref with id %v: %v", p.Project, err))
+		as.LoggedError(w, r, http.StatusInternalServerError, errors.Wrapf(err, "Error getting project ref with id %v", p.Project))
 		return
 	}
 	project, err := model.FindProject("", projectRef)
 	if err != nil {
-		as.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error getting patch: %v", err))
+		as.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error getting patch"))
 		return
 	}
 	if project == nil {
@@ -368,7 +368,7 @@ func (as *APIServer) updatePatchModule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if commitInfo == nil {
-		as.WriteJSON(w, http.StatusBadRequest, errors.Errorf("commit hash doesn't seem to exist"))
+		as.WriteJSON(w, http.StatusBadRequest, errors.New("commit hash doesn't seem to exist"))
 		return
 	}
 
@@ -376,7 +376,7 @@ func (as *APIServer) updatePatchModule(w http.ResponseWriter, r *http.Request) {
 	patchFileId := bson.NewObjectId().Hex()
 	err = db.WriteGridFile(patch.GridFSPrefix, patchFileId, strings.NewReader(patchContent))
 	if err != nil {
-		as.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("failed to write patch file to db: %v", err))
+		as.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "failed to write patch file to db"))
 		return
 	}
 
@@ -403,7 +403,7 @@ func (as *APIServer) listPatches(w http.ResponseWriter, r *http.Request) {
 	dbUser := MustHaveUser(r)
 	n, err := util.GetIntValue(r, "n", 0)
 	if err != nil {
-		as.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("cannot read value n: %v", err))
+		as.LoggedError(w, r, http.StatusBadRequest, errors.Wrap(err, "cannot read value n"))
 		return
 	}
 	query := patch.ByUser(dbUser.Id).Sort([]string{"-" + patch.CreateTimeKey})
@@ -413,7 +413,7 @@ func (as *APIServer) listPatches(w http.ResponseWriter, r *http.Request) {
 	patches, err := patch.Find(query)
 	if err != nil {
 		as.LoggedError(w, r, http.StatusInternalServerError,
-			errors.Errorf("error finding patches for user %v: %v", dbUser.Id, err))
+			errors.Wrapf(err, "error finding patches for user %s", dbUser.Id))
 		return
 	}
 	as.WriteJSON(w, http.StatusOK, patches)
@@ -471,7 +471,7 @@ func (as *APIServer) existingPatchRequest(w http.ResponseWriter, r *http.Request
 		}
 		projectYamlBytes, err := yaml.Marshal(patchedProject)
 		if err != nil {
-			as.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("error marshaling patched config: %v", err))
+			as.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "error marshaling patched config"))
 			return
 		}
 		p.PatchedConfig = string(projectYamlBytes)
@@ -516,13 +516,13 @@ func (as *APIServer) listPatchModules(w http.ResponseWriter, r *http.Request) {
 	projectRef, err := model.FindOneProjectRef(projectId)
 	if err != nil || projectRef == nil {
 		as.LoggedError(w, r, http.StatusInternalServerError,
-			errors.Errorf("Error getting project ref with id %v: %v", projectId, err))
+			errors.Wrapf(err, "Error getting project ref with id %s", projectId))
 		return
 	}
 	project, err := model.FindProject("", projectRef)
 	if err != nil {
 		as.LoggedError(w, r, http.StatusInternalServerError,
-			errors.Errorf("Error getting patch: %v", err))
+			errors.Wrap(err, "Error getting patch"))
 		return
 	}
 	if project == nil {

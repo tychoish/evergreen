@@ -170,5 +170,5 @@ func runProcessByName(name string, settings *evergreen.Settings) error {
 			return nil
 		}
 	}
-	return errors.Errorf("process '%v' does not exist", name)
+	return errors.Errorf("process '%s' does not exist", name)
 }

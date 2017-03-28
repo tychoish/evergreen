@@ -47,14 +47,14 @@ tasks:
 type MockTaskFinder struct{}
 
 func (self *MockTaskFinder) FindRunnableTasks() ([]task.Task, error) {
-	return nil, errors.Errorf("FindRunnableTasks not implemented")
+	return nil, errors.New("FindRunnableTasks not implemented")
 }
 
 type MockTaskPrioritizer struct{}
 
 func (self *MockTaskPrioritizer) PrioritizeTasks(settings *evergreen.Settings,
 	tasks []task.Task) ([]task.Task, error) {
-	return nil, errors.Errorf("PrioritizeTasks not implemented")
+	return nil, errors.New("PrioritizeTasks not implemented")
 }
 
 type MockTaskQueuePersister struct{}
@@ -62,14 +62,14 @@ type MockTaskQueuePersister struct{}
 func (self *MockTaskQueuePersister) PersistTaskQueue(distro string,
 	tasks []task.Task,
 	projectTaskDuration model.ProjectTaskDurations) ([]model.TaskQueueItem, error) {
-	return nil, errors.Errorf("PersistTaskQueue not implemented")
+	return nil, errors.New("PersistTaskQueue not implemented")
 }
 
 type MockTaskDurationEstimator struct{}
 
 func (self *MockTaskDurationEstimator) GetExpectedDurations(
 	runnableTasks []task.Task) (model.ProjectTaskDurations, error) {
-	return model.ProjectTaskDurations{}, errors.Errorf("GetExpectedDurations not " +
+	return model.ProjectTaskDurations{}, errors.New("GetExpectedDurations not " +
 		"implemented")
 }
 
@@ -77,7 +77,7 @@ type MockHostAllocator struct{}
 
 func (self *MockHostAllocator) NewHostsNeeded(d HostAllocatorData, s *evergreen.Settings) (
 	map[string]int, error) {
-	return nil, errors.Errorf("NewHostsNeeded not implemented")
+	return nil, errors.New("NewHostsNeeded not implemented")
 }
 
 func TestUpdateVersionBuildVarMap(t *testing.T) {

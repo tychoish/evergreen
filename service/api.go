@@ -131,7 +131,7 @@ func (as *APIServer) checkTask(checkSecret bool, next http.HandlerFunc) http.Han
 	return func(w http.ResponseWriter, r *http.Request) {
 		taskId := mux.Vars(r)["taskId"]
 		if taskId == "" {
-			as.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("missing task id"))
+			as.LoggedError(w, r, http.StatusBadRequest, errors.New("missing task id"))
 			return
 		}
 		t, err := task.FindOne(task.ById(taskId))
@@ -140,7 +140,7 @@ func (as *APIServer) checkTask(checkSecret bool, next http.HandlerFunc) http.Han
 			return
 		}
 		if t == nil {
-			as.LoggedError(w, r, http.StatusNotFound, errors.Errorf("task not found"))
+			as.LoggedError(w, r, http.StatusNotFound, errors.New("task not found"))
 			return
 		}
 
@@ -186,7 +186,7 @@ func (as *APIServer) checkHost(next http.HandlerFunc) http.HandlerFunc {
 		}
 		if err != nil {
 			as.LoggedError(w, r, http.StatusInternalServerError,
-				errors.Errorf("Error loading context for host %v: %v", hostId, err))
+				errors.Wrap(err, "Error loading context for host %v", hostId))
 			return
 		}
 		// if there is a secret, ensure we are using the correct one -- fail if we arent
@@ -508,7 +508,7 @@ func (as *APIServer) getUserSession(w http.ResponseWriter, r *http.Request) {
 	}{}
 
 	if err := util.ReadJSONInto(r.Body, &userCredentials); err != nil {
-		as.LoggedError(w, r, http.StatusBadRequest, errors.Errorf("Error reading user credentials: %v", err))
+		as.LoggedError(w, r, http.StatusBadRequest, errors.Wrap(err, "Error reading user credentials"))
 		return
 	}
 	userToken, err := as.UserManager.CreateUserToken(userCredentials.Username, userCredentials.Password)
@@ -535,7 +535,7 @@ func getHostFromRequest(r *http.Request) (*host.Host, error) {
 	vars := mux.Vars(r)
 	tag := vars["tag"]
 	if len(tag) == 0 {
-		return nil, errors.Errorf("no host tag supplied")
+		return nil, errors.New("no host tag supplied")
 	}
 	// find the host
 	host, err := host.FindOne(host.ById(tag))
@@ -856,7 +856,7 @@ func (as *APIServer) Handler() (http.Handler, error) {
 		pluginSettings := as.Settings.Plugins[pl.Name()]
 		err := pl.Configure(pluginSettings)
 		if err != nil {
-			return nil, errors.Errorf("Failed to configure plugin %s: %v", pl.Name(), err)
+			return nil, errors.Wrapf(err, "Failed to configure plugin %s", pl.Name())
 		}
 		handler := pl.GetAPIHandler()
 		if handler == nil {

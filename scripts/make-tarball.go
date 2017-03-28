@@ -18,8 +18,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // inspired by https://gist.github.com/jonmorehouse/9060515
@@ -104,7 +102,7 @@ func makeTarball(fileName, prefix string, paths []string, exclude []string) erro
 	// set up the output file
 	file, err := os.Create(fileName)
 	if err != nil {
-		return errors.Errorf("problem creating file %s: %v", fileName, err)
+		return fmt.Errorf("problem creating file %s: %v", fileName, err)
 	}
 	defer file.Close()
 
@@ -119,7 +117,7 @@ func makeTarball(fileName, prefix string, paths []string, exclude []string) erro
 	for unit := range getContents(paths, exclude) {
 		err := addFile(tw, prefix, unit)
 		if err != nil {
-			return errors.Errorf("error adding path: %s [%+v]: %v",
+			return fmt.Errorf("error adding path: %s [%+v]: %+v",
 				unit.path, unit, err)
 		}
 	}

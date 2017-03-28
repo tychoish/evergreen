@@ -84,8 +84,7 @@ func (prioritizer *CmpBasedTaskPrioritizer) PrioritizeTasks(
 
 		err := comparator.setupForSortingTasks()
 		if err != nil {
-			return nil, errors.Errorf("Error running setup for sorting tasks: %v",
-				err)
+			return nil, errors.Wrap(err, "Error running setup for sorting tasks")
 		}
 
 		sort.Sort(comparator)
@@ -95,7 +94,7 @@ func (prioritizer *CmpBasedTaskPrioritizer) PrioritizeTasks(
 			for _, e := range comparator.errsDuringSort {
 				errString += fmt.Sprintf("\n    %v", e)
 			}
-			return nil, errors.Errorf(errString)
+			return nil, errors.New(errString)
 		}
 
 		prioritizedTaskLists = append(prioritizedTaskLists, comparator.tasks)
@@ -116,7 +115,7 @@ func (prioritizer *CmpBasedTaskPrioritizer) PrioritizeTasks(
 func (self *CmpBasedTaskComparator) setupForSortingTasks() error {
 	for _, setupFunc := range self.setupFuncs {
 		if err := setupFunc(self); err != nil {
-			return errors.Errorf("Error running setup for sorting: %v", err)
+			return errors.Wrap(err, "Error running setup for sorting")
 		}
 	}
 	return nil
@@ -133,7 +132,7 @@ func (self *CmpBasedTaskComparator) taskMoreImportantThan(task1,
 	for _, cmp := range self.comparators {
 		ret, err := cmp(task1, task2, self)
 		if err != nil {
-			return false, err
+			return false, errors.WithStack(err)
 		}
 		switch ret {
 		case -1:

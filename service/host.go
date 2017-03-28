@@ -137,7 +137,7 @@ func (uis *UIServer) modifyHost(w http.ResponseWriter, r *http.Request) {
 		}
 		err := host.SetStatus(newStatus)
 		if err != nil {
-			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error updating host: %v", err))
+			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error updating host"))
 			return
 		}
 		msg := NewSuccessFlash(fmt.Sprintf("Host status successfully updated from '%v' to '%v'", currentStatus, host.Status))
@@ -168,7 +168,7 @@ func (uis *UIServer) modifyHosts(w http.ResponseWriter, r *http.Request) {
 	hosts, err := host.Find(host.ByIds(hostIds))
 
 	if err != nil {
-		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error finding hosts: %v", err))
+		uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error finding hosts"))
 		return
 	}
 	if len(hosts) == 0 {
@@ -189,7 +189,7 @@ func (uis *UIServer) modifyHosts(w http.ResponseWriter, r *http.Request) {
 		for _, host := range hosts {
 			err := host.SetStatus(newStatus)
 			if err != nil {
-				uis.LoggedError(w, r, http.StatusInternalServerError, errors.Errorf("Error updating host %v", err))
+				uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error updating host"))
 				return
 			}
 			numHostsUpdated += 1
