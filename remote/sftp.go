@@ -27,19 +27,19 @@ func (gateway *SFTPGateway) Init() error {
 	// configure appropriately
 	clientConfig, err := createClientConfig(gateway.User, gateway.Keyfile)
 	if err != nil {
-		return errors.Errorf("error configuring ssh: %v", err)
+		return errors.Wrap(err, "error configuring ssh")
 	}
 
 	// connect to the other side
 	conn, err := ssh.Dial("tcp", gateway.Host, clientConfig)
 	if err != nil {
-		return errors.Errorf("error connecting to ssh server at `%v`: %v", gateway.Host, err)
+		return errors.Wrapf(err, "error connecting to ssh server at `%v`", gateway.Host)
 	}
 
 	// create the sftp client
 	gateway.Client, err = sftp.NewClient(conn)
 	if err != nil {
-		return errors.Errorf("error creating sftp client to `%v`: %v", gateway.Host, err)
+		return errors.Wrapf(err, "error creating sftp client to `%v`", gateway.Host)
 	}
 
 	return nil
@@ -48,5 +48,5 @@ func (gateway *SFTPGateway) Init() error {
 
 // Close frees any necessary resources.
 func (gateway *SFTPGateway) Close() error {
-	return gateway.Client.Close()
+	return errors.WithStack(gateway.Client.Close())
 }

@@ -107,7 +107,7 @@ func (gRepoPoller *GithubRepositoryPoller) GetChangedFiles(commitRevision string
 		commitRevision,
 	)
 	if err != nil {
-		return nil, errors.Errorf("error loading commit '%v': %v", commitRevision, err)
+		return nil, errors.Wrap(err, "error loading commit '%v'", commitRevision)
 	}
 	files := []string{}
 	for _, f := range commit.Files {
@@ -179,8 +179,9 @@ func (gRepoPoller *GithubRepositoryPoller) GetRevisionsSince(
 				InvalidRevision:   revision[:10],
 				MergeBaseRevision: "",
 			}
-			revisionError = errors.Errorf("unable to find a suggested merge base commit for revision %v, must fix on projects settings page: %v",
-				revision, err)
+			revisionError = errors.Wrapf(err,
+				"unable to find a suggested merge base commit for revision %v, must fix on projects settings page",
+				revision)
 		} else {
 			// update project ref to have an inconsistent status
 			revisionDetails = &model.RepositoryErrorDetails{
@@ -194,7 +195,7 @@ func (gRepoPoller *GithubRepositoryPoller) GetRevisionsSince(
 
 		gRepoPoller.ProjectRef.RepotrackerError = revisionDetails
 		if err = gRepoPoller.ProjectRef.Upsert(); err != nil {
-			return []model.Revision{}, errors.Errorf("unable to update projectRef revision details: %v", err)
+			return []model.Revision{}, errors.Wrap(err, "unable to update projectRef revision details")
 		}
 
 		return []model.Revision{}, revisionError

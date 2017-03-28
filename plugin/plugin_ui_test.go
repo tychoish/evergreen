@@ -126,7 +126,7 @@ func TestPanelManagerRegistration(t *testing.T) {
 							{
 								Page: plugin.TaskPage,
 								DataFunc: func(context plugin.UIContext) (interface{}, error) {
-									return nil, errors.Errorf("this function just errors")
+									return nil, errors.New("this function just errors")
 								}},
 						},
 					},
@@ -293,7 +293,7 @@ func TestPluginUIDataFunctionErrorHandling(t *testing.T) {
 								Page:     plugin.TaskPage,
 								Position: plugin.PageCenter,
 								DataFunc: func(context plugin.UIContext) (interface{}, error) {
-									return nil, errors.Errorf("Error #1")
+									return nil, errors.New("Error #1")
 								},
 							},
 						},
@@ -307,7 +307,7 @@ func TestPluginUIDataFunctionErrorHandling(t *testing.T) {
 								Page:     plugin.TaskPage,
 								Position: plugin.PageCenter,
 								DataFunc: func(context plugin.UIContext) (interface{}, error) {
-									return nil, errors.Errorf("Error #2")
+									return nil, errors.New("Error #2")
 								},
 							},
 						},
@@ -321,7 +321,7 @@ func TestPluginUIDataFunctionErrorHandling(t *testing.T) {
 								Page:     plugin.TaskPage,
 								Position: plugin.PageCenter,
 								DataFunc: func(_ plugin.UIContext) (interface{}, error) {
-									return nil, errors.Errorf("Error")
+									return nil, errors.New("Error")
 								},
 							},
 						},

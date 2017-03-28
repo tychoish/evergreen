@@ -21,7 +21,7 @@ var (
 	// of itself to these slices on init, i.e. by adding the following to its
 	// source file:
 	//  func init(){
-	//  	plugin.Publish(&MyCoolPlugin{})
+	//	plugin.Publish(&MyCoolPlugin{})
 	//  }
 	// This list is then used by Agent, API, and UI Server code to register
 	// the published plugins.
@@ -322,7 +322,7 @@ func (sr *SimpleRegistry) GetCommands(cmd model.PluginCommandConf, funcs map[str
 	for _, c := range cmds {
 		pluginNameParts := strings.Split(c.Command, ".")
 		if len(pluginNameParts) != 2 {
-			return nil, errors.Errorf("Value of 'command' should be formatted: 'plugin_name.command_name'")
+			return nil, errors.New("Value of 'command' should be formatted: 'plugin_name.command_name'")
 		}
 		plugin, hasKey := sr.pluginsMapping[pluginNameParts[0]]
 		if !hasKey {
@@ -331,11 +331,11 @@ func (sr *SimpleRegistry) GetCommands(cmd model.PluginCommandConf, funcs map[str
 
 		command, err := plugin.NewCommand(pluginNameParts[1])
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		if err = command.ParseParams(c.Params); err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		cmdsParsed = append(cmdsParsed, command)
 	}

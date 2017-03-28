@@ -223,7 +223,7 @@ func (self *SimplePanelManager) RegisterPlugins(plugins []UIPlugin) error {
 
 				// register all panels to their proper scope and position
 				if panel.Page == "" {
-					return errors.Errorf("plugin '%v': cannot register ui panel without a Page")
+					return errors.New("plugin '%v': cannot register ui panel without a Page")
 				}
 				if panel.Position == "" {
 					panel.Position = PageCenter // Default to center
@@ -248,7 +248,7 @@ func (self *SimplePanelManager) RegisterPlugins(plugins []UIPlugin) error {
 				}
 			}
 		} else if err != nil {
-			return errors.Errorf("GetPanelConfig for plugin '%v' returned an error: %v", p.Name(), err)
+			return errors.Wrapf(err, "GetPanelConfig for plugin '%v' returned an error", p.Name())
 		}
 
 		registered[p.Name()] = true

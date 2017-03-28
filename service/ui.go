@@ -260,7 +260,7 @@ func (uis *UIServer) NewRouter() (*mux.Router, error) {
 		}
 
 		// create a root path for the plugin based on its name
-		plRouter := rootPluginRouter.PathPrefix(fmt.Sprintf("/%v/", pl.Name())).Subrouter()
+		plRouter := rootPluginRouter.PathPrefix(fmt.Sprintf("/%v/", pol.Name())).Subrouter()
 
 		// set up a fileserver in plugin's static root, if one is provided
 		pluginStaticPath := filepath.Join(uis.Home, "service", "plugins", pl.Name(), "static")

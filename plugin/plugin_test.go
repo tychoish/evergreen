@@ -112,10 +112,10 @@ func (mc *MockCommand) ParseParams(params map[string]interface{}) error {
 		return err
 	}
 	if mc.Param1 == "" {
-		return errors.Errorf("Param1 must be a non-blank string.")
+		return errors.New("Param1 must be a non-blank string.")
 	}
 	if mc.Param2 == 0 {
-		return errors.Errorf("Param2 must be a non-zero integer.")
+		return errors.New("Param2 must be a non-zero integer.")
 	}
 	return nil
 }
@@ -128,7 +128,7 @@ func (mc *MockCommand) Execute(logger plugin.Logger,
 	}
 
 	if resp == nil {
-		return errors.Errorf("Received nil HTTP response from api server")
+		return errors.New("Received nil HTTP response from api server")
 	}
 
 	jsonReply := map[string]string{}
