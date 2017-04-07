@@ -53,7 +53,7 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 	}
 
 	defer func() {
-		if err := db.ReleaseGlobalLock(RunnerName); err != nil {
+		if err = db.ReleaseGlobalLock(RunnerName); err != nil {
 			grip.Errorln("Error releasing global lock:", err)
 		}
 	}()
@@ -93,7 +93,7 @@ func (r *Runner) Run(config *evergreen.Settings) error {
 	}
 	wg.Wait()
 
-	runtime := time.Now().Sub(startTime)
+	runtime := time.Since(startTime)
 	if err = model.SetProcessRuntimeCompleted(RunnerName, runtime); err != nil {
 		err = errors.Wrap(err, "Error updating process status")
 		grip.Error(err)
