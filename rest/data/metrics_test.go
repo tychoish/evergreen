@@ -27,8 +27,7 @@ func (s *MetricsConnectorSuite) SetupSuite() {
 
 func (s *MetricsConnectorSuite) SetupTest() {
 	s.ctx = &DBMetricsConnector{}
-	s.Require().NoError(db.Clear(event.EventTaskSystemInfo))
-	s.Require().NoError(db.Clear(event.EventTaskProcessInfo))
+	s.Require().NoError(db.Clear(event.TaskLogCollection))
 }
 
 func (s *MetricsConnectorSuite) TestSystemsResultsShouldBeEmpty() {
@@ -40,7 +39,7 @@ func (s *MetricsConnectorSuite) TestSystemsResultsShouldBeEmpty() {
 func (s *MetricsConnectorSuite) TestProcessMetricsShouldBeEmpty() {
 	procs, err := s.ctx.FindTaskProcessMetrics("foo", time.Now(), 100, -1)
 	s.NoError(err)
-	s.Len(procs, 0)
+	s.Len(procs, 0, "%d", len(procs))
 }
 
 func (s *MetricsConnectorSuite) TestProcessLimitingFunctionalityConstrainsResults() {
@@ -48,13 +47,10 @@ func (s *MetricsConnectorSuite) TestProcessLimitingFunctionalityConstrainsResult
 	for _, m := range message.CollectProcessInfoSelfWithChildren() {
 		msgs = append(msgs, m.(*message.ProcessInfo))
 		msgs = append(msgs, m.(*message.ProcessInfo))
-		msgs = append(msgs, m.(*message.ProcessInfo))
-		msgs = append(msgs, m.(*message.ProcessInfo))
-		msgs = append(msgs, m.(*message.ProcessInfo))
-		msgs = append(msgs, m.(*message.ProcessInfo))
 	}
+
 	event.LogTaskProcessData("foo", msgs)
-	procs, err := s.ctx.FindTaskProcessMetrics("foo", time.Now().Add(-2*time.Hour), 1, 1)
+	procs, err := s.ctx.FindTaskProcessMetrics("foo", time.Now(), 1, -1)
 	s.NoError(err)
 
 	s.Len(procs, 1, "len of %d", len(msgs))
