@@ -1,6 +1,8 @@
 package event
 
 import (
+	"time"
+
 	"github.com/evergreen-ci/evergreen/db"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -80,23 +82,49 @@ func RecentSchedulerEvents(distroId string, n int) db.Q {
 // TaskSystemInfoEvents builds a query for system info,
 // (e.g. aggregate information about the system as a whole) collected
 // during a task.
-func TaskSystemInfoEvents(taskId string, n int) db.Q {
-	// TODO: (EVG-1497) decide on an better index/sort
-	return db.Query(bson.D{
+func TaskSystemInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
+	filter := bson.D{
 		{DataKey + "." + ResourceTypeKey, EventTaskSystemInfo},
 		{ResourceIdKey, taskId},
 		{TypeKey, EventTaskSystemInfo},
-	}).Sort([]string{TimestampKey}).Limit(n)
+	}
+
+	sortSpec := TimestampKey
+
+	if sort < 0 {
+		sortSpec = "-" + sortSpec
+		filter = append(filter,
+			bson.DocElem{TimestampKey, bson.DocElem{"$lte", ts}})
+	} else {
+		filter = append(filter,
+			bson.DocElem{TimestampKey, bson.DocElem{"$gte", ts}})
+	}
+
+	// TODO: (EVG-1497) decide on an better index/sort
+	return db.Query(filter).Sort([]string{sortSpec}).Limit(n)
 }
 
 // TaskProcessInfoEvents builds a query for process info, which
 // returns information about each process (and children) spawned
 // during task execution.
-func TaskProcessInfoEvents(taskId string, n int) db.Q {
-	// TODO: (EVG-1497) decide on an better index/sort
-	return db.Query(bson.D{
+func TaskProcessInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
+	filter := bson.D{
 		{DataKey + "." + ResourceTypeKey, EventTaskProcessInfo},
 		{ResourceIdKey, taskId},
 		{TypeKey, EventTaskProcessInfo},
-	}).Sort([]string{TimestampKey}).Limit(n)
+	}
+
+	sortSpec := TimestampKey
+
+	if sort < 0 {
+		sortSpec = "-" + sortSpec
+		filter = append(filter,
+			bson.DocElem{TimestampKey, bson.DocElem{"$lte", ts}})
+	} else {
+		filter = append(filter,
+			bson.DocElem{TimestampKey, bson.DocElem{"$gte", ts}})
+	}
+
+	// TODO: (EVG-1497) decide on an better index/sort
+	return db.Query(filter).Sort([]string{sortSpec}).Limit(n)
 }

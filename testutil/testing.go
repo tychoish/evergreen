@@ -61,9 +61,7 @@ func SkipTestUnlessAll(t *testing.T, testName string) {
 	}
 }
 
-func ConfigureIntegrationTest(t *testing.T, testSettings *evergreen.Settings,
-	testName string) {
-
+func ConfigureIntegrationTest(t *testing.T, testSettings *evergreen.Settings, testName string) {
 	SkipTestUnlessAll(t, testName)
 
 	// make sure an override file is provided

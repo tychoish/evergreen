@@ -123,7 +123,7 @@ func LogTaskSystemData(taskId string, info *message.SystemInfo) {
 		EventType:  EventTaskSystemInfo,
 	}
 
-	info.Base = message.Base{}
+	info.Base = message.Base{Time: event.Timestamp}
 	data := TaskSystemResourceData{
 		ResourceType: EventTaskSystemInfo,
 		SystemInfo:   info,
@@ -209,6 +209,7 @@ func LogTaskProcessData(taskId string, procs []*message.ProcessInfo) {
 		// collector.
 		if p.Parent == 0 {
 			ts = p.Base.Time
+			b.Time = ts
 		}
 
 		p.Base = b

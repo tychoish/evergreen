@@ -136,6 +136,7 @@ func FindAll(collection string, query interface{},
 	if len(sort) != 0 {
 		q = q.Sort(sort...)
 	}
+
 	return q.Skip(skip).Limit(limit).All(out)
 }
 
