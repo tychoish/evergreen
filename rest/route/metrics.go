@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/evergreen-ci/evergreen"
-	"github.com/evergreen-ci/evergreen/apiv3"
-	"github.com/evergreen-ci/evergreen/apiv3/model"
-	"github.com/evergreen-ci/evergreen/apiv3/servicecontext"
+	"github.com/evergreen-ci/evergreen/rest"
+	"github.com/evergreen-ci/evergreen/rest/data"
+	"github.com/evergreen-ci/evergreen/rest/model"
 	"github.com/gorilla/mux"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
@@ -56,13 +56,13 @@ func (p *taskSystemMetricsHandler) ParseAndValidate(r *http.Request) error {
 	return p.PaginationExecutor.ParseAndValidate(r)
 }
 
-func taskSystemMetricsPaginator(key string, limit int, args interface{}, sc servicecontext.ServiceContext) ([]model.Model, *PageResult, error) {
+func taskSystemMetricsPaginator(key string, limit int, args interface{}, sc data.Connector) ([]model.Model, *PageResult, error) {
 	task := args.(*taskMetricsArgs).task
 	grip.Infoln("getting results for task:", task)
 
 	ts, err := time.ParseInLocation(model.APITimeFormat, key, time.FixedZone("", 0))
 	if err != nil {
-		return []model.Model{}, nil, apiv3.APIError{
+		return []model.Model{}, nil, rest.APIError{
 			Message:    fmt.Sprintf("problem parsing time from '%s' (%s)", key, err.Error()),
 			StatusCode: http.StatusBadRequest,
 		}
@@ -71,7 +71,7 @@ func taskSystemMetricsPaginator(key string, limit int, args interface{}, sc serv
 	// fetch required data from the service layer
 	data, err := sc.FindTaskSystemMetrics(task, ts, limit*2, 1)
 	if err != nil {
-		if _, ok := err.(*apiv3.APIError); !ok {
+		if _, ok := err.(*rest.APIError); !ok {
 			err = errors.Wrap(err, "Database error")
 		}
 		return []model.Model{}, nil, err
@@ -79,7 +79,7 @@ func taskSystemMetricsPaginator(key string, limit int, args interface{}, sc serv
 	}
 	prevData, err := sc.FindTaskSystemMetrics(task, ts, limit, -1)
 	if err != nil {
-		if _, ok := err.(*apiv3.APIError); !ok {
+		if _, ok := err.(*rest.APIError); !ok {
 			err = errors.Wrap(err, "Database error")
 		}
 		return []model.Model{}, nil, err
@@ -111,7 +111,7 @@ func taskSystemMetricsPaginator(key string, limit int, args interface{}, sc serv
 	for idx, info := range data {
 		sysinfoModel := &model.APISystemMetrics{}
 		if err = sysinfoModel.BuildFromService(info); err != nil {
-			return []model.Model{}, nil, apiv3.APIError{
+			return []model.Model{}, nil, rest.APIError{
 				Message:    "problem converting metrics document",
 				StatusCode: http.StatusInternalServerError,
 			}
@@ -161,13 +161,13 @@ func (p *taskProcessMetricsHandler) ParseAndValidate(r *http.Request) error {
 	return p.PaginationExecutor.ParseAndValidate(r)
 }
 
-func taskProcessMetricsPaginator(key string, limit int, args interface{}, sc servicecontext.ServiceContext) ([]model.Model, *PageResult, error) {
+func taskProcessMetricsPaginator(key string, limit int, args interface{}, sc data.Connector) ([]model.Model, *PageResult, error) {
 	task := args.(*taskMetricsArgs).task
 	grip.Infoln("getting results for task:", task)
 
 	ts, err := time.ParseInLocation(model.APITimeFormat, key, time.FixedZone("", 0))
 	if err != nil {
-		return []model.Model{}, nil, apiv3.APIError{
+		return []model.Model{}, nil, rest.APIError{
 			Message:    fmt.Sprintf("problem parsing time from '%s' (%s)", key, err.Error()),
 			StatusCode: http.StatusBadRequest,
 		}
@@ -176,7 +176,7 @@ func taskProcessMetricsPaginator(key string, limit int, args interface{}, sc ser
 	// fetch required data from the service layer
 	data, err := sc.FindTaskProcessMetrics(task, ts, limit*2, 1)
 	if err != nil {
-		if _, ok := err.(*apiv3.APIError); !ok {
+		if _, ok := err.(*rest.APIError); !ok {
 			err = errors.Wrap(err, "database error")
 		}
 		return []model.Model{}, nil, err
@@ -184,7 +184,7 @@ func taskProcessMetricsPaginator(key string, limit int, args interface{}, sc ser
 	}
 	prevData, err := sc.FindTaskProcessMetrics(task, ts, limit, -1)
 	if err != nil {
-		if _, ok := err.(*apiv3.APIError); !ok {
+		if _, ok := err.(*rest.APIError); !ok {
 			err = errors.Wrap(err, "Database error")
 		}
 		return []model.Model{}, nil, err
@@ -216,7 +216,7 @@ func taskProcessMetricsPaginator(key string, limit int, args interface{}, sc ser
 	for idx, info := range data {
 		procModel := &model.APIProcessMetrics{}
 		if err = procModel.BuildFromService(info); err != nil {
-			return []model.Model{}, nil, apiv3.APIError{
+			return []model.Model{}, nil, rest.APIError{
 				Message:    "problem converting metrics document",
 				StatusCode: http.StatusInternalServerError,
 			}
