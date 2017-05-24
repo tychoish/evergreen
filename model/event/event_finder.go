@@ -83,24 +83,21 @@ func RecentSchedulerEvents(distroId string, n int) db.Q {
 // (e.g. aggregate information about the system as a whole) collected
 // during a task.
 func TaskSystemInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
-	filter := bson.D{
-		{DataKey + "." + ResourceTypeKey, EventTaskSystemInfo},
-		{ResourceIdKey, taskId},
-		{TypeKey, EventTaskSystemInfo},
+	filter := bson.M{
+		DataKey + "." + ResourceTypeKey: EventTaskSystemInfo,
+		ResourceIdKey:                   taskId,
+		TypeKey:                         EventTaskProcessInfo,
 	}
 
 	sortSpec := TimestampKey
 
 	if sort < 0 {
 		sortSpec = "-" + sortSpec
-		filter = append(filter,
-			bson.DocElem{TimestampKey, bson.DocElem{"$lte", ts}})
+		filter[TimestampKey] = bson.M{"$lte": ts}
 	} else {
-		filter = append(filter,
-			bson.DocElem{TimestampKey, bson.DocElem{"$gte", ts}})
+		filter[TimestampKey] = bson.M{"$gte": ts}
 	}
 
-	// TODO: (EVG-1497) decide on an better index/sort
 	return db.Query(filter).Sort([]string{sortSpec}).Limit(n)
 }
 
@@ -108,23 +105,20 @@ func TaskSystemInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
 // returns information about each process (and children) spawned
 // during task execution.
 func TaskProcessInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
-	filter := bson.D{
-		{DataKey + "." + ResourceTypeKey, EventTaskProcessInfo},
-		{ResourceIdKey, taskId},
-		{TypeKey, EventTaskProcessInfo},
+	filter := bson.M{
+		DataKey + "." + ResourceTypeKey: EventTaskProcessInfo,
+		ResourceIdKey:                   taskId,
+		TypeKey:                         EventTaskProcessInfo,
 	}
 
 	sortSpec := TimestampKey
 
 	if sort < 0 {
 		sortSpec = "-" + sortSpec
-		filter = append(filter,
-			bson.DocElem{TimestampKey, bson.DocElem{"$lte", ts}})
+		filter[TimestampKey] = bson.M{"$lte": ts}
 	} else {
-		filter = append(filter,
-			bson.DocElem{TimestampKey, bson.DocElem{"$gte", ts}})
+		filter[TimestampKey] = bson.M{"$gte": ts}
 	}
 
-	// TODO: (EVG-1497) decide on an better index/sort
 	return db.Query(filter).Sort([]string{sortSpec}).Limit(n)
 }
