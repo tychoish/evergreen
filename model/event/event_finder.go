@@ -86,7 +86,7 @@ func TaskSystemInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
 	filter := bson.M{
 		DataKey + "." + ResourceTypeKey: EventTaskSystemInfo,
 		ResourceIdKey:                   taskId,
-		TypeKey:                         EventTaskProcessInfo,
+		TypeKey:                         EventTaskSystemInfo,
 	}
 
 	sortSpec := TimestampKey

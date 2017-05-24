@@ -123,7 +123,11 @@ func LogTaskSystemData(taskId string, info *message.SystemInfo) {
 		EventType:  EventTaskSystemInfo,
 	}
 
-	info.Base = message.Base{Time: event.Timestamp}
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now()
+		info.Base = message.Base{Time: event.Timestamp}
+	}
+
 	data := TaskSystemResourceData{
 		ResourceType: EventTaskSystemInfo,
 		SystemInfo:   info,

@@ -46,12 +46,39 @@ func (s *MetricsConnectorSuite) TestProcessLimitingFunctionalityConstrainsResult
 	msgs := []*message.ProcessInfo{}
 	for _, m := range message.CollectProcessInfoSelfWithChildren() {
 		msgs = append(msgs, m.(*message.ProcessInfo))
-		msgs = append(msgs, m.(*message.ProcessInfo))
 	}
 
 	event.LogTaskProcessData("foo", msgs)
-	procs, err := s.ctx.FindTaskProcessMetrics("foo", time.Now(), 1, -1)
+	event.LogTaskProcessData("foo", msgs)
+	event.LogTaskProcessData("foo", msgs)
+	event.LogTaskProcessData("foo", msgs)
+	event.LogTaskProcessData("foo", msgs)
+
+	for i := 1; i < 4; i++ {
+		procs, err := s.ctx.FindTaskProcessMetrics("foo", time.Now(), i, -1)
+		s.NoError(err)
+
+		s.Len(procs, i, "checking limit of %d", i)
+	}
+
+	procs, err := s.ctx.FindTaskProcessMetrics("foo", time.Now(), 900, -1)
 	s.NoError(err)
 
-	s.Len(procs, 1, "len of %d", len(msgs))
+	s.Len(procs, 5, "checking unlimited")
+}
+
+func (s *MetricsConnectorSuite) TestSystemMetricsLimitConstrainsResults() {
+	for i := 0; i < 20; i++ {
+		m := message.CollectSystemInfo()
+		event.LogTaskSystemData("foo", m.(*message.SystemInfo))
+	}
+
+	info, err := s.ctx.FindTaskSystemMetrics("foo", time.Now().Add(-2*time.Hour), 100, -1)
+	s.NoError(err)
+	s.Len(info, 0)
+
+	info, err = s.ctx.FindTaskSystemMetrics("foo", time.Now().Add(-2*time.Hour), 100, 1)
+	s.NoError(err)
+	s.Len(info, 20)
+
 }
