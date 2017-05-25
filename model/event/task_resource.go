@@ -215,7 +215,6 @@ func LogTaskProcessData(taskId string, procs []*message.ProcessInfo) {
 			ts = p.Base.Time
 			b.Time = ts
 		}
-
 		p.Base = b
 	}
 

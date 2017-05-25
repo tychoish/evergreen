@@ -17,6 +17,38 @@ func Find(coll string, query db.Q) ([]Event, error) {
 	return events, err
 }
 
+// CountSystemEvents returns the total number of system metrics events
+// captured for the specified task. If taskId is "", then this will
+// return a count of all system events captured.
+func CountSystemEvents(taskId string) (int, error) {
+	filter := bson.M{
+		DataKey + "." + ResourceTypeKey: EventTaskSystemInfo,
+		TypeKey: EventTaskSystemInfo,
+	}
+
+	if taskId != "" {
+		filter[ResourceIdKey] = taskId
+	}
+
+	return db.CountQ(TaskLogCollection, db.Query(filter))
+}
+
+// CountProcessEvents returns the total number of process tree metrics events
+// captured for the specified task. If taskId is "", then this will
+// return a count of all process metrics captured.
+func CountProcessEvents(taskId string) (int, error) {
+	filter := bson.M{
+		DataKey + "." + ResourceTypeKey: EventTaskProcessInfo,
+		TypeKey: EventTaskProcessInfo,
+	}
+
+	if taskId != "" {
+		filter[ResourceIdKey] = taskId
+	}
+
+	return db.CountQ(TaskLogCollection, db.Query(filter))
+}
+
 // === Queries ===
 
 // Host Events

@@ -220,10 +220,28 @@ type APIProcessStat struct {
 }
 
 func (m *APIProcessMetrics) BuildFromService(in interface{}) error {
-	data, ok := in.([]*message.ProcessInfo)
-	if !ok {
+	data := []*message.ProcessInfo{}
+
+	// convert types as needed; try and avoid heroic conversions in calling code.
+	switch in := in.(type) {
+	case []*message.ProcessInfo:
+		data = in
+	case *message.ProcessInfo:
+		data = append(data, in)
+	case []message.Composer:
+		for _, p := range in {
+			proc, ok := p.(*message.ProcessInfo)
+			if !ok {
+				return errors.Errorf("cannot support convefrting %T to process metrics data", proc)
+			}
+
+			data = append(data, proc)
+		}
+	default:
 		return errors.Errorf("cannot support convefrting %T to process metrics data", in)
 	}
+
+	// begin building output
 
 	out := []APIProcessStat{}
 	for _, proc := range data {
