@@ -2,97 +2,142 @@ package event
 
 import (
 	"testing"
+	"time"
 
 	"github.com/evergreen-ci/evergreen/db"
-	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/mongodb/grip/message"
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestTaskInfoEvent(t *testing.T) {
-	Convey("Test task resource utilization collection and persistence", t, func() {
-
-		testutil.HandleTestingErr(db.Clear(TaskLogCollection), t,
-			"Error clearing '%s' collection", TaskLogCollection)
-
-		Convey("when logging system task info;", func() {
-			taskId := "testId"
-
-			Convey("before logging tasks, the query should not return any results", func() {
-				results, err := Find(TaskLogCollection, TaskSystemInfoEvents(taskId, 0))
-				So(err, ShouldBeNil)
-				So(len(results), ShouldEqual, 0)
-			})
-
-			Convey("logging a task should be retrievable,", func() {
-				sysInfo, ok := message.CollectSystemInfo().(*message.SystemInfo)
-				So(ok, ShouldBeTrue)
-
-				LogTaskSystemData(taskId, sysInfo)
-				results, err := Find(TaskLogCollection, TaskSystemInfoEvents(taskId, 0))
-				So(err, ShouldBeNil)
-				So(len(results), ShouldEqual, 1)
-			})
-
-			Convey("when logging many tasks they're all retrievable", func() {
-				taskId += "-batch"
-				for i := 0; i < 10; i++ {
-					info, ok := message.CollectSystemInfo().(*message.SystemInfo)
-					So(ok, ShouldBeTrue)
-					LogTaskSystemData(taskId, info)
-				}
-
-				results, err := Find(TaskLogCollection, TaskSystemInfoEvents(taskId, 0))
-				So(err, ShouldBeNil)
-				So(len(results), ShouldEqual, 10)
-
-			})
-		})
-
-		testutil.HandleTestingErr(db.Clear(TaskLogCollection), t,
-			"Error clearing '%s' collection", TaskLogCollection)
-
-		Convey("when logging process tree", func() {
-			taskId := "taskId"
-			Convey("before logging tasks, the query should not return any results", func() {
-				results, err := Find(TaskLogCollection, TaskProcessInfoEvents(taskId, 0))
-				So(err, ShouldBeNil)
-				So(len(results), ShouldEqual, 0)
-			})
-
-			Convey("log events should be retrievable", func() {
-				pm, ok := message.CollectProcessInfoSelf().(*message.ProcessInfo)
-				So(ok, ShouldBeTrue)
-
-				LogTaskProcessData(taskId, []*message.ProcessInfo{pm})
-
-				results, err := Find(TaskLogCollection, TaskProcessInfoEvents(taskId, 0))
-				So(err, ShouldBeNil)
-				So(len(results), ShouldEqual, 1)
-			})
-
-			Convey("logging multiple events should be retrievable", func() {
-				var count int
-				taskId += "batch"
-
-				infos := []*message.ProcessInfo{}
-				msgs := message.CollectProcessInfoSelfWithChildren()
-
-				for _, m := range msgs {
-					count++
-
-					info, ok := m.(*message.ProcessInfo)
-					So(ok, ShouldBeTrue)
-					infos = append(infos, info)
-				}
-				So(len(infos), ShouldEqual, len(msgs))
-				LogTaskProcessData(taskId, infos)
-
-				So(count, ShouldEqual, len(infos))
-				results, err := Find(TaskLogCollection, TaskProcessInfoEvents(taskId, 0))
-				So(err, ShouldBeNil)
-				So(len(results), ShouldEqual, count)
-			})
-		})
-	})
+type TaskResourceSuite struct {
+	taskId string
+	suite.Suite
 }
+
+func TestTaskResourceSuite(t *testing.T) {
+	suite.Run(t, new(TaskResourceSuite))
+}
+
+func (s *TaskResourceSuite) SetupSuite() {
+	s.taskId = "taskId"
+}
+
+func (s *TaskResourceSuite) SetupTest() {
+	s.Require().NoError(db.Clear(TaskLogCollection))
+}
+
+func (s *TaskResourceSuite) TestNoSystemInfoResultsBeforeLoggingResults() {
+	results, err := Find(TaskLogCollection, TaskSystemInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, 0)
+}
+
+func (s *TaskResourceSuite) TestLoggedSystemInfoEventIsRetreivable() {
+
+	sysInfo, ok := message.CollectSystemInfo().(*message.SystemInfo)
+	s.True(ok)
+
+	LogTaskSystemData(s.taskId, sysInfo)
+	results, err := Find(TaskLogCollection, TaskSystemInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, 1)
+
+}
+
+func (s *TaskResourceSuite) TestLoggingManySystemInfoEvents() {
+	for i := 0; i < 10; i++ {
+		info, ok := message.CollectSystemInfo().(*message.SystemInfo)
+		s.True(ok)
+		LogTaskSystemData(s.taskId, info)
+	}
+
+	results, err := Find(TaskLogCollection, TaskSystemInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, 10)
+}
+
+func (s *TaskResourceSuite) TestNoProcessEventsBeforeLoggingResults() {
+	results, err := Find(TaskLogCollection, TaskProcessInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, 0)
+}
+
+func (s *TaskResourceSuite) TestLogSingleProcessEvent() {
+	pm, ok := message.CollectProcessInfoSelf().(*message.ProcessInfo)
+	s.True(ok)
+
+	LogTaskProcessData(s.taskId, []*message.ProcessInfo{pm})
+
+	results, err := Find(TaskLogCollection, TaskProcessInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, 1)
+}
+
+func (s *TaskResourceSuite) TestLogManyProcessEvents() {
+	var count int
+	s.taskId += "batch"
+
+	infos := []*message.ProcessInfo{}
+	msgs := message.CollectProcessInfoSelfWithChildren()
+
+	for _, m := range msgs {
+		count++
+
+		info, ok := m.(*message.ProcessInfo)
+		s.True(ok)
+		infos = append(infos, info)
+	}
+	s.Equal(len(infos), len(msgs))
+	LogTaskProcessData(s.taskId, infos)
+
+	s.Equal(count, len(infos))
+	results, err := Find(TaskLogCollection, TaskProcessInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, count)
+}
+
+func (s *TaskResourceSuite) TestLoggedSystemEventsWithoutTimestampsGetCurrentTimeByDefault() {
+	startTime := time.Now().Add(-100 * time.Millisecond).Round(time.Millisecond)
+
+	sys := new(message.SystemInfo)
+	s.True(sys.Base.Time.IsZero())
+	s.True(startTime.After(sys.Base.Time))
+
+	LogTaskSystemData(s.taskId, sys)
+	results, err := Find(TaskLogCollection, TaskSystemInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, 1)
+	event := results[0]
+	info := event.Data.Data.(*TaskSystemResourceData).SystemInfo
+	s.False(event.Timestamp.IsZero())
+	s.False(info.Base.Time.IsZero())
+	s.Equal(event.Timestamp, info.Base.Time)
+
+	s.True(event.Timestamp.After(startTime),
+		"started at %s but was %s", startTime, event.Timestamp)
+}
+
+func (s *TaskResourceSuite) TestLoggedProcessEventsWithoutTimestampsGetCurrentTimeByDefault() {
+	startTime := time.Now().Add(-100 * time.Millisecond).Round(time.Millisecond)
+	info := &message.ProcessInfo{}
+
+	s.True(info.Base.Time.IsZero())
+	s.True(startTime.After(info.Base.Time))
+
+	LogTaskProcessData(s.taskId, []*message.ProcessInfo{info})
+	results, err := Find(TaskLogCollection, TaskProcessInfoEvents(s.taskId, time.Now(), 100, -1))
+	s.NoError(err)
+	s.Len(results, 1)
+	event := results[0]
+	s.Len(event.Data.Data.(*TaskProcessResourceData).Processes, 1)
+
+	s.False(event.Timestamp.IsZero())
+
+	s.True(event.Timestamp.After(startTime),
+		"started at %s but was %s", startTime, event.Timestamp)
+}
+
+func (s *TaskResourceSuite) TestSystemInfosWithTimestampsPersist()     {}
+func (s *TaskResourceSuite) TestProcessInfosWithTimestampsPersist()    {}
+func (s *TaskResourceSuite) TestLogSystemEventsReturnsOrderedEvents()  {}
+func (s *TaskResourceSuite) TestLogProcessEventsReturnsOrderedEvents() {}

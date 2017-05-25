@@ -73,6 +73,29 @@ func (s *MetricsConnectorSuite) TestSystemMetricsLimitConstrainsResults() {
 		event.LogTaskSystemData("foo", m.(*message.SystemInfo))
 	}
 
+	info, err := s.ctx.FindTaskSystemMetrics("foo", time.Now().Add(-2*time.Hour), 100, 1)
+	s.NoError(err)
+	s.Len(info, 20)
+
+	for i := 1; i < 15; i++ {
+		info, err = s.ctx.FindTaskSystemMetrics("foo", time.Now().Add(-2*time.Hour), i, 1)
+		s.NoError(err)
+		s.Len(info, i)
+	}
+
+	// if limit is 0, then full results
+	info, err = s.ctx.FindTaskSystemMetrics("foo", time.Now().Add(-2*time.Hour), 0, 1)
+	s.NoError(err)
+	s.Len(info, 20)
+
+}
+
+func (s *MetricsConnectorSuite) TestSystemMetricsReturnedInSortedOrder() {
+	for i := 0; i < 20; i++ {
+		m := message.CollectSystemInfo()
+		event.LogTaskSystemData("foo", m.(*message.SystemInfo))
+	}
+
 	info, err := s.ctx.FindTaskSystemMetrics("foo", time.Now().Add(-2*time.Hour), 100, -1)
 	s.NoError(err)
 	s.Len(info, 0)
@@ -80,5 +103,4 @@ func (s *MetricsConnectorSuite) TestSystemMetricsLimitConstrainsResults() {
 	info, err = s.ctx.FindTaskSystemMetrics("foo", time.Now().Add(-2*time.Hour), 100, 1)
 	s.NoError(err)
 	s.Len(info, 20)
-
 }

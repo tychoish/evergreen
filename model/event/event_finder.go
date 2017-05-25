@@ -82,7 +82,11 @@ func RecentSchedulerEvents(distroId string, n int) db.Q {
 // TaskSystemInfoEvents builds a query for system info,
 // (e.g. aggregate information about the system as a whole) collected
 // during a task.
-func TaskSystemInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
+//
+// If the sort value is less than 0, the query will return all
+// matching events that occur before the specified time, and otherwise
+// will return all matching events that occur before the specified time.
+func TaskSystemInfoEvents(taskId string, ts time.Time, limit, sort int) db.Q {
 	filter := bson.M{
 		DataKey + "." + ResourceTypeKey: EventTaskSystemInfo,
 		ResourceIdKey:                   taskId,
@@ -98,13 +102,17 @@ func TaskSystemInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
 		filter[TimestampKey] = bson.M{"$gte": ts}
 	}
 
-	return db.Query(filter).Sort([]string{sortSpec}).Limit(n)
+	return db.Query(filter).Sort([]string{sortSpec}).Limit(limit)
 }
 
 // TaskProcessInfoEvents builds a query for process info, which
 // returns information about each process (and children) spawned
 // during task execution.
-func TaskProcessInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
+//
+// If the sort value is less than 0, the query will return all
+// matching events that occur before the specified time, and otherwise
+// will return all matching events that occur before the specified time.
+func TaskProcessInfoEvents(taskId string, ts time.Time, limit, sort int) db.Q {
 	filter := bson.M{
 		DataKey + "." + ResourceTypeKey: EventTaskProcessInfo,
 		ResourceIdKey:                   taskId,
@@ -120,5 +128,5 @@ func TaskProcessInfoEvents(taskId string, ts time.Time, n, sort int) db.Q {
 		filter[TimestampKey] = bson.M{"$gte": ts}
 	}
 
-	return db.Query(filter).Sort([]string{sortSpec}).Limit(n)
+	return db.Query(filter).Sort([]string{sortSpec}).Limit(limit)
 }

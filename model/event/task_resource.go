@@ -211,7 +211,7 @@ func LogTaskProcessData(taskId string, procs []*message.ProcessInfo) {
 		// if p.Parent is 0, then this is the root of the
 		// process, and we should use the timestamp from this
 		// collector.
-		if p.Parent == 0 {
+		if p.Parent == 0 && !p.Base.Time.IsZero() {
 			ts = p.Base.Time
 			b.Time = ts
 		}
