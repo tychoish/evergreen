@@ -50,7 +50,10 @@ func (mc *DBMetricsConnector) FindTaskProcessMetrics(taskId string, ts time.Time
 	return out, nil
 }
 
-type MockMetricsConnector struct{}
+type MockMetricsConnector struct {
+	system  []*message.SystemInfo
+	process [][]*message.ProcessInfo
+}
 
 func (mc *MockMetricsConnector) FindTaskSystemMetrics(taskId string, ts time.Time, limit, sort int) ([]*message.SystemInfo, error) {
 	return []*message.SystemInfo{}, nil
