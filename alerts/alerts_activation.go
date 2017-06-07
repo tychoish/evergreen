@@ -3,40 +3,11 @@ package alerts
 import (
 	"time"
 
-	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/alert"
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/model/task"
-	"github.com/evergreen-ci/evergreen/model/version"
 	"gopkg.in/mgo.v2/bson"
 )
-
-func RunLastRevisionNotFoundTrigger(proj *model.ProjectRef, v *version.Version) error {
-	ctx := triggerContext{
-		projectRef: proj,
-		version:    v,
-	}
-	trigger := LastRevisionNotFound{}
-	// only one trigger to act on for now
-	shouldExec, err := trigger.ShouldExecute(ctx)
-	if err != nil {
-		return err
-	}
-	if !shouldExec {
-		return nil
-	}
-	err = alert.EnqueueAlertRequest(&alert.AlertRequest{
-		Id:        bson.NewObjectId(),
-		Trigger:   trigger.Id(),
-		VersionId: v.Id,
-		CreatedAt: time.Now(),
-	})
-
-	if err != nil {
-		return err
-	}
-	return storeTriggerBookkeeping(ctx, []Trigger{trigger})
-}
 
 // RunTaskTriggers queues alerts for any active triggers on the tasks's state change.
 func RunTaskFailureTriggers(taskId string) error {

@@ -189,10 +189,12 @@ func reachedFailureLimit(taskId string) (bool, error) {
 	if p == nil {
 		return false, errors.Errorf("project %v not found for revision %v", t.Project, t.Revision)
 	}
+
 	v := p.FindBuildVariant(t.BuildVariant)
 	if v == nil {
 		return false, errors.Errorf("build variant %v does not exist in project", t.BuildVariant)
 	}
+
 	batchTime := pr.GetBatchTime(v)
 	reached := time.Since(t.FinishTime) > (time.Duration(batchTime) * time.Minute * failureLimitMultiplier)
 	return reached, nil

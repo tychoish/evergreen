@@ -51,13 +51,24 @@ func (mc *DBMetricsConnector) FindTaskProcessMetrics(taskId string, ts time.Time
 }
 
 type MockMetricsConnector struct {
-	system  []*message.SystemInfo
-	process [][]*message.ProcessInfo
+	System  map[string][]*message.SystemInfo
+	Process map[string][][]*message.ProcessInfo
 }
 
 func (mc *MockMetricsConnector) FindTaskSystemMetrics(taskId string, ts time.Time, limit, sort int) ([]*message.SystemInfo, error) {
-	return []*message.SystemInfo{}, nil
+	out, ok := mc.System[taskId]
+	if !ok {
+		return nil, errors.Errorf("no system metrics for task %s", taskId)
+	}
+
+	return out, nil
 }
+
 func (mc *MockMetricsConnector) FindTaskProcessMetrics(taskId string, ts time.Time, limit, sort int) ([][]*message.ProcessInfo, error) {
-	return [][]*message.ProcessInfo{}, nil
+	out, ok := mc.Process[taskId]
+	if !ok {
+		return nil, errors.Errorf("no process metrics for task %s", taskId)
+	}
+
+	return out, nil
 }

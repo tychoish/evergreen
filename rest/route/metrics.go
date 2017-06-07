@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type taskMetricsArgs struct {
@@ -50,15 +51,15 @@ func (p *taskSystemMetricsHandler) Handler() RequestHandler {
 	}}
 }
 
-func (p *taskSystemMetricsHandler) ParseAndValidate(r *http.Request) error {
+func (p *taskSystemMetricsHandler) ParseAndValidate(ctx context.Context, r *http.Request) error {
 	p.Args = taskMetricsArgs{task: mux.Vars(r)["task_id"]}
 
-	return p.PaginationExecutor.ParseAndValidate(r)
+	return p.PaginationExecutor.ParseAndValidate(ctx, r)
 }
 
 func taskSystemMetricsPaginator(key string, limit int, args interface{}, sc data.Connector) ([]model.Model, *PageResult, error) {
 	task := args.(*taskMetricsArgs).task
-	grip.Infoln("getting results for task:", task)
+	grip.Debugln("getting results for task:", task)
 
 	ts, err := time.ParseInLocation(model.APITimeFormat, key, time.FixedZone("", 0))
 	if err != nil {
@@ -72,7 +73,7 @@ func taskSystemMetricsPaginator(key string, limit int, args interface{}, sc data
 	data, err := sc.FindTaskSystemMetrics(task, ts, limit*2, 1)
 	if err != nil {
 		if _, ok := err.(*rest.APIError); !ok {
-			err = errors.Wrap(err, "Database error")
+			err = errors.Wrap(err, "database error")
 		}
 		return []model.Model{}, nil, err
 
@@ -155,15 +156,15 @@ func (p *taskProcessMetricsHandler) Handler() RequestHandler {
 	}}
 }
 
-func (p *taskProcessMetricsHandler) ParseAndValidate(r *http.Request) error {
+func (p *taskProcessMetricsHandler) ParseAndValidate(ctx context.Context, r *http.Request) error {
 	p.Args = taskMetricsArgs{task: mux.Vars(r)["task_id"]}
 
-	return p.PaginationExecutor.ParseAndValidate(r)
+	return p.PaginationExecutor.ParseAndValidate(ctx, r)
 }
 
 func taskProcessMetricsPaginator(key string, limit int, args interface{}, sc data.Connector) ([]model.Model, *PageResult, error) {
 	task := args.(*taskMetricsArgs).task
-	grip.Infoln("getting results for task:", task)
+	grip.Debugln("getting results for task:", task)
 
 	ts, err := time.ParseInLocation(model.APITimeFormat, key, time.FixedZone("", 0))
 	if err != nil {
@@ -185,7 +186,7 @@ func taskProcessMetricsPaginator(key string, limit int, args interface{}, sc dat
 	prevData, err := sc.FindTaskProcessMetrics(task, ts, limit, -1)
 	if err != nil {
 		if _, ok := err.(*rest.APIError); !ok {
-			err = errors.Wrap(err, "Database error")
+			err = errors.Wrap(err, "database error")
 		}
 		return []model.Model{}, nil, err
 	}
