@@ -8,6 +8,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/distro"
 	"github.com/evergreen-ci/evergreen/model/host"
+	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/mongodb/grip/message"
 )
@@ -77,4 +78,8 @@ type Connector interface {
 	// access to the metrics data collected by agents during task execution
 	FindTaskSystemMetrics(string, time.Time, int, int) ([]*message.SystemInfo, error)
 	FindTaskProcessMetrics(string, time.Time, int, int) ([][]*message.ProcessInfo, error)
+
+	// FindPatchesByProject provides access to the patches corresponding to the input project ID
+	// as ordered by creation time.
+	FindPatchesByProject(string, time.Time, int, int) ([]*patch.Patch, error)
 }
