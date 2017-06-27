@@ -232,7 +232,7 @@ func TestPluginExecution(t *testing.T) {
 		registry := plugin.NewSimpleRegistry()
 
 		plugins := []plugin.CommandPlugin{&MockPlugin{}, &expansions.ExpansionsPlugin{}, &shell.ShellPlugin{}}
-		apiPlugins := []plugin.APIPlugin{&MockPlugin{}, &expansions.ExpansionsPlugin{}}
+		apiPlugins := []plugin.APIPlugin{}
 		for _, p := range plugins {
 			err := registry.Register(p)
 			testutil.HandleTestingErr(err, t, "failed to register plugin")

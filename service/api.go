@@ -836,6 +836,12 @@ func (as *APIServer) Handler() (http.Handler, error) {
 	taskRouter.HandleFunc("/manifest/load", as.checkTask(false, makeGetManifestHandler(as))).Methods("GET")
 	taskRouter.HandleFunc("/s3copy/s3copy", as.checkTask(false, as.s3copyPlugin)).Methods("POST")
 
+	taskRouter.HandleFunc("/json/tags/{task_name}/{name}", as.checkTask(false, as.getTaskJSONTagsForTask)).Methods("GET")
+	taskRouter.HandleFunc("/json/history/{task_name}/{name}", as.checkTask(false, nil)).Methods("GET")
+	taskRouter.HandleFunc("/json/data/{name}", as.checkTask(false, nil)).Methods("POST")
+	taskRouter.HandleFunc("/json/data/{task_name}/{name}", as.checkTask(false, nil)).Methods("GET")
+	taskRouter.HandleFunc("/json/data/{task_name}/{name}/{variant}", as.checkTask(false, nil)).Methods("GET")
+
 	// Install plugin routes
 	for _, pl := range as.plugins {
 		if pl == nil {
