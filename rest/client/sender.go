@@ -44,9 +44,9 @@ func (s *logSender) Send(m message.Composer) {
 
 func (s *logSender) convertMessages(m message.Composer) []apimodels.LogMessage {
 	out := []apimodels.LogMessage{}
-	switch m := message.(type) {
+	switch m := m.(type) {
 	case *message.GroupComposer:
-		out = append(out, convertMessages(m)...)
+		out = append(out, s.convertMessages(m)...)
 	default:
 		out = append(out, apimodels.LogMessage{
 			Type:      s.logChannel,

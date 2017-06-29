@@ -83,7 +83,7 @@ func (c *evergreenREST) SetAPIKey(apiKey string) {
 }
 
 // GetLogProducer e
-func (c *evergreenREST) GetLogProducer(taskID, taskSecret string) LogProducer {
+func (c *evergreenREST) GetLoggerProducer(taskID, taskSecret string) LoggerProducer {
 	exec := newLogSender(c, apimodels.AgentLogPrefix, taskID, taskSecret)
 	task := newLogSender(c, apimodels.TaskLogPrefix, taskID, taskSecret)
 	system := newLogSender(c, apimodels.SystemLogPrefix, taskID, taskSecret)

@@ -55,7 +55,7 @@ type Communicator interface {
 	// Sends a group of log messages to the API Server
 	SendTaskLogMessages(context.Context, string, string, []apimodels.LogMessage) error
 	// Constructs a new LogProducer instance for use by tasks.
-	GetLogProducer(string, string) LogProducer
+	GetLoggerProducer(string, string) LoggerProducer
 
 	// ---------------------------------------------------------------------
 	// End legacy API methods

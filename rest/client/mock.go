@@ -90,8 +90,8 @@ func (c *MockEvergreenREST) SendTaskLogMessages(ctx context.Context, taskID, tas
 	return nil
 }
 
-// GetLogProducer constructs a single channel log producer.
-func (c *MockEvergreenREST) GetLogProducer(taskID, taskSecret string) LogProducer {
+// GetLoggerProducer constructs a single channel log producer.
+func (c *MockEvergreenREST) GetLoggerProducer(taskID, taskSecret string) LoggerProducer {
 	return NewSingleChannelLogHarness(taskID, newLogSender(c, apimodels.AgentLogPrefix, taskID, taskSecret))
 }
 
