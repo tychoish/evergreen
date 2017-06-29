@@ -3,6 +3,8 @@ package client
 import (
 	"net/http"
 	"time"
+
+	"github.com/evergreen-ci/evergreen/apimodels"
 )
 
 const (
@@ -78,4 +80,13 @@ func (c *evergreenREST) SetAPIUser(apiUser string) {
 // SetAPIKey sets the API key.
 func (c *evergreenREST) SetAPIKey(apiKey string) {
 	c.apiKey = apiKey
+}
+
+// GetLogProducer e
+func (c *evergreenREST) GetLogProducer(taskID, taskSecret string) LogProducer {
+	exec := newLogSender(c, apimodels.AgentLogPrefix, taskID, taskSecret)
+	task := newLogSender(c, apimodels.TaskLogPrefix, taskID, taskSecret)
+	system := newLogSender(c, apimodels.SystemLogPrefix, taskID, taskSecret)
+
+	return NewLogHarness(taskID, exec, task, system)
 }

@@ -85,6 +85,16 @@ func (c *MockEvergreenREST) GetNextTask(ctx context.Context, taskID, taskSecret 
 
 }
 
+// SendTaskLogMessages posts tasks messages to the api server
+func (c *MockEvergreenREST) SendTaskLogMessages(ctx context.Context, taskID, taskSecret string, msgs []apimodels.LogMessage) error {
+	return nil
+}
+
+// GetLogProducer constructs a single channel log producer.
+func (c *MockEvergreenREST) GetLogProducer(taskID, taskSecret string) LogProducer {
+	return NewSingleChannelLogHarness(taskID, newLogSender(c, apimodels.AgentLogPrefix, taskID, taskSecret))
+}
+
 // GetAllHosts ...
 func (*MockEvergreenREST) GetAllHosts() {
 	return
