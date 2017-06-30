@@ -41,35 +41,17 @@ type LoggerProducer interface {
 //
 // Standard/Default Production  LoggerProducer
 
-// LogHarness provides a straightforward implementation of the
+// logHarness provides a straightforward implementation of the
 // plugin.LoggerProducer interface.
 type logHarness struct {
-	local     grip.Journaler
-	execution grip.Journaler
-	task      grip.Journaler
-	system    grip.Journaler
-
-	mu      sync.Mutex
-	writers []io.WriteCloser
-}
-
-// NewLogHanress takes a name, presumably of a task, and three
-// senders for execution, task, and system logging channels. The
-// "local" logging channel uses the same as the standard "grip"
-// logging instance.
-func NewLogHarness(name string, execution, task, system send.Sender) LoggerProducer {
-	for _, s := range []send.Sender{execution, task, system} {
-		s.SetName(name)
-	}
-
-	l := &logHarness{
-		local:     &logging.Grip{Sender: grip.GetSender()},
-		execution: &logging.Grip{Sender: execution},
-		task:      &logging.Grip{Sender: task},
-		system:    &logging.Grip{Sender: system},
-	}
-
-	return l
+	local            grip.Journaler
+	execution        grip.Journaler
+	task             grip.Journaler
+	system           grip.Journaler
+	taskWriterBase   send.Sender
+	systemWriterBase send.Sender
+	mu               sync.Mutex
+	writers          []io.WriteCloser
 }
 
 func (l *logHarness) Local() grip.Journaler     { return l.local }
@@ -81,7 +63,7 @@ func (l *logHarness) TaskWriter() io.Writer {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	w := send.NewWriterSender(l.task.GetSender())
+	w := send.NewWriterSender(l.taskWriterBase)
 	l.writers = append(l.writers, w)
 	return w
 }
@@ -90,7 +72,7 @@ func (l *logHarness) SystemWriter() io.Writer {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	w := send.NewWriterSender(l.system.GetSender())
+	w := send.NewWriterSender(l.systemWriterBase)
 	l.writers = append(l.writers, w)
 	return w
 }

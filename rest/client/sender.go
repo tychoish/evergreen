@@ -60,11 +60,17 @@ func (s *logSender) convertMessages(m message.Composer) []apimodels.LogMessage {
 		return out
 	}
 
+	msg, err := s.Formatter(m)
+
+	if err != nil {
+		msg = m.String()
+	}
+
 	return []apimodels.LogMessage{
 		{
 			Type:      s.logChannel,
 			Severity:  priorityToString(m.Priority()),
-			Message:   m.String(),
+			Message:   msg,
 			Timestamp: time.Now(),
 			Version:   evergreen.LogmessageCurrentVersion,
 		},
