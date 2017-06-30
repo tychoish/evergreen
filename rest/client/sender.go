@@ -5,6 +5,7 @@ import (
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/apimodels"
+	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
 	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/send"
@@ -20,12 +21,17 @@ type logSender struct {
 }
 
 func newLogSender(comm Communicator, channel, taskID, taskSecret string) send.Sender {
-	return &logSender{
+	s := &logSender{
 		comm:       comm,
 		logChannel: channel,
 		taskID:     taskID,
 		taskSecret: taskSecret,
+		Base:       send.NewBase(taskID),
 	}
+
+	_ = s.Base.SetErrorHandler(send.ErrorHandlerFromSender(grip.GetSender()))
+
+	return s
 }
 
 func (s *logSender) Send(m message.Composer) {
@@ -43,20 +49,26 @@ func (s *logSender) Send(m message.Composer) {
 }
 
 func (s *logSender) convertMessages(m message.Composer) []apimodels.LogMessage {
-	out := []apimodels.LogMessage{}
-	switch m := m.(type) {
-	case *message.GroupComposer:
-		out = append(out, s.convertMessages(m)...)
-	default:
-		out = append(out, apimodels.LogMessage{
+	g, ok := m.(*message.GroupComposer)
+	if ok {
+		out := []apimodels.LogMessage{}
+
+		for _, msg := range g.Messages() {
+			out = append(out, s.convertMessages(msg)...)
+		}
+
+		return out
+	}
+
+	return []apimodels.LogMessage{
+		{
 			Type:      s.logChannel,
 			Severity:  priorityToString(m.Priority()),
 			Message:   m.String(),
 			Timestamp: time.Now(),
 			Version:   evergreen.LogmessageCurrentVersion,
-		})
+		},
 	}
-	return out
 }
 
 func priorityToString(l level.Priority) string {

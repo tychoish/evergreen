@@ -211,9 +211,9 @@ func (c *evergreenREST) GetNextTask(ctx context.Context, taskID, taskSecret stri
 		return nil, err
 	}
 	return taskResponse, nil
-
 }
 
+// SendTaskLogMessages posts a group of log messages for a task.
 func (c *evergreenREST) SendTaskLogMessages(ctx context.Context, taskID, taskSecret string, msgs []apimodels.LogMessage) error {
 	payload := apimodels.TaskLog{
 		TaskId:       taskID,
