@@ -6,11 +6,12 @@ import (
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/send"
-	"github.com/mongodb/grip/slogger"
+	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // Plugin command responsible for creating a tgz archive.
@@ -30,35 +31,35 @@ type TarGzPackCommand struct {
 	ExcludeFiles []string `mapstructure:"exclude_files" plugin:"expand"`
 }
 
-func (self *TarGzPackCommand) Name() string {
+func (c *TarGzPackCommand) Name() string {
 	return TarGzPackCmdName
 }
 
-func (self *TarGzPackCommand) Plugin() string {
+func (c *TarGzPackCommand) Plugin() string {
 	return ArchivePluginName
 }
 
 // ParseParams reads in the given parameters for the command.
-func (self *TarGzPackCommand) ParseParams(params map[string]interface{}) error {
-	if err := mapstructure.Decode(params, self); err != nil {
-		return errors.Wrapf(err, "error parsing '%v' params", self.Name())
+func (c *TarGzPackCommand) ParseParams(params map[string]interface{}) error {
+	if err := mapstructure.Decode(params, c); err != nil {
+		return errors.Wrapf(err, "error parsing '%v' params", c.Name())
 	}
-	if err := self.validateParams(); err != nil {
-		return errors.Wrapf(err, "error validating '%v' params", self.Name())
+	if err := c.validateParams(); err != nil {
+		return errors.Wrapf(err, "error validating '%v' params", c.Name())
 	}
 	return nil
 }
 
 // Make sure a target and source dir are set, and files are specified to be
 // included.
-func (self *TarGzPackCommand) validateParams() error {
-	if self.Target == "" {
+func (c *TarGzPackCommand) validateParams() error {
+	if c.Target == "" {
 		return errors.New("target cannot be blank")
 	}
-	if self.SourceDir == "" {
+	if c.SourceDir == "" {
 		return errors.New("source_dir cannot be blank")
 	}
-	if len(self.Include) == 0 {
+	if len(c.Include) == 0 {
 		return errors.New("include cannot be empty")
 	}
 
@@ -66,30 +67,28 @@ func (self *TarGzPackCommand) validateParams() error {
 }
 
 // Execute builds the archive.
-func (self *TarGzPackCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	conf *model.TaskConfig,
-	stop chan bool) error {
+func (c *TarGzPackCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
+	logger := client.GetLoggerProducer(conf.Task.Id, conf.Task.Secret)
 
-	if err := plugin.ExpandValues(self, conf.Expansions); err != nil {
+	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		return errors.Wrap(err, "error expanding params")
 	}
 
 	// if the source dir is a relative path, join it to the working dir
-	if !filepath.IsAbs(self.SourceDir) {
-		self.SourceDir = filepath.Join(conf.WorkDir, self.SourceDir)
+	if !filepath.IsAbs(c.SourceDir) {
+		c.SourceDir = filepath.Join(conf.WorkDir, c.SourceDir)
 	}
 
 	// if the target is a relative path, join it to the working dir
-	if !filepath.IsAbs(self.Target) {
-		self.Target = filepath.Join(conf.WorkDir, self.Target)
+	if !filepath.IsAbs(c.Target) {
+		c.Target = filepath.Join(conf.WorkDir, c.Target)
 	}
 
 	errChan := make(chan error)
 	filesArchived := -1
 	go func() {
 		var err error
-		filesArchived, err = self.MakeArchive(pluginLogger)
+		filesArchived, err = c.MakeArchive(logger.Execution())
 		errChan <- errors.WithStack(err)
 	}()
 
@@ -99,57 +98,37 @@ func (self *TarGzPackCommand) Execute(pluginLogger plugin.Logger,
 			return errors.WithStack(err)
 		}
 		if filesArchived == 0 {
-			deleteErr := os.Remove(self.Target)
+			deleteErr := os.Remove(c.Target)
 			if deleteErr != nil {
-				pluginLogger.LogExecution(slogger.INFO, "Error deleting empty archive: %v", deleteErr)
+				logger.Execution().Infof("problem deleting empty archive: %s", deleteErr.Error())
 			}
 		}
 		return nil
-	case <-stop:
-		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
-			" execution of targz pack command")
+	case <-ctx.Done():
+		logger.Execution().Info(message.Fields{
+			"message": "received signal to terminate execution of targz pack command",
+			"task_id": conf.Task.Id,
+		})
 		return nil
 	}
 
-}
-
-// since archive.BuildArchive takes in a slogger.Logger
-type agentAppender struct {
-	pluginLogger plugin.Logger
-}
-
-// satisfy the slogger.Appender interface
-func (self *agentAppender) Append(log *slogger.Log) error {
-	self.pluginLogger.LogExecution(log.Level, slogger.FormatLog(log))
-	return nil
 }
 
 // Build the archive.
 // Returns the number of files included in the archive (0 means empty archive).
-func (self *TarGzPackCommand) MakeArchive(pluginLogger plugin.Logger) (int, error) {
-	// create a logger to pass into the BuildArchive command
-	appender := &agentAppender{
-		pluginLogger: pluginLogger,
-	}
-
-	log := &slogger.Logger{
-		Name:      "",
-		Appenders: []send.Sender{slogger.WrapAppender(appender)},
-	}
-
-	// create a targz writer for the target file
-	f, gz, tarWriter, err := TarGzWriter(self.Target)
+func (c *TarGzPackCommand) MakeArchive(logger grip.Journaler) (int, error) {
+	f, gz, tarWriter, err := TarGzWriter(c.Target)
 	if err != nil {
-		return -1, errors.Wrapf(err, "error opening target archive file %s", self.Target)
+		return -1, errors.Wrapf(err, "error opening target archive file %s", c.Target)
 	}
 	defer func() {
-		grip.CatchError(tarWriter.Close())
-		grip.CatchError(gz.Close())
-		grip.CatchError(f.Close())
+		logger.CatchError(tarWriter.Close())
+		logger.CatchError(gz.Close())
+		logger.CatchError(f.Close())
 	}()
 
 	// Build the archive
-	out, err := BuildArchive(tarWriter, self.SourceDir, self.Include,
-		self.ExcludeFiles, log)
+	out, err := BuildArchive(tarWriter, c.SourceDir, c.Include,
+		c.ExcludeFiles, logger)
 	return out, errors.WithStack(err)
 }
