@@ -12,6 +12,7 @@ import (
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // TarContentsFile represents a tar file on disk.
@@ -23,7 +24,7 @@ type TarContentsFile struct {
 // BuildArchive reads the rootPath directory into the tar.Writer,
 // taking included and excluded strings into account.
 // Returns the number of files that were added to the archive
-func BuildArchive(tarWriter *tar.Writer, rootPath string, includes []string,
+func BuildArchive(ctx context.Context, tarWriter *tar.Writer, rootPath string, includes []string,
 	excludes []string, logger grip.Journaler) (int, error) {
 
 	pathsToAdd := make(chan TarContentsFile)
@@ -40,6 +41,10 @@ func BuildArchive(tarWriter *tar.Writer, rootPath string, includes []string,
 			}
 			if !exists {
 				continue
+			}
+
+			if ctx.Err() != nil {
+				return errors.New("archive creation operation canceled")
 			}
 
 			var walk filepath.WalkFunc
@@ -84,6 +89,10 @@ func BuildArchive(tarWriter *tar.Writer, rootPath string, includes []string,
 		processed := map[string]bool{}
 	FileChanLoop:
 		for file := range inputChan {
+			if ctx.Err() != nil {
+				return errors.New("archive creation operation canceled")
+			}
+
 			var intarball string
 			// Tarring symlinks doesn't work reliably right now, so if the file is
 			// a symlink, leave intarball path intact but write from the file
@@ -174,6 +183,8 @@ func BuildArchive(tarWriter *tar.Writer, rootPath string, includes []string,
 	}(pathsToAdd)
 
 	select {
+	case ctx.Done():
+		return numFilesArchived, errors.New("archive creation operation canceled")
 	case <-done:
 		return numFilesArchived, nil
 	case err := <-errChan:
@@ -182,7 +193,7 @@ func BuildArchive(tarWriter *tar.Writer, rootPath string, includes []string,
 }
 
 // Extract unpacks the tar.Reader into rootPath.
-func Extract(tarReader *tar.Reader, rootPath string) error {
+func Extract(ctx context.Context, tarReader *tar.Reader, rootPath string) error {
 	for {
 		hdr, err := tarReader.Next()
 		if err == io.EOF {
@@ -190,6 +201,9 @@ func Extract(tarReader *tar.Reader, rootPath string) error {
 		}
 		if err != nil {
 			return errors.WithStack(err)
+		}
+		if ctx.Err() {
+			return errors.New("extraction operation canceled")
 		}
 
 		if hdr.Typeflag == tar.TypeDir {

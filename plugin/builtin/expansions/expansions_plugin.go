@@ -5,9 +5,10 @@ import (
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 func init() {
@@ -23,16 +24,16 @@ const (
 type ExpansionsPlugin struct{}
 
 // Name fulfills the Plugin interface.
-func (self *ExpansionsPlugin) Name() string {
+func (p *ExpansionsPlugin) Name() string {
 	return ExpansionsPluginName
 }
 
-func (self *ExpansionsPlugin) Configure(map[string]interface{}) error {
+func (p *ExpansionsPlugin) Configure(map[string]interface{}) error {
 	return nil
 }
 
 // NewCommand fulfills the Plugin interface.
-func (self *ExpansionsPlugin) NewCommand(cmdName string) (plugin.Command, error) {
+func (p *ExpansionsPlugin) NewCommand(cmdName string) (plugin.Command, error) {
 	if cmdName == UpdateVarsCmdName {
 		return &UpdateCommand{}, nil
 	} else if cmdName == FetchVarsCmdname {
@@ -67,45 +68,49 @@ type PutCommandParams struct {
 	Concat string
 }
 
-func (self *UpdateCommand) Name() string {
+func (c *UpdateCommand) Name() string {
 	return UpdateVarsCmdName
 }
 
-func (self *UpdateCommand) Plugin() string {
+func (c *UpdateCommand) Plugin() string {
 	return ExpansionsPluginName
 }
 
 // ParseParams validates the input to the UpdateCommand, returning and error
 // if something is incorrect. Fulfills Command interface.
-func (self *UpdateCommand) ParseParams(params map[string]interface{}) error {
-	err := mapstructure.Decode(params, self)
+func (c *UpdateCommand) ParseParams(params map[string]interface{}) error {
+	err := mapstructure.Decode(params, c)
 	if err != nil {
 		return err
 	}
 
-	for _, item := range self.Updates {
+	for _, item := range c.Updates {
 		if item.Key == "" {
 			return errors.Errorf("error parsing '%v' params: key must not be "+
-				"a blank string", self.Name())
+				"a blank string", c.Name())
 		}
 	}
 
 	return nil
 }
 
-func (self *UpdateCommand) ExecuteUpdates(conf *model.TaskConfig) error {
-	for _, update := range self.Updates {
+func (c *UpdateCommand) ExecuteUpdates(ctx context.Context, conf *model.TaskConfig) error {
+	for _, update := range c.Updates {
+		if ctx.Err() != nil {
+			return errors.New("operation aborted")
+		}
+
 		if update.Concat == "" {
 			newValue, err := conf.Expansions.ExpandString(update.Value)
 
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 			conf.Expansions.Put(update.Key, newValue)
 		} else {
 			newValue, err := conf.Expansions.ExpandString(update.Concat)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			oldValue := conf.Expansions.Get(update.Key)
@@ -117,25 +122,23 @@ func (self *UpdateCommand) ExecuteUpdates(conf *model.TaskConfig) error {
 }
 
 // Execute updates the expansions. Fulfills Command interface.
-func (self *UpdateCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
-
-	err := self.ExecuteUpdates(conf)
+func (c *UpdateCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
+	err := c.ExecuteUpdates(ctx, conf)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	if self.YamlFile != "" {
-		self.YamlFile, err = conf.Expansions.ExpandString(self.YamlFile)
+	if c.YamlFile != "" {
+		c.YamlFile, err = conf.Expansions.ExpandString(c.YamlFile)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
-		pluginLogger.LogTask(slogger.INFO, "Updating expansions with keys from file: %v", self.YamlFile)
-		filename := filepath.Join(conf.WorkDir, self.YamlFile)
+		logger.Task().Infof("Updating expansions with keys from file: %s", c.YamlFile)
+		filename := filepath.Join(conf.WorkDir, c.YamlFile)
 		err := conf.Expansions.UpdateFromYaml(filename)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 	return nil

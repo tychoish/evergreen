@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,9 +10,10 @@ import (
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/subprocess"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
+	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -28,77 +30,74 @@ type GitGetProjectCommand struct {
 	Revisions map[string]string `plugin:"expand"`
 }
 
-func (ggpc *GitGetProjectCommand) Name() string {
+func (c *GitGetProjectCommand) Name() string {
 	return GetProjectCmdName
 }
 
-func (ggpc *GitGetProjectCommand) Plugin() string {
+func (c *GitGetProjectCommand) Plugin() string {
 	return GitPluginName
 }
 
 // ParseParams parses the command's configuration.
 // Fulfills the Command interface.
-func (ggpc *GitGetProjectCommand) ParseParams(params map[string]interface{}) error {
-	err := mapstructure.Decode(params, ggpc)
+func (c *GitGetProjectCommand) ParseParams(params map[string]interface{}) error {
+	err := mapstructure.Decode(params, c)
 	if err != nil {
 		return err
 	}
 
-	if ggpc.Directory == "" {
+	if c.Directory == "" {
 		return errors.Errorf("error parsing '%v' params: value for directory "+
-			"must not be blank", ggpc.Name())
+			"must not be blank", c.Name())
 	}
 	return nil
 }
 
 // Execute gets the source code required by the project
-func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	conf *model.TaskConfig,
-	stop chan bool) error {
+func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
 
 	// expand the github parameters before running the task
-	if err := plugin.ExpandValues(ggpc, conf.Expansions); err != nil {
+	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		return err
 	}
 
 	location, err := conf.ProjectRef.Location()
-
 	if err != nil {
 		return err
 	}
 
+	logger := client.GetLoggerProducer(conf.Task.Id, conf.Task.Secret)
+
 	gitCommands := []string{
 		fmt.Sprintf("set -o errexit"),
 		fmt.Sprintf("set -o verbose"),
-		fmt.Sprintf("rm -rf %s", ggpc.Directory),
+		fmt.Sprintf("rm -rf %s", c.Directory),
 	}
 
-	cloneCmd := fmt.Sprintf("git clone '%s' '%s'", location, ggpc.Directory)
+	cloneCmd := fmt.Sprintf("git clone '%s' '%s'", location, c.Directory)
 	if conf.ProjectRef.Branch != "" {
 		cloneCmd = fmt.Sprintf("%s --branch '%s'", cloneCmd, conf.ProjectRef.Branch)
 	}
 
 	gitCommands = append(gitCommands,
 		cloneCmd,
-		fmt.Sprintf("cd %v; git reset --hard %s", ggpc.Directory, conf.Task.Revision))
+		fmt.Sprintf("cd %v; git reset --hard %s", c.Directory, conf.Task.Revision))
 
 	cmdsJoined := strings.Join(gitCommands, "\n")
 
 	fetchSourceCmd := &subprocess.LocalCommand{
 		CmdString:        cmdsJoined,
 		WorkingDirectory: conf.WorkDir,
-		Stdout:           pluginLogger.GetTaskLogWriter(slogger.INFO),
-		Stderr:           pluginLogger.GetTaskLogWriter(slogger.ERROR),
+		Stdout:           logger.TaskWriter(level.Info),
+		Stderr:           logger.TaskWriter(level.Error),
 		ScriptMode:       true,
 	}
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	errChan := make(chan error)
 	go func() {
-		pluginLogger.LogExecution(slogger.INFO, "Fetching source from git...")
-		errChan <- fetchSourceCmd.Run(ctx)
-		pluginLogger.Flush()
+		logger.Execution().Info("Fetching source from git...")
+		errChan <- fetchSourceCmd.Run()
 	}()
 
 	// wait until the command finishes or the stop channel is tripped
@@ -107,13 +106,12 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 		if err != nil {
 			return errors.WithStack(err)
 		}
-	case <-stop:
-		cancel()
-		pluginLogger.LogExecution(slogger.INFO, "Got kill signal")
+	case <-ctx.Done():
+		logger.Execution().Info("Got kill signal during git.get_project command")
 		if fetchSourceCmd.Cmd != nil {
-			pluginLogger.LogExecution(slogger.INFO, "Stopping process: %v", fetchSourceCmd.Cmd.Process.Pid)
+			logger.Execution().Infof("Stopping process: %d", fetchSourceCmd.Cmd.Process.Pid)
 			if err := fetchSourceCmd.Stop(); err != nil {
-				pluginLogger.LogExecution(slogger.ERROR, "Error occurred stopping process: %v", err)
+				logger.Execution().Error("Error occurred stopping process: %v", err)
 			}
 		}
 		return errors.New("Fetch command interrupted")
@@ -121,14 +119,18 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 
 	// Fetch source for the modules
 	for _, moduleName := range conf.BuildVariant.Modules {
-		pluginLogger.LogExecution(slogger.INFO, "Fetching module: %v", moduleName)
+		if ctx.Err() != nil {
+			return errors.New("git.get_project command aborted while applying modules")
+		}
+		logger.Execution().Infof("Fetching module: %s", moduleName)
+
 		module, err := conf.Project.GetModuleByName(moduleName)
 		if err != nil {
-			pluginLogger.LogExecution(slogger.ERROR, "Couldn't get module %v: %v", moduleName, err)
+			logger.Execution().Errorf("Couldn't get module %s: %v", moduleName, err)
 			continue
 		}
 		if module == nil {
-			pluginLogger.LogExecution(slogger.ERROR, "No module found for %v", moduleName)
+			logger.Execution().Errorf("No module found for %s", moduleName)
 			continue
 		}
 
@@ -145,7 +147,7 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 			return errors.WithStack(err)
 		}
 
-		revision := ggpc.Revisions[moduleName]
+		revision := c.Revisions[moduleName]
 
 		// if there is no revision, then use the revision from the module, then branch name
 		if revision == "" {
@@ -165,16 +167,15 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 
 		moduleFetchCmd := &subprocess.LocalCommand{
 			CmdString:        strings.Join(moduleCmds, "\n"),
-			WorkingDirectory: filepath.ToSlash(filepath.Join(conf.WorkDir, ggpc.Directory)),
-			Stdout:           pluginLogger.GetTaskLogWriter(slogger.INFO),
-			Stderr:           pluginLogger.GetTaskLogWriter(slogger.ERROR),
+			WorkingDirectory: filepath.ToSlash(filepath.Join(conf.WorkDir, c.Directory)),
+			Stdout:           logger.TaskWriter(level.Info),
+			Stderr:           logger.TaskWriter(level.Error),
 			ScriptMode:       true,
 		}
 
 		ctx, cancel := context.WithCancel(context.TODO())
 		go func() {
-			errChan <- moduleFetchCmd.Run(ctx)
-			pluginLogger.Flush()
+			errChan <- moduleFetchCmd.Run()
 		}()
 
 		// wait until the command finishes or the stop channel is tripped
@@ -183,39 +184,38 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 			if err != nil {
 				return err
 			}
-		case <-stop:
-			cancel()
-			pluginLogger.LogExecution(slogger.INFO, "Got kill signal")
+		case <-ctx.Done():
+			logger.Execution().Info("Got kill signal")
 			if moduleFetchCmd.Cmd != nil {
-				pluginLogger.LogExecution(slogger.INFO, "Stopping process: %v", moduleFetchCmd.Cmd.Process.Pid)
+				logger.Execution().Infof("Stopping process: %d", moduleFetchCmd.Cmd.Process.Pid)
 				if err := moduleFetchCmd.Stop(); err != nil {
-					pluginLogger.LogExecution(slogger.ERROR, "Error occurred stopping process: %v", err)
+					logger.Execution().Errorf("Error occurred stopping process: %v", err)
 				}
 			}
-			return errors.New("Fetch module command interrupted.")
+			return errors.New("Fetch module command interrupted")
 		}
-
 	}
 
 	//Apply patches if necessary
 	if conf.Task.Requester != evergreen.PatchVersionRequester {
 		return nil
 	}
+
 	go func() {
-		pluginLogger.LogExecution(slogger.INFO, "Fetching patch.")
-		patch, err := ggpc.GetPatch(pluginCom, pluginLogger)
+		logger.Execution().Info("Fetching patch.")
+		patch, err := client.GetTaskPatch(ctx, conf.Task.Id, conf.Task.Secret)
 		if err != nil {
-			pluginLogger.LogExecution(slogger.ERROR, "Failed to get patch: %v", err)
+			logger.Execution().Errorf("Failed to get patch: %v", err)
 			errChan <- errors.Wrap(err, "Failed to get patch")
 		}
-		err = ggpc.getPatchContents(pluginCom, pluginLogger, patch)
+		err = c.getPatchContents(ctx, client, logger, conf, patch)
 		if err != nil {
-			pluginLogger.LogExecution(slogger.ERROR, "Failed to get patch contents: %v", err)
+			logger.Execution().Errorf("Failed to get patch contents: %v", err)
 			errChan <- errors.Wrap(err, "Failed to get patch contents")
 		}
-		err = ggpc.applyPatch(conf, patch, pluginLogger)
+		err = c.applyPatch(ctx, conf, patch, logger)
 		if err != nil {
-			pluginLogger.LogExecution(slogger.INFO, "Failed to apply patch: %v", err)
+			logger.Execution().Infof("Failed to apply patch: %v", err)
 			errChan <- errors.Wrap(err, "Failed to apply patch")
 		}
 		errChan <- nil
@@ -223,9 +223,8 @@ func (ggpc *GitGetProjectCommand) Execute(pluginLogger plugin.Logger,
 
 	select {
 	case err := <-errChan:
-		return err
-	case <-stop:
+		return errors.WithStack(err)
+	case <-ctx.Done():
 		return errors.New("Patch command interrupted")
 	}
-
 }

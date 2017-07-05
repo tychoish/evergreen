@@ -6,12 +6,12 @@ import (
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
-	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/attach/xunit"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // AttachXUnitResultsCommand reads in an xml file of xunit
@@ -74,26 +74,21 @@ func (c *AttachXUnitResultsCommand) expandParams(conf *model.TaskConfig) error {
 
 // Execute carries out the AttachResultsCommand command - this is required
 // to satisfy the 'Command' interface
-func (c *AttachXUnitResultsCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	taskConfig *model.TaskConfig,
-	stop chan bool) error {
-
-	if err := c.expandParams(taskConfig); err != nil {
+func (c *AttachXUnitResultsCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
+	if err := c.expandParams(conf); err != nil {
 		return err
 	}
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- c.parseAndUploadResults(taskConfig, pluginLogger, pluginCom)
+		errChan <- c.parseAndUploadResults(ctx, conf, logger, client)
 	}()
 
 	select {
 	case err := <-errChan:
-		return err
-	case <-stop:
-		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
-			" execution of attach xunit results command")
+		return errors.WithStack(err)
+	case <-ctx.Done():
+		logger.Execution().Info("Received signal to terminate execution of attach xunit results command")
 		return nil
 	}
 }
@@ -113,19 +108,23 @@ func getFilePaths(workDir string, files []string) ([]string, error) {
 	return out, errors.Wrapf(catcher.Resolve(), "%d incorrect file specifications", catcher.Len())
 }
 
-func (c *AttachXUnitResultsCommand) parseAndUploadResults(
-	taskConfig *model.TaskConfig, pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator) error {
+func (c *AttachXUnitResultsCommand) parseAndUploadResults(ctx context.Context, conf *model.TaskConfig,
+	logger client.LoggerProducer, client client.Communicator) error {
+
 	tests := []task.TestResult{}
 	logs := []*model.TestLog{}
 	logIdxToTestIdx := []int{}
 
-	reportFilePaths, err := getFilePaths(taskConfig.WorkDir, c.Files)
+	reportFilePaths, err := getFilePaths(conf.WorkDir, c.Files)
 	if err != nil {
 		return err
 	}
 
 	for _, reportFileLoc := range reportFilePaths {
+		if ctx.Err() {
+			return errors.New("operation canceled")
+		}
+
 		file, err := os.Open(reportFileLoc)
 		if err != nil {
 			return errors.Wrap(err, "couldn't open xunit file")
@@ -144,7 +143,7 @@ func (c *AttachXUnitResultsCommand) parseAndUploadResults(
 		for _, suite := range testSuites {
 			for _, tc := range suite.TestCases {
 				// logs are only created when a test case does not succeed
-				test, log := tc.ToModelTestResultAndLog(taskConfig.Task)
+				test, log := tc.ToModelTestResultAndLog(conf.Task)
 				if log != nil {
 					logs = append(logs, log)
 					logIdxToTestIdx = append(logIdxToTestIdx, len(tests))
@@ -155,14 +154,18 @@ func (c *AttachXUnitResultsCommand) parseAndUploadResults(
 	}
 
 	for i, log := range logs {
-		logId, err := SendJSONLogs(pluginLogger, pluginCom, log)
+		if ctx.Err() {
+			return errors.New("operation canceled")
+		}
+
+		logId, err := sendJSONLogs(pluginLogger, pluginCom, log)
 		if err != nil {
-			pluginLogger.LogTask(slogger.WARN, "Error uploading logs for %v", log.Name)
+			logger.Task().Warningf("problem uploading logs for %s", log.Name)
 			continue
 		}
 		tests[logIdxToTestIdx[i]].LogId = logId
 		tests[logIdxToTestIdx[i]].LineNum = 1
 	}
 
-	return SendJSONResults(taskConfig, pluginLogger, pluginCom, &task.TestResults{tests})
+	return sendJSONResults(ctx, conf, logger, client, &task.TestResults{tests})
 }

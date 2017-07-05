@@ -1,6 +1,7 @@
 package attach
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/artifact"
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/evergreen-ci/evergreen/plugin"
-	"github.com/mongodb/grip/slogger"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/pkg/errors"
 )
 
@@ -127,12 +128,13 @@ func (self *AttachPlugin) NewCommand(cmdName string) (plugin.Command,
 // SendJSONLogs is responsible for sending the specified logs
 // to the API Server. If successful, it returns a log ID that can be used
 // to refer to the log object in test results.
-func SendJSONLogs(pluginLogger plugin.Logger, pluginCom plugin.PluginCommunicator, logs *model.TestLog) (string, error) {
-	pluginLogger.LogExecution(slogger.INFO, "Attaching test logs for %v", logs.Name)
-	logId, err := pluginCom.TaskPostTestLog(logs)
+func sendJSONLogs(ctx context.Context, logger client.LoggerProducer, client client.Communicator, logs *model.TestLog) (string, error) {
+	logger.Execution().Infof("Attaching test logs for %s", logs.Name)
+	logID, err := client.SendTestLog(ctx, logs)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
-	pluginLogger.LogTask(slogger.INFO, "Attach test logs succeeded")
-	return logId, nil
+
+	logger.Task().Info("Attach test logs succeeded")
+	return logID, nil
 }
