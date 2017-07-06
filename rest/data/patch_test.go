@@ -25,7 +25,8 @@ type PatchConnectorSuite struct {
 func TestPatchConnectorSuite(t *testing.T) {
 	s := new(PatchConnectorSuite)
 	s.ctx = &DBConnector{}
-	s.time = time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+	//s.time = time.Now()
+	s.time = time.Date(2009, time.November, 10, 23, 0, 0, 0, time.Local)
 
 	testutil.ConfigureIntegrationTest(t, testConfig, "TestPatchConnectorSuite")
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
@@ -46,6 +47,7 @@ func TestPatchConnectorSuite(t *testing.T) {
 
 	//bson.M{}
 	p, _ := patch.Find(db.Query(bson.M{"create_time": bson.M{"$lte": s.time}}))
+	//p, _ := patch.Find(db.Query(bson.M{"create_time": s.time}))
 
 	fmt.Println(p)
 	fmt.Println(s.time)
