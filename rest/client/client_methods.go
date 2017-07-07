@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/distro"
+	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/util"
@@ -230,4 +232,51 @@ func (c *evergreenREST) SendTaskLogMessages(ctx context.Context, taskData TaskDa
 	}
 
 	return nil
+}
+
+func (c *evergreenREST) SendTaskResults(ctx context.Context, td TaskData, r *task.TestResults) error {
+	if results == nil || len(results.Results) == 0 {
+		return nil
+	}
+
+	if _, err := c.retryPost(ctx, c.getTaskPathSuffix("results", taskData.ID), taskData.Secret, v1, &r); err != nil {
+		err = errors.Wrapf(err, "problem sending %s log messages for task %s", len(msgs), td.ID)
+		grip.Error(err)
+		return err
+	}
+
+	return nil
+}
+
+// GetPatch tries to get the patch data from the server in json format,
+// and unmarhals it into a patch struct. The GET request is attempted
+// multiple times upon failure.
+func (c *evergreenREST) GetTaskPatch(ctx context.Context, td TaskData) (*patch.Patch, error) {
+	patch := patch.Patch{}
+	resp, err := c.retryGet(ctx, c.getTaskPathSuffix("patch", td.ID), td.ID, v1)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get patch for %s", td.ID)
+	}
+
+	if err = util.ReadJSONInto(resp.Body, &patch); err != nil {
+		return nil, errors.Wrapf(err, "problem parsing patch response for %s", td.ID)
+	}
+
+	return &patch, nil
+}
+
+func (c *evergreenREST) GetPatchFile(ctx context.Context, td TaskData, patchFileID string) (string, error) {
+	resp, err := c.retryGet(ctx, c.getTaskPathSuffix("patch/patchfile", td.ID), td.Secret, v1)
+	if err != nil {
+		return "", errors.Wrapf(err, "could not get file %s for patch %ss", patchFileID, td.ID)
+	}
+
+	var result []byte
+	result, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", errors.Wrapf(err, "problem reading file %s for patch %s", patchFileID, td.ID)
+	}
+
+	return string(result), nil
 }
