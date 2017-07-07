@@ -382,3 +382,7 @@ func (c *MockEvergreenREST) SetAPIUser(apiUser string) {
 func (c *MockEvergreenREST) SetAPIKey(apiKey string) {
 	c.apiKey = apiKey
 }
+
+func (c *MockEvergreenREST) GetPatchFile(ctx context.Context, _, _, _ string) (string, error) {
+	return "", nil
+}
