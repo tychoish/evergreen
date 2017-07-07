@@ -139,7 +139,7 @@ func (c *GitGetProjectCommand) applyPatch(ctx context.Context,
 			ScriptMode:       true,
 		}
 
-		if err = patchCmd.Run(context.TODO()); err != nil {
+		if err = patchCmd.Run(ctx); err != nil {
 			return errors.WithStack(err)
 		}
 	}

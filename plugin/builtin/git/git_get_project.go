@@ -93,7 +93,8 @@ func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Commun
 		ScriptMode:       true,
 	}
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	errChan := make(chan error)
 	go func() {
 		logger.Execution().Info("Fetching source from git...")
