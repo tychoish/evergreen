@@ -307,7 +307,6 @@ func (sr *SimpleRegistry) ParseCommandConf(cmd model.PluginCommandConf, funcs ma
 // Returns ErrUnknownPlugin if the cmd refers to a plugin that isn't registered,
 // or some other error if the plugin can't parse valid parameters from the conf.
 func (sr *SimpleRegistry) GetCommands(cmd model.PluginCommandConf, funcs map[string]*model.YAMLCommandSet) ([]Command, error) {
-
 	cmds, err := sr.ParseCommandConf(cmd, funcs)
 	if err != nil {
 		return nil, err
@@ -350,7 +349,7 @@ type Command interface {
 	// Execute runs the command using the agent's logger, communicator,
 	// task config, and a channel for interrupting long-running commands.
 	// Execute is called after ParseParams.
-	Execute(context.Context, client.Communicator, *model.TaskConfig) error
+	Execute(context.Context, client.Communicator, client.LoggerProducer, *model.TaskConfig) error
 
 	// A string name for the command
 	Name() string

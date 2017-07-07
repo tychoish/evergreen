@@ -7,6 +7,7 @@ import (
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/distro"
+	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"golang.org/x/net/context"
@@ -383,6 +384,18 @@ func (c *MockEvergreenREST) SetAPIKey(apiKey string) {
 	c.apiKey = apiKey
 }
 
-func (c *MockEvergreenREST) GetPatchFile(ctx context.Context, _, _, _ string) (string, error) {
+func (c *MockEvergreenREST) GetPatchFile(ctx context.Context, _ TaskData, _ string) (string, error) {
+	return "", nil
+}
+
+func (c *MockEvergreenREST) GetTaskPatch(ctx context.Context, td TaskData) (*patch.Patch, error) {
+	return nil, nil
+}
+
+func (c *MockEvergreenREST) SendTaskResults(ctx context.Context, td TaskData, r *task.TestResults) error {
+	return nil
+}
+
+func (c *MockEvergreenREST) SendTestLog(ctx context.Context, td TaskData, log *model.TestLog) (string, error) {
 	return "", nil
 }

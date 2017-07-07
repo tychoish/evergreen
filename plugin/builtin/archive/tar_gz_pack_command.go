@@ -67,8 +67,8 @@ func (c *TarGzPackCommand) validateParams() error {
 }
 
 // Execute builds the archive.
-func (c *TarGzPackCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
-	logger := client.GetLoggerProducer(conf.Task.Id, conf.Task.Secret)
+func (c *TarGzPackCommand) Execute(ctx context.Context,
+	client client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		return errors.Wrap(err, "error expanding params")
@@ -88,7 +88,7 @@ func (c *TarGzPackCommand) Execute(ctx context.Context, client client.Communicat
 	filesArchived := -1
 	go func() {
 		var err error
-		filesArchived, err = c.MakeArchive(logger.Execution())
+		filesArchived, err = c.MakeArchive(ctx, logger.Execution())
 		errChan <- errors.WithStack(err)
 	}()
 
@@ -116,7 +116,7 @@ func (c *TarGzPackCommand) Execute(ctx context.Context, client client.Communicat
 
 // Build the archive.
 // Returns the number of files included in the archive (0 means empty archive).
-func (c *TarGzPackCommand) MakeArchive(logger grip.Journaler) (int, error) {
+func (c *TarGzPackCommand) MakeArchive(ctx context.Context, logger grip.Journaler) (int, error) {
 	f, gz, tarWriter, err := TarGzWriter(c.Target)
 	if err != nil {
 		return -1, errors.Wrapf(err, "error opening target archive file %s", c.Target)
@@ -128,7 +128,7 @@ func (c *TarGzPackCommand) MakeArchive(logger grip.Journaler) (int, error) {
 	}()
 
 	// Build the archive
-	out, err := BuildArchive(tarWriter, c.SourceDir, c.Include,
+	out, err := BuildArchive(ctx, tarWriter, c.SourceDir, c.Include,
 		c.ExcludeFiles, logger)
 	return out, errors.WithStack(err)
 }

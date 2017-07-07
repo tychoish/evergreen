@@ -74,14 +74,14 @@ func (c *AttachXUnitResultsCommand) expandParams(conf *model.TaskConfig) error {
 
 // Execute carries out the AttachResultsCommand command - this is required
 // to satisfy the 'Command' interface
-func (c *AttachXUnitResultsCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
+func (c *AttachXUnitResultsCommand) Execute(ctx context.Context, comm client.Communicator, conf *model.TaskConfig) error {
 	if err := c.expandParams(conf); err != nil {
 		return err
 	}
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- c.parseAndUploadResults(ctx, conf, logger, client)
+		errChan <- c.parseAndUploadResults(ctx, conf, logger, comm)
 	}()
 
 	select {
@@ -109,7 +109,7 @@ func getFilePaths(workDir string, files []string) ([]string, error) {
 }
 
 func (c *AttachXUnitResultsCommand) parseAndUploadResults(ctx context.Context, conf *model.TaskConfig,
-	logger client.LoggerProducer, client client.Communicator) error {
+	logger client.LoggerProducer, comm client.Communicator) error {
 
 	tests := []task.TestResult{}
 	logs := []*model.TestLog{}
@@ -153,12 +153,14 @@ func (c *AttachXUnitResultsCommand) parseAndUploadResults(ctx context.Context, c
 		}
 	}
 
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
+
 	for i, log := range logs {
 		if ctx.Err() {
 			return errors.New("operation canceled")
 		}
 
-		logId, err := sendJSONLogs(pluginLogger, pluginCom, log)
+		logId, err := sendJSONLogs(ctx, logger, comm, td, log)
 		if err != nil {
 			logger.Task().Warningf("problem uploading logs for %s", log.Name)
 			continue
@@ -167,5 +169,5 @@ func (c *AttachXUnitResultsCommand) parseAndUploadResults(ctx context.Context, c
 		tests[logIdxToTestIdx[i]].LineNum = 1
 	}
 
-	return sendJSONResults(ctx, conf, logger, client, &task.TestResults{tests})
+	return sendJSONResults(ctx, conf, logger, comm, &task.TestResults{tests})
 }

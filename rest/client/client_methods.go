@@ -236,12 +236,12 @@ func (c *evergreenREST) SendTaskLogMessages(ctx context.Context, taskData TaskDa
 
 // SendTaskResults posts a task's results, used by the attach results operations.
 func (c *evergreenREST) SendTaskResults(ctx context.Context, td TaskData, r *task.TestResults) error {
-	if results == nil || len(results.Results) == 0 {
+	if r == nil || len(r.Results) == 0 {
 		return nil
 	}
 
 	if _, err := c.retryPost(ctx, c.getTaskPathSuffix("results", td.ID), td.Secret, v1, r); err != nil {
-		err = errors.Wrapf(err, "problem sending %s log messages for task %s", len(msgs), td.ID)
+		err = errors.Wrapf(err, "problem adding %d results to task %s", len(r.Results), td.ID)
 		grip.Error(err)
 		return err
 	}

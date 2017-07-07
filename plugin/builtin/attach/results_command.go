@@ -1,7 +1,6 @@
 package attach
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 
@@ -10,8 +9,8 @@ import (
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // AttachResultsCommand is used to attach MCI test results in json
@@ -64,12 +63,12 @@ func (c *AttachResultsCommand) expandAttachResultsParams(
 
 // Execute carries out the AttachResultsCommand command - this is required
 // to satisfy the 'Command' interface
-func (c *AttachResultsCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
+func (c *AttachResultsCommand) Execute(ctx context.Context, comm client.Communicator, conf *model.TaskConfig) error {
 	if err := c.expandAttachResultsParams(conf); err != nil {
 		return errors.WithStack(err)
 	}
 
-	logger := client.GetLoggerProducer(conf.Task.Id, conf.Task.Secret)
+	logger := comm.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
 
 	errChan := make(chan error)
 	go func() {
@@ -91,18 +90,17 @@ func (c *AttachResultsCommand) Execute(ctx context.Context, client client.Commun
 			return
 		}
 		if err := reportFile.Close(); err != nil {
-			pluginLogger.LogExecution(slogger.INFO, "Error closing file: %v", err)
+			logger.Execution().Infof("Error closing file: %v", err)
 		}
 
-		errChan <- errors.WithStack(sendJSONResults(ctx, conf, logger, client, results))
+		errChan <- errors.WithStack(sendJSONResults(ctx, conf, logger, comm, results))
 	}()
 
 	select {
 	case err := <-errChan:
 		return errors.WithStack(err)
 	case <-ctx.Done():
-		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
-			" execution of attach results command")
+		logger.Execution().Info("Received signal to terminate execution of attach results command")
 		return nil
 	}
 }
@@ -110,11 +108,13 @@ func (c *AttachResultsCommand) Execute(ctx context.Context, client client.Commun
 // SendJSONResults is responsible for sending the
 // specified file to the API Server
 func sendJSONResults(ctx context.Context, conf *model.TaskConfig,
-	logger client.LoggerProducer, client client.Communicator,
+	logger client.LoggerProducer, comm client.Communicator,
 	results *task.TestResults) error {
 
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
+
 	for i, res := range results.Results {
-		if ctx.Err() {
+		if ctx.Err() != nil {
 			return errors.Errorf("operation canceled after uploading ")
 		}
 
@@ -127,7 +127,7 @@ func sendJSONResults(ctx context.Context, conf *model.TaskConfig,
 				Lines:         []string{res.LogRaw},
 			}
 
-			id, err := client.SendTestLog(ctx, testLogs)
+			id, err := comm.SendTestLog(ctx, td, testLogs)
 			if err != nil {
 				logger.Execution().Errorf("problem posting raw logs from results %s", err.Error())
 			} else {
@@ -142,7 +142,7 @@ func sendJSONResults(ctx context.Context, conf *model.TaskConfig,
 	}
 	logger.Execution().Info("attaching test results")
 
-	err := client.SendTaskResults(ctx, results)
+	err := comm.SendTaskResults(ctx, results)
 	if err != nil {
 		return errors.WithStack(err)
 	}

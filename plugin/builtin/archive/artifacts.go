@@ -44,7 +44,7 @@ func BuildArchive(ctx context.Context, tarWriter *tar.Writer, rootPath string, i
 			}
 
 			if ctx.Err() != nil {
-				return errors.New("archive creation operation canceled")
+				errChan <- errors.New("archive creation operation canceled")
 			}
 
 			var walk filepath.WalkFunc
@@ -90,7 +90,7 @@ func BuildArchive(ctx context.Context, tarWriter *tar.Writer, rootPath string, i
 	FileChanLoop:
 		for file := range inputChan {
 			if ctx.Err() != nil {
-				return errors.New("archive creation operation canceled")
+				return
 			}
 
 			var intarball string
@@ -183,7 +183,7 @@ func BuildArchive(ctx context.Context, tarWriter *tar.Writer, rootPath string, i
 	}(pathsToAdd)
 
 	select {
-	case ctx.Done():
+	case <-ctx.Done():
 		return numFilesArchived, errors.New("archive creation operation canceled")
 	case <-done:
 		return numFilesArchived, nil
@@ -202,7 +202,7 @@ func Extract(ctx context.Context, tarReader *tar.Reader, rootPath string) error 
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if ctx.Err() {
+		if ctx.Err() != nil {
 			return errors.New("extraction operation canceled")
 		}
 

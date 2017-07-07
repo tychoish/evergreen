@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,7 +65,7 @@ func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Commun
 		return err
 	}
 
-	logger := client.GetLoggerProducer(conf.Task.Id, conf.Task.Secret)
+	logger := client.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
 
 	gitCommands := []string{
 		fmt.Sprintf("set -o errexit"),
