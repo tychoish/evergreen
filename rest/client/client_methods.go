@@ -234,13 +234,14 @@ func (c *evergreenREST) SendTaskLogMessages(ctx context.Context, taskData TaskDa
 	return nil
 }
 
+// SendTaskResults posts a task's results, used by the attach results operations.
 func (c *evergreenREST) SendTaskResults(ctx context.Context, td TaskData, r *task.TestResults) error {
-	if results == nil || len(results.Results) == 0 {
+	if r == nil || len(r.Results) == 0 {
 		return nil
 	}
 
-	if _, err := c.retryPost(ctx, c.getTaskPathSuffix("results", taskData.ID), taskData.Secret, v1, &r); err != nil {
-		err = errors.Wrapf(err, "problem sending %s log messages for task %s", len(msgs), td.ID)
+	if _, err := c.retryPost(ctx, c.getTaskPathSuffix("results", td.ID), td.Secret, v1, r); err != nil {
+		err = errors.Wrapf(err, "problem adding %d results to task %s", len(r.Results), td.ID)
 		grip.Error(err)
 		return err
 	}
@@ -266,11 +267,14 @@ func (c *evergreenREST) GetTaskPatch(ctx context.Context, td TaskData) (*patch.P
 	return &patch, nil
 }
 
+// GetPatchFiles is used by the git.get_project plugin and fetches
+// patches from the database, used in patch builds.
 func (c *evergreenREST) GetPatchFile(ctx context.Context, td TaskData, patchFileID string) (string, error) {
 	resp, err := c.retryGet(ctx, c.getTaskPathSuffix("patch/patchfile", td.ID), td.Secret, v1)
 	if err != nil {
 		return "", errors.Wrapf(err, "could not get file %s for patch %ss", patchFileID, td.ID)
 	}
+	defer resp.Body.Close()
 
 	var result []byte
 	result, err = ioutil.ReadAll(resp.Body)
@@ -280,3 +284,67 @@ func (c *evergreenREST) GetPatchFile(ctx context.Context, td TaskData, patchFile
 
 	return string(result), nil
 }
+
+// SendTestLog is used by the attach plugin to add to the test_logs
+// collection for log data associated with a test.
+func (c *evergreenREST) SendTestLog(ctx context.Context, td TaskData, log *model.TestLog) (string, error) {
+	resp, err := c.retryPost(ctx, c.getTaskPathSuffix("test_logs", td.ID), td.Secret, v1, log)
+	if err != nil {
+		return "", errors.Wrapf(err, "problem sending task log for %s", td.ID)
+	}
+	defer resp.Body.Close()
+
+	var result []byte
+	result, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", errors.Wrapf(err, "problem log id after posting test log for %s", td.ID)
+	}
+
+	return string(result), nil
+}
+
+// func (c *evergreenREST) S3CopyOperation() {
+
+//	resp, err := pluginCom.TaskPostJSON(s3CopyAPIEndpoint, s3CopyReq)
+//	if resp != nil {
+//		defer resp.Body.Close()
+//	}
+
+//	if resp != nil && resp.StatusCode != http.StatusOK {
+//		body, _ := ioutil.ReadAll(resp.Body)
+//		err = errors.Errorf("S3 push copy failed (%v): %v", resp.StatusCode,
+//			string(body))
+//		if s3CopyFile.Optional {
+//			pluginLogger.LogExecution(slogger.ERROR,
+//				"ignoring optional file, which encountered error: %+v",
+//				err.Error())
+//			continue
+//		}
+
+//		return err
+//	}
+//	if err != nil {
+//		body, _ := ioutil.ReadAll(resp.Body)
+//		err = errors.Wrapf(err, "S3 push copy failed (%v): %v",
+//			resp.StatusCode, string(body))
+//		if s3CopyFile.Optional {
+//			pluginLogger.LogExecution(slogger.ERROR,
+//				"ignoring optional file, which encountered error: %+v",
+//				err.Error())
+//			continue
+//		}
+
+//		return err
+//	}
+
+//	err = scc.AttachTaskFiles(pluginLogger, pluginCom, s3CopyReq)
+//	if err != nil {
+//		body, readAllErr := ioutil.ReadAll(resp.Body)
+//		if readAllErr != nil {
+//			return errors.WithStack(err)
+//		}
+//		return errors.Wrapf(err, "Error: %v: %v",
+//			resp.StatusCode, string(body))
+//	}
+
+// }
