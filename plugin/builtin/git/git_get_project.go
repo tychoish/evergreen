@@ -53,7 +53,8 @@ func (c *GitGetProjectCommand) ParseParams(params map[string]interface{}) error 
 }
 
 // Execute gets the source code required by the project
-func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
+func (c *GitGetProjectCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	// expand the github parameters before running the task
 	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
@@ -64,8 +65,6 @@ func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Commun
 	if err != nil {
 		return err
 	}
-
-	logger := client.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
 
 	gitCommands := []string{
 		fmt.Sprintf("set -o errexit"),
@@ -97,7 +96,7 @@ func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Commun
 	errChan := make(chan error)
 	go func() {
 		logger.Execution().Info("Fetching source from git...")
-		errChan <- fetchSourceCmd.Run()
+		errChan <- fetchSourceCmd.Run(ctx)
 	}()
 
 	// wait until the command finishes or the stop channel is tripped
@@ -111,7 +110,7 @@ func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Commun
 		if fetchSourceCmd.Cmd != nil {
 			logger.Execution().Infof("Stopping process: %d", fetchSourceCmd.Cmd.Process.Pid)
 			if err := fetchSourceCmd.Stop(); err != nil {
-				logger.Execution().Error("Error occurred stopping process: %v", err)
+				logger.Execution().Errorf("Error occurred stopping process: %v", err)
 			}
 		}
 		return errors.New("Fetch command interrupted")
@@ -173,9 +172,8 @@ func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Commun
 			ScriptMode:       true,
 		}
 
-		ctx, cancel := context.WithCancel(context.TODO())
 		go func() {
-			errChan <- moduleFetchCmd.Run()
+			errChan <- moduleFetchCmd.Run(ctx)
 		}()
 
 		// wait until the command finishes or the stop channel is tripped
@@ -203,17 +201,17 @@ func (c *GitGetProjectCommand) Execute(ctx context.Context, client client.Commun
 
 	go func() {
 		logger.Execution().Info("Fetching patch.")
-		patch, err := client.GetTaskPatch(ctx, conf.Task.Id, conf.Task.Secret)
+		patch, err := comm.GetTaskPatch(ctx, client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
 		if err != nil {
 			logger.Execution().Errorf("Failed to get patch: %v", err)
 			errChan <- errors.Wrap(err, "Failed to get patch")
 		}
-		err = c.getPatchContents(ctx, client, logger, conf, patch)
+		err = c.getPatchContents(ctx, comm, logger, conf, patch)
 		if err != nil {
 			logger.Execution().Errorf("Failed to get patch contents: %v", err)
 			errChan <- errors.Wrap(err, "Failed to get patch contents")
 		}
-		err = c.applyPatch(ctx, conf, patch, logger)
+		err = c.applyPatch(ctx, logger, conf, patch)
 		if err != nil {
 			logger.Execution().Infof("Failed to apply patch: %v", err)
 			errChan <- errors.Wrap(err, "Failed to apply patch")

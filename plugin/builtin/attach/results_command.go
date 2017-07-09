@@ -63,12 +63,12 @@ func (c *AttachResultsCommand) expandAttachResultsParams(
 
 // Execute carries out the AttachResultsCommand command - this is required
 // to satisfy the 'Command' interface
-func (c *AttachResultsCommand) Execute(ctx context.Context, comm client.Communicator, conf *model.TaskConfig) error {
+func (c *AttachResultsCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
 	if err := c.expandAttachResultsParams(conf); err != nil {
 		return errors.WithStack(err)
 	}
-
-	logger := comm.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
 
 	errChan := make(chan error)
 	go func() {
@@ -142,7 +142,7 @@ func sendJSONResults(ctx context.Context, conf *model.TaskConfig,
 	}
 	logger.Execution().Info("attaching test results")
 
-	err := comm.SendTaskResults(ctx, results)
+	err := comm.SendTaskResults(ctx, client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}, results)
 	if err != nil {
 		return errors.WithStack(err)
 	}

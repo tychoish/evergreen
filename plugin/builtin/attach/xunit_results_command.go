@@ -74,7 +74,9 @@ func (c *AttachXUnitResultsCommand) expandParams(conf *model.TaskConfig) error {
 
 // Execute carries out the AttachResultsCommand command - this is required
 // to satisfy the 'Command' interface
-func (c *AttachXUnitResultsCommand) Execute(ctx context.Context, comm client.Communicator, conf *model.TaskConfig) error {
+func (c *AttachXUnitResultsCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
 	if err := c.expandParams(conf); err != nil {
 		return err
 	}
@@ -121,7 +123,7 @@ func (c *AttachXUnitResultsCommand) parseAndUploadResults(ctx context.Context, c
 	}
 
 	for _, reportFileLoc := range reportFilePaths {
-		if ctx.Err() {
+		if ctx.Err() != nil {
 			return errors.New("operation canceled")
 		}
 
@@ -156,7 +158,7 @@ func (c *AttachXUnitResultsCommand) parseAndUploadResults(ctx context.Context, c
 	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
 
 	for i, log := range logs {
-		if ctx.Err() {
+		if ctx.Err() != nil {
 			return errors.New("operation canceled")
 		}
 

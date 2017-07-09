@@ -52,7 +52,9 @@ func (c *TarGzUnpackCommand) validateParams() error {
 }
 
 // Implementation of Execute, to unpack the archive.
-func (c *TarGzUnpackCommand) Execute(ctx context.Context, comm client.Communicator, conf *model.TaskConfig) error {
+func (c *TarGzUnpackCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
 	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		return errors.Wrap(err, "error expanding params")
 	}
@@ -61,8 +63,6 @@ func (c *TarGzUnpackCommand) Execute(ctx context.Context, comm client.Communicat
 	go func() {
 		errChan <- c.UnpackArchive(ctx)
 	}()
-
-	logger := comm.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
 
 	select {
 	case err := <-errChan:

@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +12,7 @@ import (
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/subprocess"
 	"github.com/evergreen-ci/evergreen/util"
+	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -23,18 +23,20 @@ type GitApplyPatchCommand struct{}
 func (*GitApplyPatchCommand) Name() string                                    { return ApplyPatchCmdName }
 func (*GitApplyPatchCommand) Plugin() string                                  { return GitPluginName }
 func (*GitApplyPatchCommand) ParseParams(params map[string]interface{}) error { return nil }
-func (*GitApplyPatchCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
-	logger := client.GetLoggerProducer(conf.Task.Id, conf.Task.Secret)
+func (*GitApplyPatchCommand) Execute(ctx context.Context,
+	client client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
 	logger.Task().Warning("git.apply_patch is deprecated. Patches are applied in git.get_project.")
 	return nil
 }
 
 // getPatchContents() dereferences any patch files that are stored externally, fetching them from
 // the API server, and setting them into the patch object.
-func (c GitGetProjectCommand) getPatchContents(ctx context.Context, client client.Communicator,
-	logger client.LogProducer, conf *model.TaskConfig, patch *patch.Patch) error {
+func (c GitGetProjectCommand) getPatchContents(ctx context.Context, comm client.Communicator,
+	logger client.LoggerProducer, conf *model.TaskConfig, patch *patch.Patch) error {
 
-	for i, patchPart := range p.Patches {
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
+	for i, patchPart := range patch.Patches {
 		// If the patch isn't stored externally, no need to do anything.
 		if patchPart.PatchSet.PatchFileId == "" {
 			continue
@@ -47,12 +49,12 @@ func (c GitGetProjectCommand) getPatchContents(ctx context.Context, client clien
 		// otherwise, fetch the contents and load it into the patch object
 		logger.Execution().Infof("Fetching patch contents for %s", patchPart.PatchSet.PatchFileId)
 
-		result, err := client.GetPatchFile(ctx, conf.Task.Id, conf.Task.Secret, patchPart.PatchSet.PatchFileId)
+		result, err := comm.GetPatchFile(ctx, td, patchPart.PatchSet.PatchFileId)
 		if err != nil {
 			return errors.Wrapf(err, "problem getting patch file")
 		}
 
-		p.Patches[i].PatchSet.Patch = string(result)
+		patch.Patches[i].PatchSet.Patch = string(result)
 	}
 	return nil
 }
@@ -79,8 +81,8 @@ func GetPatchCommands(modulePatch patch.ModulePatch, dir, patchPath string) []st
 
 // applyPatch is used by the agent to copy patch data onto disk
 // and then call the necessary git commands to apply the patch file
-func (c *GitGetProjectCommand) applyPatch(ctx context.Context,
-	conf *model.TaskConfig, p *patch.Patch, logger client.LogProducer) error {
+func (c *GitGetProjectCommand) applyPatch(ctx context.Context, logger client.LoggerProducer,
+	conf *model.TaskConfig, p *patch.Patch) error {
 
 	// patch sets and contain multiple patches, some of them for modules
 	for _, patchPart := range p.Patches {
@@ -105,7 +107,7 @@ func (c *GitGetProjectCommand) applyPatch(ctx context.Context,
 
 			// skip the module if this build variant does not use it
 			if !util.SliceContains(conf.BuildVariant.Modules, module.Name) {
-				logger.Exeuction().Infof(
+				logger.Execution().Infof(
 					"Skipping patch for module %v: the current build variant does not use it",
 					module.Name)
 				continue
@@ -134,8 +136,8 @@ func (c *GitGetProjectCommand) applyPatch(ctx context.Context,
 		patchCmd := &subprocess.LocalCommand{
 			CmdString:        cmdsJoined,
 			WorkingDirectory: conf.WorkDir,
-			Stdout:           logger.TaskWriter(), // INFO
-			Stderr:           logger.TaskWriter(), // ERROR
+			Stdout:           logger.TaskWriter(level.Info),
+			Stderr:           logger.TaskWriter(level.Error),
 			ScriptMode:       true,
 		}
 

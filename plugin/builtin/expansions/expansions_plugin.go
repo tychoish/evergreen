@@ -122,8 +122,8 @@ func (c *UpdateCommand) ExecuteUpdates(ctx context.Context, conf *model.TaskConf
 }
 
 // Execute updates the expansions. Fulfills Command interface.
-func (c *UpdateCommand) Execute(ctx context.Context, comm client.Communicator, conf *model.TaskConfig) error {
-	logger := comm.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
+func (c *UpdateCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	err := c.ExecuteUpdates(ctx, conf)
 

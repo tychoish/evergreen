@@ -29,8 +29,9 @@ func (c *FetchVarsCommand) Plugin() string                                  { re
 func (c *FetchVarsCommand) ParseParams(params map[string]interface{}) error { return nil }
 
 // Execute fetches the expansions from the API server
-func (c *FetchVarsCommand) Execute(ctx context.Context, comm client.Communicator, conf *model.TaskConfig) error {
-	logger := comm.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
+func (c *FetchVarsCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
 	logger.Task().Error("Expansions.fetch deprecated")
 	return nil
 }

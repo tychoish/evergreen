@@ -2,13 +2,13 @@ package keyval
 
 import (
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/plugin"
-	"github.com/evergreen-ci/evergreen/util"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -61,41 +61,18 @@ func (incCmd *IncCommand) ParseParams(params map[string]interface{}) error {
 }
 
 // Execute fetches the expansions from the API server
-func (incCmd *IncCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, conf *model.TaskConfig,
-	stop chan bool) error {
+func (incCmd *IncCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	if err := plugin.ExpandValues(incCmd, conf.Expansions); err != nil {
 		return err
 	}
 
-	keyVal := &model.KeyVal{}
-	postFunc := func() error {
-		resp, err := pluginCom.TaskPostJSON(IncRoute, incCmd.Key)
-		if resp != nil {
-			defer resp.Body.Close()
-		}
-		if err != nil {
-			return util.RetriableError{err}
-		}
-		if resp.StatusCode != http.StatusOK {
-			return util.RetriableError{
-				fmt.Errorf("unexpected status code: %v", resp.StatusCode),
-			}
-		}
-		err = util.ReadJSONInto(resp.Body, keyVal)
-		if err != nil {
-			return fmt.Errorf("failed to read JSON reply: %v", err)
-		}
-		return nil
-	}
-
-	retryFail, err := util.Retry(postFunc, 10, 1*time.Second)
-	if retryFail {
-		return fmt.Errorf("incrementing value failed after %v tries: %v", 10, err)
-	}
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
+	keyVal := model.KeyVal{}
+	err := comm.IncrementKey(ctx, td, &keyVal) //.TaskPostJSON(IncRoute, incCmd.Key)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "problem incriminating key %s", incCmd.Key)
 	}
 
 	conf.Expansions.Put(incCmd.Destination, fmt.Sprintf("%d", keyVal.Value))

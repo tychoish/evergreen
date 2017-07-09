@@ -1,7 +1,6 @@
 package gotest
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,8 +12,8 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // ParseFilesCommand is a struct implementing plugin.Command. It is used to parse a file or
@@ -50,12 +49,12 @@ func (c *ParseFilesCommand) ParseParams(params map[string]interface{}) error {
 
 // Execute parses the specified output files and sends the test results found in them
 // back to the server.
-func (c *ParseFilesCommand) Execute(ctx context.Context, client client.Communicator, conf *model.TaskConfig) error {
-	logger := client.GetLoggerProducer(conf.Task.Id, conf.Task.Secret)
+func (c *ParseFilesCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		err = errors.Wrap(err, "error expanding params")
-		logger.Task().Error("Error parsing gotest files: %+v", err)
+		logger.Task().Errorf("Error parsing gotest files: %+v", err)
 		return err
 	}
 
@@ -81,8 +80,9 @@ func (c *ParseFilesCommand) Execute(ctx context.Context, client client.Communica
 		return errors.Wrap(err, "error parsing output results")
 	}
 
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
 	// ship all of the test logs off to the server
-	pluginLogger.LogTask(slogger.INFO, "Sending test logs to server...")
+	logger.Task().Info("Sending test logs to server...")
 	allResults := []*TestResult{}
 	for idx, log := range logs {
 		if ctx.Err() != nil {
@@ -91,7 +91,7 @@ func (c *ParseFilesCommand) Execute(ctx context.Context, client client.Communica
 
 		var logId string
 
-		logId, err = client.SendTestLog(ctx, conf.Task.Id, conf.Task.Secret&log)
+		logId, err = comm.SendTestLog(ctx, td, &log)
 		if err != nil {
 			// continue on error to let the other logs be posted
 			logger.Task().Errorf("problem posting log: %v", err)
@@ -111,9 +111,9 @@ func (c *ParseFilesCommand) Execute(ctx context.Context, client client.Communica
 	resultsAsModel := ToModelTestResults(conf.Task, allResults)
 
 	// ship the parsed results off to the server
-	logger.Task().Task("Sending parsed results to server...")
+	logger.Task().Info("Sending parsed results to server...")
 
-	if err := cleint.SendTaskResults(ctx, conf.Task.Id, conf.Task.Secret, &resultsAsModel); err != nil {
+	if err := comm.SendTaskResults(ctx, td, &resultsAsModel); err != nil {
 		return errors.Wrap(err, "error posting parsed results to server")
 	}
 	logger.Task().Info("Successfully sent parsed results to server")
@@ -153,7 +153,7 @@ func (c *ParseFilesCommand) AllOutputFiles() ([]string, error) {
 
 // ParseTestOutputFiles parses all of the files that are passed in, and returns the
 // test logs and test results found within.
-func ParseTestOutputFiles(ctx context.Context, logger client.Communicator,
+func ParseTestOutputFiles(ctx context.Context, logger client.LoggerProducer,
 	conf *model.TaskConfig, outputFiles []string) ([]model.TestLog, [][]*TestResult, error) {
 
 	var results [][]*TestResult
@@ -184,7 +184,7 @@ func ParseTestOutputFiles(ctx context.Context, logger client.Communicator,
 		parser := &VanillaParser{Suite: suiteName}
 		if err := parser.Parse(fileReader); err != nil {
 			// continue on error
-			logger.Task().Error("Error parsing file '%s': %v", outputFile, err)
+			logger.Task().Errorf("Error parsing file '%s': %v", outputFile, err)
 			continue
 		}
 
