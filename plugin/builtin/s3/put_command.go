@@ -315,7 +315,7 @@ func (s3pc *S3PutCommand) AttachTaskFiles(comm client.Communicator,
 		Visibility: s3pc.Visibility,
 	}
 
-	err := comm.PostTaskFiles([]*artifact.File{file})
+	err := comm.AttachFiles([]*artifact.File{file})
 	if err != nil {
 		return errors.Wrap(err, "Attach files failed")
 	}

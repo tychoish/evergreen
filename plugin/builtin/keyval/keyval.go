@@ -69,7 +69,7 @@ func (incCmd *IncCommand) Execute(ctx context.Context,
 	}
 
 	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
-	keyVal := model.KeyVal{}
+	keyVal := model.KeyVal{Key: incCmd.Key}
 	err := comm.IncrementKey(ctx, td, &keyVal) //.TaskPostJSON(IncRoute, incCmd.Key)
 	if err != nil {
 		return errors.Wrapf(err, "problem incriminating key %s", incCmd.Key)
