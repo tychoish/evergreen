@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 var (

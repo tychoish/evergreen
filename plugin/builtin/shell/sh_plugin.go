@@ -2,15 +2,19 @@ package shell
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/subprocess"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
+	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 func init() {
@@ -61,33 +65,24 @@ func (cc *TrackCommand) ParseParams(params map[string]interface{}) error {
 }
 
 // Execute starts the shell with its given parameters.
-func (cc *TrackCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
-	pluginLogger.LogExecution(slogger.WARN,
-		"WARNING: shell.track is deprecated. Process tracking is now enabled by default.")
+func (cc *TrackCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
+	logger.Execution().Warning("shell.track is deprecated. Process tracking is now enabled by default.")
 	return nil
 }
 
 type CleanupCommand struct{}
 
-func (cc *CleanupCommand) Name() string {
-	return CleanupCmd
-}
-
-func (cc *CleanupCommand) Plugin() string {
-	return ShellPluginName
-}
-
-// ParseParams reads in the command's parameters.
-func (cc *CleanupCommand) ParseParams(params map[string]interface{}) error {
-	return nil
-}
+func (cc *CleanupCommand) Name() string                                    { return CleanupCmd }
+func (cc *CleanupCommand) Plugin() string                                  { return ShellPluginName }
+func (cc *CleanupCommand) ParseParams(params map[string]interface{}) error { return nil }
 
 // Execute starts the shell with its given parameters.
-func (cc *CleanupCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
-	pluginLogger.LogExecution(slogger.WARN,
-		"WARNING: shell.cleanup is deprecated. Process cleanup is now enabled by default.")
+func (cc *CleanupCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
+	logger.Execution().Warning("shell.cleanup is deprecated. Process cleanup is now enabled by default.")
 	return nil
 }
 
@@ -124,13 +119,8 @@ type ShellExecCommand struct {
 	ContinueOnError bool `mapstructure:"continue_on_err"`
 }
 
-func (_ *ShellExecCommand) Name() string {
-	return ShellExecCmd
-}
-
-func (_ *ShellExecCommand) Plugin() string {
-	return ShellPluginName
-}
+func (_ *ShellExecCommand) Name() string   { return ShellExecCmd }
+func (_ *ShellExecCommand) Plugin() string { return ShellPluginName }
 
 // ParseParams reads in the command's parameters.
 func (sec *ShellExecCommand) ParseParams(params map[string]interface{}) error {
@@ -142,17 +132,20 @@ func (sec *ShellExecCommand) ParseParams(params map[string]interface{}) error {
 }
 
 // Execute starts the shell with its given parameters.
-func (sec *ShellExecCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	conf *model.TaskConfig,
-	stop chan bool) error {
-	pluginLogger.LogExecution(slogger.DEBUG, "Preparing script...")
+func (sec *ShellExecCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
-	logWriterInfo := pluginLogger.GetTaskLogWriter(slogger.INFO)
-	logWriterErr := pluginLogger.GetTaskLogWriter(slogger.ERROR)
+	logger.Execution().Debug("Preparing script...")
+
+	var logWriterInfo io.Writer
+	var logWriterErr io.Writer
+
 	if sec.SystemLog {
-		logWriterInfo = pluginLogger.GetSystemLogWriter(slogger.INFO)
-		logWriterErr = pluginLogger.GetSystemLogWriter(slogger.ERROR)
+		logWriterInfo = logger.SystemWriter(level.Info)
+		logWriterErr = logger.SystemWriter(level.Error)
+	} else {
+		logWriterInfo = logger.TaskWriter(level.Info)
+		logWriterErr = logger.TaskWriter(level.Error)
 	}
 
 	localCmd := &subprocess.LocalCommand{
@@ -176,11 +169,12 @@ func (sec *ShellExecCommand) Execute(pluginLogger plugin.Logger,
 	if err != nil {
 		return errors.Wrap(err, "Failed to apply expansions")
 	}
+
 	if sec.Silent {
-		pluginLogger.LogExecution(slogger.INFO, "Executing script with %s (source hidden)...",
+		logger.Execution().Infof("Executing script with %s (source hidden)...",
 			localCmd.Shell)
 	} else {
-		pluginLogger.LogExecution(slogger.INFO, "Executing script with %s: %v",
+		logger.Execution().Infof("Executing script with %s: %v",
 			localCmd.Shell, localCmd.CmdString)
 	}
 
@@ -188,55 +182,63 @@ func (sec *ShellExecCommand) Execute(pluginLogger plugin.Logger,
 	go func() {
 		var err error
 		env := os.Environ()
-		env = append(env, fmt.Sprintf("EVR_TASK_ID=%v", conf.Task.Id))
-		env = append(env, fmt.Sprintf("EVR_AGENT_PID=%v", os.Getpid()))
+		env = append(env, fmt.Sprintf("EVR_TASK_ID=%v", conf.Task.Id), fmt.Sprintf("EVR_AGENT_PID=%v", os.Getpid()))
 		localCmd.Environment = env
 		err = localCmd.Start()
-		if err == nil {
-			pluginLogger.LogSystem(slogger.DEBUG, "spawned shell process with pid %v", localCmd.Cmd.Process.Pid)
+
+		if err != nil {
+			logger.System().Debugf("error spawning shell process: %v", err)
+		} else {
+			logger.System().Debugf("spawned shell process with pid %d", localCmd.Cmd.Process.Pid)
 
 			// Call the platform's process-tracking function. On some OSes this will be a noop,
 			// on others this may need to do some additional work to track the process so that
 			// it can be cleaned up later.
-			trackProcess(conf.Task.Id, localCmd.Cmd.Process.Pid, pluginLogger)
+			trackProcess(conf.Task.Id, localCmd.Cmd.Process.Pid, logger)
 
-			if !sec.Background {
-				err = localCmd.Cmd.Wait()
+			if sec.Background {
+				logger.Execution().Debug("running command in the background")
+				close(doneStatus)
+			} else {
+				select {
+				case doneStatus <- localCmd.Cmd.Wait():
+					logger.System().Debugf("shell process %d completed", localCmd.Cmd.Process.Pid)
+				case <-ctx.Done():
+					doneStatus <- localCmd.Stop()
+					logger.System().Infof("shell process %d terminated", localCmd.Cmd.Process.Pid)
+				}
 			}
-		} else {
-			pluginLogger.LogSystem(slogger.DEBUG, "error spawning shell process: %v", err)
 		}
-		doneStatus <- err
 	}()
 
-	defer pluginLogger.Flush()
 	select {
 	case err = <-doneStatus:
 		if err != nil {
 			if sec.ContinueOnError {
-				pluginLogger.LogExecution(slogger.INFO, "(ignoring) Script finished with error: %v", err)
+				logger.Execution().Infof("(ignoring) Script finished with error: %v", err)
 				return nil
-			} else {
-				pluginLogger.LogExecution(slogger.INFO, "Script finished with error: %v", err)
-				return err
 			}
-		} else {
-			pluginLogger.LogExecution(slogger.INFO, "Script execution complete.")
+
+			err = errors.Wrap(err, "script finished with error")
+			logger.Execution().Info(err)
+			return err
 		}
-	case <-stop:
-		pluginLogger.LogExecution(slogger.INFO, "Got kill signal")
+
+		logger.Execution().Info("Script execution complete.")
+	case <-ctx.Done():
+		logger.Execution().Info("Got kill signal")
 
 		// need to check command has started
 		if localCmd.Cmd != nil {
-			pluginLogger.LogExecution(slogger.INFO, "Stopping process: %v", localCmd.Cmd.Process.Pid)
+			logger.Execution().Infof("Stopping process: %d", localCmd.Cmd.Process.Pid)
 
 			// try and stop the process
 			if err := localCmd.Stop(); err != nil {
-				pluginLogger.LogExecution(slogger.ERROR, "Error occurred stopping process: %v", err)
+				logger.Execution().Error(errors.Wrap(err, "error while stopping process"))
 			}
 		}
 
-		return errors.New("Shell command interrupted.")
+		return errors.New("shell command interrupted")
 	}
 
 	return nil
@@ -258,8 +260,8 @@ func envHasMarkers(env []string, pidMarker, taskMarker string) bool {
 }
 
 // KillSpawnedProcs cleans up any tasks that were spawned by the given task.
-func KillSpawnedProcs(taskId string, pluginLogger plugin.Logger) error {
+func KillSpawnedProcs(taskId string, logger grip.Journaler) error {
 	// Clean up all shell processes spawned during the execution of this task by this agent,
 	// by calling the platform-specific "cleanup" function
-	return cleanup(taskId, pluginLogger)
+	return cleanup(taskId, logger)
 }

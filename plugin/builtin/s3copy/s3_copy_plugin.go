@@ -1,7 +1,6 @@
 package s3copy
 
 import (
-	"context"
 	"path/filepath"
 
 	"github.com/evergreen-ci/evergreen/apimodels"
@@ -12,6 +11,7 @@ import (
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 func init() {
