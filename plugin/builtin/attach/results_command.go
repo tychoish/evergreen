@@ -6,11 +6,11 @@ import (
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
-	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // AttachResultsCommand is used to attach MCI test results in json
@@ -21,40 +21,40 @@ type AttachResultsCommand struct {
 	FileLoc string `mapstructure:"file_location" plugin:"expand"`
 }
 
-func (self *AttachResultsCommand) Name() string {
+func (c *AttachResultsCommand) Name() string {
 	return AttachResultsCmd
 }
 
-func (self *AttachResultsCommand) Plugin() string {
+func (c *AttachResultsCommand) Plugin() string {
 	return AttachPluginName
 }
 
 // ParseParams decodes the S3 push command parameters that are
 // specified as part of an AttachPlugin command; this is required
 // to satisfy the 'Command' interface
-func (self *AttachResultsCommand) ParseParams(params map[string]interface{}) error {
-	if err := mapstructure.Decode(params, self); err != nil {
-		return errors.Wrapf(err, "error decoding '%v' params", self.Name())
+func (c *AttachResultsCommand) ParseParams(params map[string]interface{}) error {
+	if err := mapstructure.Decode(params, c); err != nil {
+		return errors.Wrapf(err, "error decoding '%v' params", c.Name())
 	}
 
-	if err := self.validateAttachResultsParams(); err != nil {
-		return errors.Wrapf(err, "error validating '%v' params", self.Name())
+	if err := c.validateAttachResultsParams(); err != nil {
+		return errors.Wrapf(err, "error validating '%v' params", c.Name())
 	}
 	return nil
 }
 
 // validateAttachResultsParams is a helper function that ensures all
 // the fields necessary for attaching a results are present
-func (self *AttachResultsCommand) validateAttachResultsParams() (err error) {
-	if self.FileLoc == "" {
+func (c *AttachResultsCommand) validateAttachResultsParams() (err error) {
+	if c.FileLoc == "" {
 		return errors.New("file_location cannot be blank")
 	}
 	return nil
 }
 
-func (self *AttachResultsCommand) expandAttachResultsParams(
+func (c *AttachResultsCommand) expandAttachResultsParams(
 	taskConfig *model.TaskConfig) (err error) {
-	self.FileLoc, err = taskConfig.Expansions.ExpandString(self.FileLoc)
+	c.FileLoc, err = taskConfig.Expansions.ExpandString(c.FileLoc)
 	if err != nil {
 		return errors.Wrap(err, "error expanding file_location")
 	}
@@ -63,20 +63,18 @@ func (self *AttachResultsCommand) expandAttachResultsParams(
 
 // Execute carries out the AttachResultsCommand command - this is required
 // to satisfy the 'Command' interface
-func (self *AttachResultsCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	taskConfig *model.TaskConfig,
-	stop chan bool) error {
+func (c *AttachResultsCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
-	if err := self.expandAttachResultsParams(taskConfig); err != nil {
+	if err := c.expandAttachResultsParams(conf); err != nil {
 		return errors.WithStack(err)
 	}
 
 	errChan := make(chan error)
 	go func() {
-		reportFileLoc := self.FileLoc
-		if !filepath.IsAbs(self.FileLoc) {
-			reportFileLoc = filepath.Join(taskConfig.WorkDir, self.FileLoc)
+		reportFileLoc := c.FileLoc
+		if !filepath.IsAbs(c.FileLoc) {
+			reportFileLoc = filepath.Join(conf.WorkDir, c.FileLoc)
 		}
 
 		// attempt to open the file
@@ -92,40 +90,46 @@ func (self *AttachResultsCommand) Execute(pluginLogger plugin.Logger,
 			return
 		}
 		if err := reportFile.Close(); err != nil {
-			pluginLogger.LogExecution(slogger.INFO, "Error closing file: %v", err)
+			logger.Execution().Infof("Error closing file: %v", err)
 		}
-		errChan <- errors.WithStack(SendJSONResults(taskConfig, pluginLogger, pluginCom, results))
+
+		errChan <- errors.WithStack(sendJSONResults(ctx, conf, logger, comm, results))
 	}()
 
 	select {
 	case err := <-errChan:
 		return errors.WithStack(err)
-	case <-stop:
-		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
-			" execution of attach results command")
+	case <-ctx.Done():
+		logger.Execution().Info("Received signal to terminate execution of attach results command")
 		return nil
 	}
 }
 
 // SendJSONResults is responsible for sending the
 // specified file to the API Server
-func SendJSONResults(taskConfig *model.TaskConfig,
-	pluginLogger plugin.Logger, pluginCom plugin.PluginCommunicator,
+func sendJSONResults(ctx context.Context, conf *model.TaskConfig,
+	logger client.LoggerProducer, comm client.Communicator,
 	results *task.TestResults) error {
+
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
+
 	for i, res := range results.Results {
+		if ctx.Err() != nil {
+			return errors.Errorf("operation canceled after uploading ")
+		}
 
 		if res.LogRaw != "" {
-			pluginLogger.LogExecution(slogger.INFO, "Attaching raw test logs")
+			logger.Execution().Info("Attaching raw test logs")
 			testLogs := &model.TestLog{
 				Name:          res.TestFile,
-				Task:          taskConfig.Task.Id,
-				TaskExecution: taskConfig.Task.Execution,
+				Task:          conf.Task.Id,
+				TaskExecution: conf.Task.Execution,
 				Lines:         []string{res.LogRaw},
 			}
 
-			id, err := pluginCom.TaskPostTestLog(testLogs)
+			id, err := comm.SendTestLog(ctx, td, testLogs)
 			if err != nil {
-				pluginLogger.LogExecution(slogger.ERROR, "Error posting raw logs from results: %v", err)
+				logger.Execution().Errorf("problem posting raw logs from results %s", err.Error())
 			} else {
 				results.Results[i].LogId = id
 			}
@@ -134,16 +138,16 @@ func SendJSONResults(taskConfig *model.TaskConfig,
 			// being saved in the test_logs collection, we can clear them to prevent them from being saved in the task
 			// collection.
 			results.Results[i].LogRaw = ""
-
 		}
 	}
+	logger.Execution().Info("attaching test results")
 
-	pluginLogger.LogExecution(slogger.INFO, "Attaching test results")
-	err := pluginCom.TaskPostResults(results)
+	err := comm.SendTaskResults(ctx, client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}, results)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	pluginLogger.LogTask(slogger.INFO, "Attach test results succeeded")
+	logger.Task().Info("Attach test results succeeded")
+
 	return nil
 }

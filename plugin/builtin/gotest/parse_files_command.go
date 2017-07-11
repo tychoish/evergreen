@@ -10,9 +10,10 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // ParseFilesCommand is a struct implementing plugin.Command. It is used to parse a file or
@@ -24,22 +25,22 @@ type ParseFilesCommand struct {
 }
 
 // Name returns the string name for the parse files command.
-func (pfCmd *ParseFilesCommand) Name() string {
+func (c *ParseFilesCommand) Name() string {
 	return ParseFilesCommandName
 }
 
-func (pfCmd *ParseFilesCommand) Plugin() string {
+func (c *ParseFilesCommand) Plugin() string {
 	return GotestPluginName
 }
 
 // ParseParams reads the specified map of parameters into the ParseFilesCommand struct, and
 // validates that at least one file pattern is specified.
-func (pfCmd *ParseFilesCommand) ParseParams(params map[string]interface{}) error {
-	if err := mapstructure.Decode(params, pfCmd); err != nil {
-		return errors.Wrapf(err, "error decoding '%v' params", pfCmd.Name())
+func (c *ParseFilesCommand) ParseParams(params map[string]interface{}) error {
+	if err := mapstructure.Decode(params, c); err != nil {
+		return errors.Wrapf(err, "error decoding '%s' params", c.Name())
 	}
 
-	if len(pfCmd.Files) == 0 {
+	if len(c.Files) == 0 {
 		return errors.Errorf("error validating params: must specify at least one "+
 			"file pattern to parse: '%+v'", params)
 	}
@@ -48,23 +49,22 @@ func (pfCmd *ParseFilesCommand) ParseParams(params map[string]interface{}) error
 
 // Execute parses the specified output files and sends the test results found in them
 // back to the server.
-func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, taskConfig *model.TaskConfig,
-	stop chan bool) error {
+func (c *ParseFilesCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
-	if err := plugin.ExpandValues(pfCmd, taskConfig.Expansions); err != nil {
+	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		err = errors.Wrap(err, "error expanding params")
-		pluginLogger.LogTask(slogger.ERROR, "Error parsing gotest files: %+v", err)
+		logger.Task().Errorf("Error parsing gotest files: %+v", err)
 		return err
 	}
 
 	// make sure the file patterns are relative to the task's working directory
-	for idx, file := range pfCmd.Files {
-		pfCmd.Files[idx] = filepath.Join(taskConfig.WorkDir, file)
+	for idx, file := range c.Files {
+		c.Files[idx] = filepath.Join(conf.WorkDir, file)
 	}
 
 	// will be all files containing test results
-	outputFiles, err := pfCmd.AllOutputFiles()
+	outputFiles, err := c.AllOutputFiles()
 	if err != nil {
 		return errors.Wrap(err, "error obtaining names of output files")
 	}
@@ -75,20 +75,26 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 	}
 
 	// parse all of the files
-	logs, results, err := ParseTestOutputFiles(outputFiles, stop, pluginLogger, taskConfig)
+	logs, results, err := ParseTestOutputFiles(ctx, logger, conf, outputFiles)
 	if err != nil {
 		return errors.Wrap(err, "error parsing output results")
 	}
 
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
 	// ship all of the test logs off to the server
-	pluginLogger.LogTask(slogger.INFO, "Sending test logs to server...")
+	logger.Task().Info("Sending test logs to server...")
 	allResults := []*TestResult{}
 	for idx, log := range logs {
+		if ctx.Err() != nil {
+			return errors.New("operation canceled")
+		}
+
 		var logId string
 
-		if logId, err = pluginCom.TaskPostTestLog(&log); err != nil {
+		logId, err = comm.SendTestLog(ctx, td, &log)
+		if err != nil {
 			// continue on error to let the other logs be posted
-			pluginLogger.LogTask(slogger.ERROR, "Error posting log: %v", err)
+			logger.Task().Errorf("problem posting log: %v", err)
 		}
 
 		// add all of the test results that correspond to that log to the
@@ -99,17 +105,18 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 		}
 
 	}
-	pluginLogger.LogTask(slogger.INFO, "Finished posting logs to server")
+	logger.Task().Info("Finished posting logs to server")
 
 	// convert everything
-	resultsAsModel := ToModelTestResults(taskConfig.Task, allResults)
+	resultsAsModel := ToModelTestResults(conf.Task, allResults)
 
 	// ship the parsed results off to the server
-	pluginLogger.LogTask(slogger.INFO, "Sending parsed results to server...")
-	if err := pluginCom.TaskPostResults(&resultsAsModel); err != nil {
+	logger.Task().Info("Sending parsed results to server...")
+
+	if err := comm.SendTaskResults(ctx, td, &resultsAsModel); err != nil {
 		return errors.Wrap(err, "error posting parsed results to server")
 	}
-	pluginLogger.LogTask(slogger.INFO, "Successfully sent parsed results to server")
+	logger.Task().Info("Successfully sent parsed results to server")
 
 	return nil
 
@@ -117,12 +124,12 @@ func (pfCmd *ParseFilesCommand) Execute(pluginLogger plugin.Logger,
 
 // AllOutputFiles creates a list of all test output files that will be parsed, by expanding
 // all of the file patterns specified to the command.
-func (pfCmd *ParseFilesCommand) AllOutputFiles() ([]string, error) {
+func (c *ParseFilesCommand) AllOutputFiles() ([]string, error) {
 
 	outputFiles := []string{}
 
 	// walk through all specified file patterns
-	for _, pattern := range pfCmd.Files {
+	for _, pattern := range c.Files {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
 			return nil, errors.Wrap(err, "error expanding file patterns")
@@ -146,21 +153,16 @@ func (pfCmd *ParseFilesCommand) AllOutputFiles() ([]string, error) {
 
 // ParseTestOutputFiles parses all of the files that are passed in, and returns the
 // test logs and test results found within.
-func ParseTestOutputFiles(outputFiles []string, stop chan bool,
-	pluginLogger plugin.Logger, taskConfig *model.TaskConfig) ([]model.TestLog,
-	[][]*TestResult, error) {
+func ParseTestOutputFiles(ctx context.Context, logger client.LoggerProducer,
+	conf *model.TaskConfig, outputFiles []string) ([]model.TestLog, [][]*TestResult, error) {
 
 	var results [][]*TestResult
 	var logs []model.TestLog
 
 	// now, open all the files, and parse the test results
 	for _, outputFile := range outputFiles {
-		// kill the execution if API server requests
-		select {
-		case <-stop:
+		if ctx.Err() != nil {
 			return nil, nil, errors.New("command was stopped")
-		default:
-			// no stop signal
 		}
 
 		// assume that the name of the file, stripping off the ".suite" extension if present,
@@ -172,7 +174,7 @@ func ParseTestOutputFiles(outputFiles []string, stop chan bool,
 		fileReader, err := os.Open(outputFile)
 		if err != nil {
 			// don't bomb out on a single bad file
-			pluginLogger.LogTask(slogger.ERROR, "Unable to open file '%v' for parsing: %v",
+			logger.Task().Errorf("Unable to open file '%s' for parsing: %v",
 				outputFile, err)
 			continue
 		}
@@ -182,8 +184,7 @@ func ParseTestOutputFiles(outputFiles []string, stop chan bool,
 		parser := &VanillaParser{Suite: suiteName}
 		if err := parser.Parse(fileReader); err != nil {
 			// continue on error
-			pluginLogger.LogTask(slogger.ERROR, "Error parsing file '%v': %v",
-				outputFile, err)
+			logger.Task().Errorf("Error parsing file '%s': %v", outputFile, err)
 			continue
 		}
 
@@ -191,8 +192,8 @@ func ParseTestOutputFiles(outputFiles []string, stop chan bool,
 		logLines := parser.Logs()
 		testLog := model.TestLog{
 			Name:          suiteName,
-			Task:          taskConfig.Task.Id,
-			TaskExecution: taskConfig.Task.Execution,
+			Task:          conf.Task.Id,
+			TaskExecution: conf.Task.Execution,
 			Lines:         logLines,
 		}
 		// save the results

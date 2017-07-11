@@ -399,3 +399,19 @@ func (c *MockEvergreenREST) SetAPIUser(apiUser string) {
 func (c *MockEvergreenREST) SetAPIKey(apiKey string) {
 	c.apiKey = apiKey
 }
+
+func (c *MockEvergreenREST) GetPatchFile(ctx context.Context, _ TaskData, _ string) (string, error) {
+	return "", nil
+}
+
+func (c *MockEvergreenREST) GetTaskPatch(ctx context.Context, td TaskData) (*patch.Patch, error) {
+	return nil, nil
+}
+
+func (c *MockEvergreenREST) SendTaskResults(ctx context.Context, td TaskData, r *task.TestResults) error {
+	return nil
+}
+
+func (c *MockEvergreenREST) SendTestLog(ctx context.Context, td TaskData, log *model.TestLog) (string, error) {
+	return "", nil
+}

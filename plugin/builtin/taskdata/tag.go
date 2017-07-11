@@ -56,23 +56,6 @@ func uiHandleTaskTag(w http.ResponseWriter, r *http.Request) {
 	plugin.WriteJSON(w, http.StatusOK, "")
 }
 
-func apiGetTagsForTask(w http.ResponseWriter, r *http.Request) {
-	t := plugin.GetTask(r)
-	if t == nil {
-		http.Error(w, "task not found", http.StatusNotFound)
-		return
-	}
-
-	taskName := mux.Vars(r)["task_name"]
-	name := mux.Vars(r)["name"]
-	tagged, err := model.GetTaskJSONTagsForTask(t.Project, t.BuildVariant, taskName, name)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	plugin.WriteJSON(w, http.StatusOK, tagged)
-}
-
 func uiGetTaskJSONByTag(w http.ResponseWriter, r *http.Request) {
 	projectId := mux.Vars(r)["project_id"]
 	tag := mux.Vars(r)["tag"]

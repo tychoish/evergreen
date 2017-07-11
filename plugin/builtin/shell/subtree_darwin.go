@@ -7,16 +7,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/evergreen-ci/evergreen/plugin"
-	"github.com/mongodb/grip/slogger"
+	"github.com/mongodb/grip"
+	"github.com/pkg/errors"
 )
 
-func trackProcess(key string, pid int, log plugin.Logger) {
+func trackProcess(key string, pid int, logger grip.Journaler) {
 	// trackProcess is a noop on OSX, because we detect all the processes to be killed in
 	// cleanup() and we don't need to do any special bookkeeping up-front.
 }
 
-func cleanup(key string, log plugin.Logger) error {
+func cleanup(key string, logger grip.Journaler) error {
 	/*
 		Usage of ps on OSX for extracting environment variables:
 		-E: print the environment of the process (VAR1=FOO VAR2=BAR ...)
@@ -30,8 +30,9 @@ func cleanup(key string, log plugin.Logger) error {
 
 	out, err := exec.Command("ps", "-E", "-e", "-o", "pid,command").CombinedOutput()
 	if err != nil {
-		log.LogSystem(slogger.ERROR, "cleanup failed to get output of 'ps': %v", err)
-		return err
+		m := "cleanup failed to get output of 'ps'"
+		logger.Errorf("%s: %v", m, err)
+		return errors.Wrap(err, m)
 	}
 	myPid := fmt.Sprintf("%v", os.Getpid())
 
@@ -53,7 +54,7 @@ func cleanup(key string, log plugin.Logger) error {
 			// add it to the list of processes to clean up
 			pidAsInt, err := strconv.Atoi(pid)
 			if err != nil {
-				log.LogSystem(slogger.ERROR, "Cleaup failed to convert from string to int: %v", err)
+				logger.Errorf("cleanup failed to convert from string to int: %v", err)
 				continue
 			}
 			pidsToKill = append(pidsToKill, pidAsInt)
@@ -66,9 +67,9 @@ func cleanup(key string, log plugin.Logger) error {
 		p.Pid = pid
 		err := p.Kill()
 		if err != nil {
-			log.LogSystem(slogger.ERROR, "Cleanup got error killing pid %v: %v", pid, err)
+			logger.Errorf("Cleanup got error killing pid %d: %v", pid, err)
 		} else {
-			log.LogSystem(slogger.INFO, "Cleanup killed pid %v", pid)
+			logger.Infof("Cleanup killed pid %d", pid)
 		}
 	}
 	return nil
