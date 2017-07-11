@@ -5,9 +5,10 @@ import (
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // Plugin command responsible for unpacking a tgz archive.
@@ -18,32 +19,32 @@ type TarGzUnpackCommand struct {
 	DestDir string `mapstructure:"dest_dir" plugin:"expand"`
 }
 
-func (self *TarGzUnpackCommand) Name() string {
+func (c *TarGzUnpackCommand) Name() string {
 	return TarGzUnpackCmdName
 }
 
-func (self *TarGzUnpackCommand) Plugin() string {
+func (c *TarGzUnpackCommand) Plugin() string {
 	return ArchivePluginName
 }
 
 // Implementation of ParseParams.
-func (self *TarGzUnpackCommand) ParseParams(params map[string]interface{}) error {
-	if err := mapstructure.Decode(params, self); err != nil {
-		return errors.Wrapf(err, "error parsing '%v' params", self.Name())
+func (c *TarGzUnpackCommand) ParseParams(params map[string]interface{}) error {
+	if err := mapstructure.Decode(params, c); err != nil {
+		return errors.Wrapf(err, "error parsing '%v' params", c.Name())
 	}
-	if err := self.validateParams(); err != nil {
-		return errors.Wrapf(err, "error validating '%v' params", self.Name())
+	if err := c.validateParams(); err != nil {
+		return errors.Wrapf(err, "error validating '%v' params", c.Name())
 	}
 	return nil
 }
 
 // Make sure both source and dest dir are speciifed.
-func (self *TarGzUnpackCommand) validateParams() error {
+func (c *TarGzUnpackCommand) validateParams() error {
 
-	if self.Source == "" {
+	if c.Source == "" {
 		return errors.New("source cannot be blank")
 	}
-	if self.DestDir == "" {
+	if c.DestDir == "" {
 		return errors.New("dest_dir cannot be blank")
 	}
 
@@ -51,45 +52,42 @@ func (self *TarGzUnpackCommand) validateParams() error {
 }
 
 // Implementation of Execute, to unpack the archive.
-func (self *TarGzUnpackCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	conf *model.TaskConfig,
-	stop chan bool) error {
+func (c *TarGzUnpackCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
-	if err := plugin.ExpandValues(self, conf.Expansions); err != nil {
+	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		return errors.Wrap(err, "error expanding params")
 	}
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- self.UnpackArchive()
+		errChan <- c.UnpackArchive(ctx)
 	}()
 
 	select {
 	case err := <-errChan:
-		return err
-	case <-stop:
-		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
-			" execution of targz unpack command")
+		return errors.WithStack(err)
+	case <-ctx.Done():
+		logger.Execution().Info("Received signal to terminate execution of targz unpack command")
 		return nil
 	}
 }
 
 // UnpackArchive unpacks the archive. The target archive to unpack is
 // set for the command during parameter parsing.
-func (self *TarGzUnpackCommand) UnpackArchive() error {
+func (c *TarGzUnpackCommand) UnpackArchive(ctx context.Context) error {
 
 	// get a reader for the source file
-	f, _, tarReader, err := TarGzReader(self.Source)
+	f, _, tarReader, err := TarGzReader(c.Source)
 	if err != nil {
-		return errors.Wrapf(err, "error opening tar file %v for reading", self.Source)
+		return errors.Wrapf(err, "error opening tar file %v for reading", c.Source)
 	}
 	defer f.Close()
 
 	// extract the actual tarball into the destination directory
-	if err := os.MkdirAll(self.DestDir, 0755); err != nil {
-		return errors.Wrapf(err, "error creating destination dir %v", self.DestDir)
+	if err := os.MkdirAll(c.DestDir, 0755); err != nil {
+		return errors.Wrapf(err, "error creating destination dir %v", c.DestDir)
 	}
 
-	return errors.WithStack(Extract(tarReader, self.DestDir))
+	return errors.WithStack(Extract(ctx, tarReader, c.DestDir))
 }

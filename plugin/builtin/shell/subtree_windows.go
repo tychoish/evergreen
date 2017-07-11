@@ -6,7 +6,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
 )
@@ -124,7 +124,7 @@ func (r *processRegistry) removeJob(taskId string) error {
 // job object, which can later be used by "cleanup" to terminate all members of the job object at
 // once. If a job object doesn't already exist, it will create one automatically, scoped by the
 // task ID for which the shell process was started.
-func trackProcess(taskId string, pid int, log plugin.Logger) error {
+func trackProcess(taskId string, pid int, logger grip.Journaler) error {
 	job, err := processMapping.getJob(taskId)
 	if err != nil {
 		log.LogSystem(slogger.ERROR, "failed creating job object: %v", err)
@@ -143,7 +143,7 @@ func trackProcess(taskId string, pid int, log plugin.Logger) error {
 // cleanup() has a windows-specific implementation which finds the job object associated with the
 // given task key, and if it exists, terminates it. This will guarantee that any shell processes
 // started throughout the task run are destroyed, as long as they were captured in trackProcess.
-func cleanup(key string, log plugin.Logger) error {
+func cleanup(key string, logger grip.Journaler) error {
 	job, err := processMapping.getJob(key)
 	if err != nil {
 		return nil

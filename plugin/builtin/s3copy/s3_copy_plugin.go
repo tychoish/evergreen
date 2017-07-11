@@ -1,18 +1,17 @@
 package s3copy
 
 import (
-	"io/ioutil"
-	"net/http"
 	"path/filepath"
 
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/artifact"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 func init() {
@@ -168,13 +167,11 @@ func (scc *S3CopyCommand) validateS3CopyParams() (err error) {
 
 // Execute carries out the S3CopyCommand command - this is required
 // to satisfy the 'Command' interface
-func (scc *S3CopyCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	taskConfig *model.TaskConfig,
-	stop chan bool) error {
+func (scc *S3CopyCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	// expand the S3 copy parameters before running the task
-	if err := plugin.ExpandValues(scc, taskConfig.Expansions); err != nil {
+	if err := plugin.ExpandValues(scc, conf.Expansions); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -185,15 +182,14 @@ func (scc *S3CopyCommand) Execute(pluginLogger plugin.Logger,
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- errors.WithStack(scc.S3Copy(taskConfig, pluginLogger, pluginCom))
+		errChan <- errors.WithStack(scc.S3Copy(ctx, comm, logger, conf))
 	}()
 
 	select {
 	case err := <-errChan:
-		return err
-	case <-stop:
-		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
-			" execution of S3 copy command")
+		return errors.WithStack(err)
+	case <-ctx.Done():
+		logger.Execution().Info("Received signal to terminate execution of S3 copy command")
 		return nil
 	}
 }
@@ -201,15 +197,22 @@ func (scc *S3CopyCommand) Execute(pluginLogger plugin.Logger,
 // S3Copy is responsible for carrying out the core of the S3CopyPlugin's
 // function - it makes an API calls to copy a given staged file to it's final
 // production destination
-func (scc *S3CopyCommand) S3Copy(taskConfig *model.TaskConfig,
-	pluginLogger plugin.Logger, pluginCom plugin.PluginCommunicator) error {
+func (scc *S3CopyCommand) S3Copy(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
+
 	for _, s3CopyFile := range scc.S3CopyFiles {
 		if len(s3CopyFile.BuildVariants) > 0 && !util.SliceContains(
-			s3CopyFile.BuildVariants, taskConfig.BuildVariant.Name) {
+			s3CopyFile.BuildVariants, conf.BuildVariant.Name) {
 			continue
 		}
 
-		pluginLogger.LogExecution(slogger.INFO, "Making API push copy call to "+
+		if ctx.Err() != nil {
+			return errors.New("s3copy operation received was canceled")
+		}
+
+		logger.Execution().Infof("Making API push copy call to "+
 			"transfer %v/%v => %v/%v", s3CopyFile.Source.Bucket,
 			s3CopyFile.Source.Path, s3CopyFile.Destination.Bucket,
 			s3CopyFile.Destination.Path)
@@ -223,46 +226,23 @@ func (scc *S3CopyCommand) S3Copy(taskConfig *model.TaskConfig,
 			S3DestinationPath:   s3CopyFile.Destination.Path,
 			S3DisplayName:       s3CopyFile.DisplayName,
 		}
-		resp, err := pluginCom.TaskPostJSON(s3CopyAPIEndpoint, s3CopyReq)
-		if resp != nil {
-			defer resp.Body.Close()
-		}
 
-		if resp != nil && resp.StatusCode != http.StatusOK {
-			body, _ := ioutil.ReadAll(resp.Body)
-			err = errors.Errorf("S3 push copy failed (%v): %v", resp.StatusCode,
-				string(body))
+		err := comm.S3CopyOperation(ctx, td, &s3CopyReq)
+		if err != nil {
+			err = errors.Wrap(err, "s3 push copy failed")
+			logger.Execution().Error(err)
+
 			if s3CopyFile.Optional {
-				pluginLogger.LogExecution(slogger.ERROR,
-					"ignoring optional file, which encountered error: %+v",
-					err.Error())
+				logger.Execution().Errorf("file '%s' is optional, continuing",
+					s3CopyFile.DisplayName)
 				continue
 			}
 
-			return err
 		}
-		if err != nil {
-			body, _ := ioutil.ReadAll(resp.Body)
-			err = errors.Wrapf(err, "S3 push copy failed (%v): %v",
-				resp.StatusCode, string(body))
-			if s3CopyFile.Optional {
-				pluginLogger.LogExecution(slogger.ERROR,
-					"ignoring optional file, which encountered error: %+v",
-					err.Error())
-				continue
-			}
 
-			return err
-		}
-		pluginLogger.LogExecution(slogger.INFO, "API push copy call succeeded")
-		err = scc.AttachTaskFiles(pluginLogger, pluginCom, s3CopyReq)
+		err = scc.AttachTaskFiles(ctx, comm, logger, td, s3CopyReq)
 		if err != nil {
-			body, readAllErr := ioutil.ReadAll(resp.Body)
-			if readAllErr != nil {
-				return errors.WithStack(err)
-			}
-			return errors.Wrapf(err, "Error: %v: %v",
-				resp.StatusCode, string(body))
+			return errors.WithStack(err)
 		}
 	}
 	return nil
@@ -270,8 +250,8 @@ func (scc *S3CopyCommand) S3Copy(taskConfig *model.TaskConfig,
 
 // AttachTaskFiles is responsible for sending the
 // specified file to the API Server
-func (c *S3CopyCommand) AttachTaskFiles(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, request apimodels.S3CopyRequest) error {
+func (c *S3CopyCommand) AttachTaskFiles(ctx context.Context, comm client.Communicator,
+	logger client.LoggerProducer, td client.TaskData, request apimodels.S3CopyRequest) error {
 
 	remotePath := filepath.ToSlash(request.S3DestinationPath)
 	fileLink := s3baseURL + request.S3DestinationBucket + "/" + remotePath
@@ -282,7 +262,8 @@ func (c *S3CopyCommand) AttachTaskFiles(pluginLogger plugin.Logger,
 		displayName = filepath.Base(request.S3SourcePath)
 	}
 
-	pluginLogger.LogExecution(slogger.INFO, "attaching file with name %v", displayName)
+	logger.Execution().Infof("attaching file with name %v", displayName)
+
 	file := artifact.File{
 		Name: displayName,
 		Link: fileLink,
@@ -290,10 +271,10 @@ func (c *S3CopyCommand) AttachTaskFiles(pluginLogger plugin.Logger,
 
 	files := []*artifact.File{&file}
 
-	err := pluginCom.PostTaskFiles(files)
-	if err != nil {
+	if err := comm.AttachTaskFiles(ctx, td, files); err != nil {
 		return errors.Wrap(err, "Attach files failed")
 	}
-	pluginLogger.LogExecution(slogger.INFO, "API attach files call succeeded")
+
+	logger.Execution().Info("API attach files call succeeded")
 	return nil
 }

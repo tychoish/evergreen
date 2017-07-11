@@ -2,10 +2,8 @@ package expansions
 
 import (
 	"github.com/evergreen-ci/evergreen/model"
-	"github.com/evergreen-ci/evergreen/plugin"
-	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
-	"github.com/pkg/errors"
+	"github.com/evergreen-ci/evergreen/rest/client"
+	"golang.org/x/net/context"
 )
 
 const FetchVarsRoute = "fetch_vars"
@@ -26,41 +24,14 @@ type FetchCommandParams struct {
 	LocalKey string `mapstructure:"local_key" json:"local_key"`
 }
 
-func (self *FetchVarsCommand) Name() string {
-	return FetchVarsCmdname
-}
-
-func (self *FetchVarsCommand) Plugin() string {
-	return ExpansionsPluginName
-}
-
-// ParseParams reads in the command's config. Fulfills the Command interface.
-func (self *FetchVarsCommand) ParseParams(params map[string]interface{}) error {
-	err := mapstructure.Decode(params, self)
-	if err != nil {
-		return err
-	}
-
-	for _, item := range self.Keys {
-		if item.RemoteKey == "" {
-			return errors.Errorf("error parsing '%v' params: value for remote "+
-				"key must not be a blank string", self.Name())
-		}
-		if item.LocalKey == "" {
-			return errors.Errorf("error parsing '%v' params: value for local "+
-				"key must not be a blank string", self.Name())
-		}
-	}
-	return nil
-}
+func (c *FetchVarsCommand) Name() string                                    { return FetchVarsCmdname }
+func (c *FetchVarsCommand) Plugin() string                                  { return ExpansionsPluginName }
+func (c *FetchVarsCommand) ParseParams(params map[string]interface{}) error { return nil }
 
 // Execute fetches the expansions from the API server
-func (self *FetchVarsCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator,
-	conf *model.TaskConfig,
-	stop chan bool) error {
+func (c *FetchVarsCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
-	pluginLogger.LogTask(slogger.ERROR, "Expansions.fetch deprecated")
+	logger.Task().Error("Expansions.fetch deprecated")
 	return nil
-
 }

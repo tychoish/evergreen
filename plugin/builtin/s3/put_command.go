@@ -10,13 +10,14 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/artifact"
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/thirdparty"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/goamz/goamz/aws"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -167,9 +168,8 @@ func (s3pc *S3PutCommand) shouldRunForVariant(buildVariantName string) bool {
 
 // Implementation of Execute.  Expands the parameters, and then puts the
 // resource to s3.
-func (s3pc *S3PutCommand) Execute(log plugin.Logger,
-	com plugin.PluginCommunicator, conf *model.TaskConfig,
-	stop chan bool) error {
+func (s3pc *S3PutCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	// expand necessary params
 	if err := s3pc.expandParams(conf); err != nil {
@@ -182,40 +182,39 @@ func (s3pc *S3PutCommand) Execute(log plugin.Logger,
 	}
 
 	if !s3pc.shouldRunForVariant(conf.BuildVariant.Name) {
-		log.LogTask(slogger.INFO, "Skipping S3 put of local file %v for variant %v",
-			s3pc.LocalFile,
-			conf.BuildVariant.Name)
+		logger.Task().Infof("Skipping S3 put of local file %v for variant %v",
+			s3pc.LocalFile, conf.BuildVariant.Name)
 		return nil
 	}
 
 	if s3pc.isMulti() {
-		log.LogTask(slogger.INFO, "Putting files matching filter %v into path %v in s3 bucket %v",
+		logger.Task().Infof("Putting files matching filter %v into path %v in s3 bucket %v",
 			s3pc.LocalFilesIncludeFilter, s3pc.RemoteFile, s3pc.Bucket)
 	} else {
 		if !filepath.IsAbs(s3pc.LocalFile) {
 			s3pc.LocalFile = filepath.Join(conf.WorkDir, s3pc.LocalFile)
 		}
-		log.LogTask(slogger.INFO, "Putting %v into path %v in s3 bucket %v",
+		logger.Task().Infof("Putting %v into path %v in s3 bucket %v",
 			s3pc.LocalFile, s3pc.RemoteFile, s3pc.Bucket)
 	}
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- errors.WithStack(s3pc.PutWithRetry(log, com))
+		errChan <- errors.WithStack(s3pc.PutWithRetry(comm, logger))
 	}()
 
 	select {
 	case err := <-errChan:
 		return err
-	case <-stop:
-		log.LogExecution(slogger.INFO, "Received signal to terminate execution of S3 Put Command")
+	case <-ctx.Done():
+		logger.Execution().Info("Received signal to terminate execution of S3 Put Command")
 		return nil
 	}
 
 }
 
 // Wrapper around the Put() function to retry it.
-func (s3pc *S3PutCommand) PutWithRetry(log plugin.Logger, com plugin.PluginCommunicator) error {
+func (s3pc *S3PutCommand) PutWithRetry(comm client.Communicator, logger client.LoggerProducer) error {
 	retriablePut := util.RetriableFunc(
 		func() error {
 			filesList, err := s3pc.Put()
@@ -223,14 +222,14 @@ func (s3pc *S3PutCommand) PutWithRetry(log plugin.Logger, com plugin.PluginCommu
 				if err == errSkippedFile {
 					return errors.WithStack(err)
 				}
-				log.LogExecution(slogger.ERROR, "Error putting to s3 bucket: %v", err)
+				logger.Execution().Errorf("Error putting to s3 bucket: %v", err)
 				return util.RetriableError{err}
 			}
 
 			catcher := grip.NewCatcher()
 
 			for _, file := range filesList {
-				catcher.Add(errors.Wrapf(s3pc.AttachTaskFiles(log, com, file, s3pc.RemoteFile),
+				catcher.Add(errors.Wrapf(s3pc.AttachTaskFiles(comm, logger, file, s3pc.RemoteFile),
 					"problem attaching file: %s to %s", file, s3pc.RemoteFile))
 			}
 
@@ -240,11 +239,11 @@ func (s3pc *S3PutCommand) PutWithRetry(log plugin.Logger, com plugin.PluginCommu
 
 	retryFail, err := util.Retry(retriablePut, maxS3PutAttempts, s3PutSleep)
 	if err == errSkippedFile {
-		log.LogExecution(slogger.INFO, "S3 put skipped optional missing file.")
+		logger.Execution().Info("S3 put skipped optional missing file.")
 		return nil
 	}
 	if retryFail {
-		log.LogExecution(slogger.ERROR, "S3 put failed with error: %v", err)
+		logger.Execution().Errorf("S3 put failed with error: %v", err)
 		return errors.WithStack(err)
 	}
 
@@ -295,8 +294,8 @@ func (s3pc *S3PutCommand) Put() ([]string, error) {
 
 // AttachTaskFiles is responsible for sending the
 // specified file to the API Server. Does not support multiple file putting.
-func (s3pc *S3PutCommand) AttachTaskFiles(log plugin.Logger,
-	com plugin.PluginCommunicator, localFile, remoteFile string) error {
+func (s3pc *S3PutCommand) AttachTaskFiles(comm client.Communicator,
+	logger client.LoggerProducer, localFile, remoteFile string) error {
 
 	remoteFileName := filepath.ToSlash(remoteFile)
 	if s3pc.isMulti() {
@@ -316,10 +315,10 @@ func (s3pc *S3PutCommand) AttachTaskFiles(log plugin.Logger,
 		Visibility: s3pc.Visibility,
 	}
 
-	err := com.PostTaskFiles([]*artifact.File{file})
+	err := comm.AttachFiles([]*artifact.File{file})
 	if err != nil {
 		return errors.Wrap(err, "Attach files failed")
 	}
-	log.LogExecution(slogger.INFO, "API attach files call succeeded")
+	logger.Execution().Info("API attach files call succeeded")
 	return nil
 }

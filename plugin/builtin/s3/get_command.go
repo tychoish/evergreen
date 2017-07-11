@@ -11,12 +11,13 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/builtin/archive"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/thirdparty"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/goamz/goamz/aws"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip/slogger"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -50,23 +51,23 @@ type S3GetCommand struct {
 	ExtractTo string `mapstructure:"extract_to" plugin:"expand"`
 }
 
-func (self *S3GetCommand) Name() string {
+func (c *S3GetCommand) Name() string {
 	return S3GetCmd
 }
 
-func (self *S3GetCommand) Plugin() string {
+func (c *S3GetCommand) Plugin() string {
 	return S3PluginName
 }
 
 // S3GetCommand-specific implementation of ParseParams.
-func (self *S3GetCommand) ParseParams(params map[string]interface{}) error {
-	if err := mapstructure.Decode(params, self); err != nil {
-		return errors.Wrapf(err, "error decoding %v params", self.Name())
+func (c *S3GetCommand) ParseParams(params map[string]interface{}) error {
+	if err := mapstructure.Decode(params, c); err != nil {
+		return errors.Wrapf(err, "error decoding %v params", c.Name())
 	}
 
 	// make sure the command params are valid
-	if err := self.validateParams(); err != nil {
-		return errors.Wrapf(err, "error validating %v params", self.Name())
+	if err := c.validateParams(); err != nil {
+		return errors.Wrapf(err, "error validating %v params", c.Name())
 	}
 
 	return nil
@@ -74,108 +75,103 @@ func (self *S3GetCommand) ParseParams(params map[string]interface{}) error {
 
 // Validate that all necessary params are set, and that only one of
 // local_file and extract_to is specified.
-func (self *S3GetCommand) validateParams() error {
-	if self.AwsKey == "" {
+func (c *S3GetCommand) validateParams() error {
+	if c.AwsKey == "" {
 		return errors.New("aws_key cannot be blank")
 	}
-	if self.AwsSecret == "" {
+	if c.AwsSecret == "" {
 		return errors.New("aws_secret cannot be blank")
 	}
-	if self.RemoteFile == "" {
+	if c.RemoteFile == "" {
 		return errors.New("remote_file cannot be blank")
 	}
 
 	// make sure the bucket is valid
-	if err := validateS3BucketName(self.Bucket); err != nil {
-		return errors.Wrapf(err, "%v is an invalid bucket name", self.Bucket)
+	if err := validateS3BucketName(c.Bucket); err != nil {
+		return errors.Wrapf(err, "%v is an invalid bucket name", c.Bucket)
 	}
 
 	// make sure local file and extract-to dir aren't both specified
-	if self.LocalFile != "" && self.ExtractTo != "" {
+	if c.LocalFile != "" && c.ExtractTo != "" {
 		return errors.New("cannot specify both local_file and extract_to directory")
 	}
 
 	// make sure one is specified
-	if self.LocalFile == "" && self.ExtractTo == "" {
+	if c.LocalFile == "" && c.ExtractTo == "" {
 		return errors.New("must specify either local_file or extract_to")
 	}
 	return nil
 }
 
-func (self *S3GetCommand) shouldRunForVariant(buildVariantName string) bool {
+func (c *S3GetCommand) shouldRunForVariant(buildVariantName string) bool {
 	//No buildvariant filter, so run always
-	if len(self.BuildVariants) == 0 {
+	if len(c.BuildVariants) == 0 {
 		return true
 	}
 
 	//Only run if the buildvariant specified appears in our list.
-	return util.SliceContains(self.BuildVariants, buildVariantName)
+	return util.SliceContains(c.BuildVariants, buildVariantName)
 }
 
 // Apply the expansions from the relevant task config to all appropriate
 // fields of the S3GetCommand.
-func (self *S3GetCommand) expandParams(conf *model.TaskConfig) error {
-	return plugin.ExpandValues(self, conf.Expansions)
+func (c *S3GetCommand) expandParams(conf *model.TaskConfig) error {
+	return plugin.ExpandValues(c, conf.Expansions)
 }
 
 // Implementation of Execute.  Expands the parameters, and then fetches the
 // resource from s3.
-func (self *S3GetCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, conf *model.TaskConfig,
-	stop chan bool) error {
+func (c *S3GetCommand) Execute(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	// expand necessary params
-	if err := self.expandParams(conf); err != nil {
+	if err := c.expandParams(conf); err != nil {
 		return err
 	}
 
 	// validate the params
-	if err := self.validateParams(); err != nil {
+	if err := c.validateParams(); err != nil {
 		return errors.Wrap(err, "expanded params are not valid")
 	}
 
-	if !self.shouldRunForVariant(conf.BuildVariant.Name) {
-		pluginLogger.LogTask(slogger.INFO, "Skipping S3 get of remote file %v for variant %v",
-			self.RemoteFile,
-			conf.BuildVariant.Name)
+	if !c.shouldRunForVariant(conf.BuildVariant.Name) {
+		logger.Task().Infof("Skipping S3 get of remote file %v for variant %v",
+			c.RemoteFile, conf.BuildVariant.Name)
 		return nil
 	}
 
 	// if the local file or extract_to is a relative path, join it to the
 	// working dir
-	if self.LocalFile != "" && !filepath.IsAbs(self.LocalFile) {
-		self.LocalFile = filepath.Join(conf.WorkDir, self.LocalFile)
+	if c.LocalFile != "" && !filepath.IsAbs(c.LocalFile) {
+		c.LocalFile = filepath.Join(conf.WorkDir, c.LocalFile)
 	}
-	if self.ExtractTo != "" && !filepath.IsAbs(self.ExtractTo) {
-		self.ExtractTo = filepath.Join(conf.WorkDir, self.ExtractTo)
+	if c.ExtractTo != "" && !filepath.IsAbs(c.ExtractTo) {
+		c.ExtractTo = filepath.Join(conf.WorkDir, c.ExtractTo)
 	}
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- errors.WithStack(self.GetWithRetry(pluginLogger))
+		errChan <- errors.WithStack(c.GetWithRetry(ctx, logger))
 	}()
 
 	select {
 	case err := <-errChan:
 		return errors.WithStack(err)
-	case <-stop:
-		pluginLogger.LogExecution(slogger.INFO, "Received signal to terminate"+
-			" execution of S3 Get Command")
+	case <-ctx.Done():
+		logger.Execution().Info("Received signal to terminate execution of S3 Get Command")
 		return nil
 	}
 
 }
 
 // Wrapper around the Get() function to retry it
-func (self *S3GetCommand) GetWithRetry(pluginLogger plugin.Logger) error {
+func (c *S3GetCommand) GetWithRetry(ctx context.Context, logger client.LoggerProducer) error {
 	retriableGet := util.RetriableFunc(
 		func() error {
-			pluginLogger.LogTask(slogger.INFO, "Fetching %v from"+
-				" s3 bucket %v", self.RemoteFile, self.Bucket)
-			err := errors.WithStack(self.Get())
+			logger.Task().Infof("Fetching %v from s3 bucket %v", c.RemoteFile, c.Bucket)
+			err := errors.WithStack(c.Get(ctx))
 			if err != nil {
-				pluginLogger.LogExecution(slogger.ERROR, "Error getting from"+
-					" s3 bucket: %v", err)
+				logger.Execution().Errorf("Error getting from s3 bucket: %v", err)
 				return util.RetriableError{err}
 			}
 			return nil
@@ -185,49 +181,49 @@ func (self *S3GetCommand) GetWithRetry(pluginLogger plugin.Logger) error {
 	retryFail, err := util.Retry(retriableGet, MaxS3GetAttempts, S3GetSleep)
 	err = errors.WithStack(err)
 	if retryFail {
-		pluginLogger.LogExecution(slogger.ERROR, "S3 get failed with error: %v", err)
+		logger.Execution().Errorf("S3 get failed with error: %v", err)
 		return err
 	}
 	return nil
 }
 
 // Fetch the specified resource from s3.
-func (self *S3GetCommand) Get() error {
+func (c *S3GetCommand) Get(ctx context.Context) error {
 	// get the appropriate session and bucket
 	auth := &aws.Auth{
-		AccessKey: self.AwsKey,
-		SecretKey: self.AwsSecret,
+		AccessKey: c.AwsKey,
+		SecretKey: c.AwsSecret,
 	}
 
 	session := thirdparty.NewS3Session(auth, aws.USEast)
-	bucket := session.Bucket(self.Bucket)
+	bucket := session.Bucket(c.Bucket)
 
 	// get a reader for the bucket
-	reader, err := bucket.GetReader(self.RemoteFile)
+	reader, err := bucket.GetReader(c.RemoteFile)
 	if err != nil {
-		return errors.Wrapf(err, "error getting bucket reader for file %v", self.RemoteFile)
+		return errors.Wrapf(err, "error getting bucket reader for file %v", c.RemoteFile)
 	}
 	defer reader.Close()
 
 	// either untar the remote, or just write to a file
-	if self.LocalFile != "" {
+	if c.LocalFile != "" {
 		var exists bool
 		// remove the file, if it exists
-		exists, err = util.FileExists(self.LocalFile)
+		exists, err = util.FileExists(c.LocalFile)
 		if err != nil {
 			return errors.Wrapf(err, "error checking existence of local file %v",
-				self.LocalFile)
+				c.LocalFile)
 		}
 		if exists {
-			if err := os.RemoveAll(self.LocalFile); err != nil {
-				return errors.Wrapf(err, "error clearing local file %v", self.LocalFile)
+			if err := os.RemoveAll(c.LocalFile); err != nil {
+				return errors.Wrapf(err, "error clearing local file %v", c.LocalFile)
 			}
 		}
 
 		// open the local file
-		file, err := os.Create(self.LocalFile)
+		file, err := os.Create(c.LocalFile)
 		if err != nil {
-			return errors.Wrapf(err, "error opening local file %v", self.LocalFile)
+			return errors.Wrapf(err, "error opening local file %v", c.LocalFile)
 		}
 		defer file.Close()
 
@@ -238,13 +234,13 @@ func (self *S3GetCommand) Get() error {
 	// wrap the reader in a gzip reader and a tar reader
 	gzipReader, err := gzip.NewReader(reader)
 	if err != nil {
-		return errors.Wrapf(err, "error creating gzip reader for %v", self.RemoteFile)
+		return errors.Wrapf(err, "error creating gzip reader for %v", c.RemoteFile)
 	}
 
 	tarReader := tar.NewReader(gzipReader)
-	err = archive.Extract(tarReader, self.ExtractTo)
+	err = archive.Extract(ctx, tarReader, c.ExtractTo)
 	if err != nil {
-		return errors.Wrapf(err, "error extracting %v to %v", self.RemoteFile, self.ExtractTo)
+		return errors.Wrapf(err, "error extracting %v to %v", c.RemoteFile, c.ExtractTo)
 	}
 
 	return nil

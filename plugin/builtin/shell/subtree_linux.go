@@ -6,11 +6,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/evergreen-ci/evergreen/plugin"
-	"github.com/mongodb/grip/slogger"
+	"github.com/mongodb/grip"
 )
 
-func trackProcess(key string, pid int, log plugin.Logger) {
+func trackProcess(key string, pid int, logger grip.Journaler) {
 	// trackProcess is a noop on linux, because we detect all the processes to be killed in
 	// cleanup() and we don't need to do any special bookkeeping up-front.
 }
@@ -37,13 +36,15 @@ func getEnv(pid int) ([]string, error) {
 	return results, nil
 }
 
-func cleanup(key string, log plugin.Logger) error {
+func cleanup(key string, logger grip.Journaler) error {
 	pids, err := listProc()
 	if err != nil {
 		return err
 	}
+
 	pidMarker := fmt.Sprintf("EVR_AGENT_PID=%v", os.Getpid())
 	taskMarker := fmt.Sprintf("EVR_TASK_ID=%v", key)
+
 	for _, pid := range pids {
 		env, err := getEnv(pid)
 		if err != nil {
@@ -53,9 +54,9 @@ func cleanup(key string, log plugin.Logger) error {
 			p := os.Process{}
 			p.Pid = pid
 			if err := p.Kill(); err != nil {
-				log.LogTask(slogger.INFO, "Killing %v failed: %v", pid, err)
+				logger.Infof("killing %d failed: %v", pid, err)
 			} else {
-				log.LogTask(slogger.INFO, "Killed process %v", pid)
+				logger.Infof("Killed process %d", pid)
 			}
 		}
 	}

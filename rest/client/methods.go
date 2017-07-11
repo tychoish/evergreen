@@ -409,3 +409,49 @@ func (c *communicatorImpl) GetJSONHistory(ctx context.Context, td TaskData, tags
 
 	return out, nil
 }
+
+// func (c *evergreenREST) S3CopyOperation() {
+
+//	resp, err := pluginCom.TaskPostJSON(s3CopyAPIEndpoint, s3CopyReq)
+//	if resp != nil {
+//		defer resp.Body.Close()
+//	}
+
+//	if resp != nil && resp.StatusCode != http.StatusOK {
+//		body, _ := ioutil.ReadAll(resp.Body)
+//		err = errors.Errorf("S3 push copy failed (%v): %v", resp.StatusCode,
+//			string(body))
+//		if s3CopyFile.Optional {
+//			pluginLogger.LogExecution(slogger.ERROR,
+//				"ignoring optional file, which encountered error: %+v",
+//				err.Error())
+//			continue
+//		}
+
+//		return err
+//	}
+//	if err != nil {
+//		body, _ := ioutil.ReadAll(resp.Body)
+//		err = errors.Wrapf(err, "S3 push copy failed (%v): %v",
+//			resp.StatusCode, string(body))
+//		if s3CopyFile.Optional {
+//			pluginLogger.LogExecution(slogger.ERROR,
+//				"ignoring optional file, which encountered error: %+v",
+//				err.Error())
+//			continue
+//		}
+
+//		return err
+//	}
+
+//	err = scc.AttachTaskFiles(pluginLogger, pluginCom, s3CopyReq)
+//	if err != nil {
+//		body, readAllErr := ioutil.ReadAll(resp.Body)
+//		if readAllErr != nil {
+//			return errors.WithStack(err)
+//		}
+//		return errors.Wrapf(err, "Error: %v: %v",
+//			resp.StatusCode, string(body))
+//	}
+
+// }

@@ -4,17 +4,15 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/patch"
-	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/subprocess"
 	"github.com/evergreen-ci/evergreen/util"
-	"github.com/mongodb/grip/slogger"
+	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -25,126 +23,38 @@ type GitApplyPatchCommand struct{}
 func (*GitApplyPatchCommand) Name() string                                    { return ApplyPatchCmdName }
 func (*GitApplyPatchCommand) Plugin() string                                  { return GitPluginName }
 func (*GitApplyPatchCommand) ParseParams(params map[string]interface{}) error { return nil }
-func (*GitApplyPatchCommand) Execute(pluginLogger plugin.Logger,
-	pluginCom plugin.PluginCommunicator, conf *model.TaskConfig, stop chan bool) error {
-	pluginLogger.LogExecution(slogger.INFO,
-		"WARNING: git.apply_patch is deprecated. Patches are applied in git.get_project ")
+func (*GitApplyPatchCommand) Execute(ctx context.Context,
+	client client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
+
+	logger.Task().Warning("git.apply_patch is deprecated. Patches are applied in git.get_project.")
 	return nil
-}
-
-// GetPatch tries to get the patch data from the server in json format,
-// and unmarhals it into a patch struct. The GET request is attempted
-// multiple times upon failure.
-func (ggpc GitGetProjectCommand) GetPatch(pluginCom plugin.PluginCommunicator, pluginLogger plugin.Logger) (*patch.Patch, error) {
-	patch := &patch.Patch{}
-	retriableGet := func() error {
-		resp, err := pluginCom.TaskGetJSON(GitPatchPath)
-		if resp != nil {
-			defer resp.Body.Close()
-		}
-
-		if err != nil {
-			//Some generic error trying to connect - try again
-			pluginLogger.LogExecution(slogger.WARN, "Error connecting to API server: %v", err)
-			return util.RetriableError{err}
-		}
-
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			//nothing broke, but no patch was found for task Id - no retry
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				pluginLogger.LogExecution(slogger.ERROR, "Error reading response body")
-			}
-			msg := fmt.Sprintf("no patch found for task: %v", string(body))
-			pluginLogger.LogExecution(slogger.WARN, msg)
-			return errors.New(msg)
-		}
-
-		if resp != nil && resp.StatusCode == http.StatusInternalServerError {
-			//something went wrong in api server
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				pluginLogger.LogExecution(slogger.ERROR, "Error reading response body")
-			}
-			msg := fmt.Sprintf("error fetching patch from server: %v", string(body))
-			pluginLogger.LogExecution(slogger.WARN, msg)
-			return util.RetriableError{
-				errors.New(msg),
-			}
-		}
-
-		if resp != nil && resp.StatusCode == http.StatusConflict {
-			//wrong secret
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				pluginLogger.LogExecution(slogger.ERROR, "Error reading response body")
-			}
-			msg := fmt.Sprintf("secret conflict: %v", string(body))
-			pluginLogger.LogExecution(slogger.ERROR, msg)
-			return errors.New(msg)
-		}
-
-		if resp == nil {
-			pluginLogger.LogExecution(slogger.WARN, "Empty response from API server")
-			return util.RetriableError{errors.New("empty response")}
-		}
-
-		err = util.ReadJSONInto(resp.Body, patch)
-		if err != nil {
-			pluginLogger.LogExecution(slogger.ERROR,
-				"Error reading json into patch struct: %v", err)
-			return util.RetriableError{err}
-		}
-		return nil
-	}
-
-	retryFail, err := util.Retry(retriableGet, 10, 1*time.Second)
-	if retryFail {
-		return nil, errors.Wrapf(err, "getting patch failed after %d tries", 10)
-	}
-	if err != nil {
-		return nil, errors.Wrap(err, "getting patch failed")
-	}
-	return patch, nil
 }
 
 // getPatchContents() dereferences any patch files that are stored externally, fetching them from
 // the API server, and setting them into the patch object.
-func (ggpc GitGetProjectCommand) getPatchContents(com plugin.PluginCommunicator, log plugin.Logger, p *patch.Patch) error {
-	for i, patchPart := range p.Patches {
+func (c GitGetProjectCommand) getPatchContents(ctx context.Context, comm client.Communicator,
+	logger client.LoggerProducer, conf *model.TaskConfig, patch *patch.Patch) error {
+
+	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
+	for i, patchPart := range patch.Patches {
 		// If the patch isn't stored externally, no need to do anything.
 		if patchPart.PatchSet.PatchFileId == "" {
 			continue
 		}
-		// otherwise, fetch the contents and load it into the patch object
-		log.LogExecution(slogger.INFO, "Fetching patch contents for %v", patchPart.PatchSet.PatchFileId)
-		var result []byte
-		retriableGet := util.RetriableFunc(
-			func() error {
-				resp, err := com.TaskGetJSON(fmt.Sprintf("%s/%s", GitPatchFilePath, patchPart.PatchSet.PatchFileId))
-				if resp != nil {
-					defer resp.Body.Close()
-				}
-				if err != nil {
-					//Some generic error trying to connect - try again
-					log.LogExecution(slogger.WARN, "Error connecting to API server: %v", err)
-					return util.RetriableError{err}
-				}
-				if resp != nil && resp.StatusCode != http.StatusOK {
-					log.LogExecution(slogger.WARN, "Unexpected status code %v, retrying", resp.StatusCode)
-					_ = resp.Body.Close()
-					return util.RetriableError{errors.Errorf("Unexpected status code %v", resp.StatusCode)}
-				}
-				result, err = ioutil.ReadAll(resp.Body)
 
-				return err
-			})
-
-		_, err := util.Retry(retriableGet, 10, 1*time.Second)
-		if err != nil {
-			return err
+		if ctx.Err() != nil {
+			return errors.New("operation canceled")
 		}
-		p.Patches[i].PatchSet.Patch = string(result)
+
+		// otherwise, fetch the contents and load it into the patch object
+		logger.Execution().Infof("Fetching patch contents for %s", patchPart.PatchSet.PatchFileId)
+
+		result, err := comm.GetPatchFile(ctx, td, patchPart.PatchSet.PatchFileId)
+		if err != nil {
+			return errors.Wrapf(err, "problem getting patch file")
+		}
+
+		patch.Patches[i].PatchSet.Patch = string(result)
 	}
 	return nil
 }
@@ -171,15 +81,20 @@ func GetPatchCommands(modulePatch patch.ModulePatch, dir, patchPath string) []st
 
 // applyPatch is used by the agent to copy patch data onto disk
 // and then call the necessary git commands to apply the patch file
-func (ggpc *GitGetProjectCommand) applyPatch(conf *model.TaskConfig,
-	p *patch.Patch, pluginLogger plugin.Logger) error {
+func (c *GitGetProjectCommand) applyPatch(ctx context.Context, logger client.LoggerProducer,
+	conf *model.TaskConfig, p *patch.Patch) error {
+
 	// patch sets and contain multiple patches, some of them for modules
 	for _, patchPart := range p.Patches {
+		if ctx.Err() != nil {
+			return errors.New("apply patch operation canceled")
+		}
+
 		var dir string
 		if patchPart.ModuleName == "" {
 			// if patch is not part of a module, just apply patch against src root
-			dir = ggpc.Directory
-			pluginLogger.LogExecution(slogger.INFO, "Applying patch with git...")
+			dir = c.Directory
+			logger.Execution().Info("Applying patch with git...")
 		} else {
 			// if patch is part of a module, apply patch in module root
 			module, err := conf.Project.GetModuleByName(patchPart.ModuleName)
@@ -192,14 +107,14 @@ func (ggpc *GitGetProjectCommand) applyPatch(conf *model.TaskConfig,
 
 			// skip the module if this build variant does not use it
 			if !util.SliceContains(conf.BuildVariant.Modules, module.Name) {
-				pluginLogger.LogExecution(slogger.INFO, "Skipping patch for"+
-					" module %v, since the current build variant does not"+
-					" use it", module.Name)
+				logger.Execution().Infof(
+					"Skipping patch for module %v: the current build variant does not use it",
+					module.Name)
 				continue
 			}
 
-			dir = filepath.Join(ggpc.Directory, module.Prefix, module.Name)
-			pluginLogger.LogExecution(slogger.INFO, "Applying module patch with git...")
+			dir = filepath.Join(c.Directory, module.Prefix, module.Name)
+			logger.Execution().Info("Applying module patch with git...")
 		}
 
 		// create a temporary folder and store patch files on disk,
@@ -221,15 +136,14 @@ func (ggpc *GitGetProjectCommand) applyPatch(conf *model.TaskConfig,
 		patchCmd := &subprocess.LocalCommand{
 			CmdString:        cmdsJoined,
 			WorkingDirectory: conf.WorkDir,
-			Stdout:           pluginLogger.GetTaskLogWriter(slogger.INFO),
-			Stderr:           pluginLogger.GetTaskLogWriter(slogger.ERROR),
+			Stdout:           logger.TaskWriter(level.Info),
+			Stderr:           logger.TaskWriter(level.Error),
 			ScriptMode:       true,
 		}
 
-		if err = patchCmd.Run(context.TODO()); err != nil {
+		if err = patchCmd.Run(ctx); err != nil {
 			return errors.WithStack(err)
 		}
-		pluginLogger.Flush()
 	}
 	return nil
 }

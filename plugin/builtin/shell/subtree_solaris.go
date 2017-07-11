@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/evergreen-ci/evergreen/plugin"
+	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/slogger"
 )
 
@@ -15,7 +16,7 @@ import (
 // so that we can detect the 'tracer' strings.
 var pargsEnvPattern = regexp.MustCompile("^\\s*envp\\[\\d+\\]:\\s*(.*)$")
 
-func trackProcess(key string, pid int, log plugin.Logger) {
+func trackProcess(key string, pid int, logger grip.Journaler) {
 	// trackProcess is a noop on solaris, because we detect all the processes to be killed in
 	// cleanup() and we don't need to do any special bookkeeping up-front.
 }
