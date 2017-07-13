@@ -14,9 +14,9 @@ import (
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/thirdparty"
 	"github.com/evergreen-ci/evergreen/util"
+	"github.com/jpillora/backoff"
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 )
 
@@ -207,6 +207,19 @@ func (s3pc *s3put) Execute(ctx context.Context,
 // Wrapper around the Put() function to retry it.
 func (s3pc *s3put) putWithRetry(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer) error {
+	backoffCounter := &backoff.Backoff{
+		Min:    s3PutSleep,
+		Max:    maxs3putAttempts * s3PutSleep,
+		Factor: 2,
+		Jitter: true,
+	}
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for i := 1; i <= maxs3putAttempts; i++ {
+		logger.Task().Infof("performing s3 put to %s of %s", s3pc.Bucket, s3pc.RemoteFile)
+
+	}
 
 	retriablePut := util.RetriableFunc(
 		func() error {
@@ -219,14 +232,6 @@ func (s3pc *s3put) putWithRetry(ctx context.Context,
 				return util.RetriableError{err}
 			}
 
-			catcher := grip.NewCatcher()
-
-			for _, file := range filesList {
-				catcher.Add(errors.Wrapf(s3pc.attachFiles(comm, logger, file, s3pc.RemoteFile),
-					"problem attaching file: %s to %s", file, s3pc.RemoteFile))
-			}
-
-			return catcher.Resolve()
 		},
 	)
 
@@ -255,7 +260,12 @@ func (s3pc *s3put) put(ctx context.Context) ([]string, error) {
 			return nil, errors.WithStack(err)
 		}
 	}
+
 	for _, fpath := range filesList {
+		if ctx.Err() != nil {
+			return nil, errors.New("s3 put operation canceled")
+		}
+
 		remoteName := s3pc.RemoteFile
 		if s3pc.isMulti() {
 			fname := filepath.Base(fpath)
@@ -281,13 +291,18 @@ func (s3pc *s3put) put(ctx context.Context) ([]string, error) {
 			}
 			return nil, errors.WithStack(err)
 		}
+
+		err = s3pc.attachFiles(ctx, comm, logger, file, s3pc.RemoteFile)
+		if err != nil {
+			return errors.Wrapf(err, "problem attaching file: %s to %s", fpath, s3pc.RemoteFile)
+		}
 	}
 	return filesList, nil
 }
 
 // attachTaskFiles is responsible for sending the
 // specified file to the API Server. Does not support multiple file putting.
-func (s3pc *s3put) attachFiles(comm client.Communicator,
+func (s3pc *s3put) attachFiles(ctx context.Context, comm client.Communicator,
 	logger client.LoggerProducer, localFile, remoteFile string) error {
 
 	remoteFileName := filepath.ToSlash(remoteFile)
