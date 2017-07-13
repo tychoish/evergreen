@@ -54,7 +54,7 @@ func BuildArchive(ctx context.Context, tarWriter *tar.Writer, rootPath string, i
 					outputChan <- TarContentsFile{path, info}
 					return nil
 				}
-				grip.Warning(filepath.Walk(dir, walk))
+				logger.Warning(filepath.Walk(dir, walk))
 			} else if strings.Contains(filematch, "**") {
 				globSuffix := filematch[2:]
 				walk = func(path string, info os.FileInfo, err error) error {
@@ -63,7 +63,7 @@ func BuildArchive(ctx context.Context, tarWriter *tar.Writer, rootPath string, i
 					}
 					return nil
 				}
-				grip.Warning(filepath.Walk(dir, walk))
+				logger.Warning(filepath.Walk(dir, walk))
 			} else {
 				walk = func(path string, info os.FileInfo, err error) error {
 					a, b := filepath.Split(path)
@@ -78,7 +78,7 @@ func BuildArchive(ctx context.Context, tarWriter *tar.Writer, rootPath string, i
 					}
 					return nil
 				}
-				grip.Warning(filepath.Walk(rootPath, walk))
+				logger.Warning(filepath.Walk(rootPath, walk))
 			}
 		}
 		close(outputChan)
