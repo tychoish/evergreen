@@ -53,33 +53,6 @@ type Registry interface {
 		funcs map[string]*model.YAMLCommandSet) ([]model.PluginCommandConf, error)
 }
 
-// LoggerProducer provides a mechanism for plugins to access the
-// process' logging facilities. The interfaces are all based on grip
-// interfaces and abstractions, and the behavior of the interfaces is
-// dependent on the configuration and implementation of the
-// LoggerProducer instance.
-type LoggerProducer interface {
-	// Provides access to the local logger. In most implementations
-	// this is roughly equivalent to using the standard "grip" logger.
-	Local() grip.Journaler
-
-	// The Execution/Task/System loggers provide a grip-like
-	// logging interface for the distinct logging channels that the
-	// Evergreen agent provides to tasks
-	Execution() grip.Journaler
-	Task() grip.Journaler
-	System() grip.Journaler
-
-	// The writer functions return an io.Writer for use with
-	// exec.Cmd operations for capturing standard output and standard
-	// error from sbprocesses.
-	TaskWriter() io.Writer
-	SystemWriter() io.Writer
-
-	// Close releases all resources by calling Close on all underlying senders.
-	Close() error
-}
-
 // Logger allows any plugin to log to the appropriate place with any
 // The agent (which provides each plugin execution with a Logger implementation)
 // handles sending log data to the remote server.
@@ -267,7 +240,6 @@ func (sr *SimpleRegistry) Register(p CommandPlugin) error {
 }
 
 func (sr *SimpleRegistry) ParseCommandConf(cmd model.PluginCommandConf, funcs map[string]*model.YAMLCommandSet) ([]model.PluginCommandConf, error) {
-
 	if funcName := cmd.Function; funcName != "" {
 		cmds, ok := funcs[funcName]
 		if !ok {

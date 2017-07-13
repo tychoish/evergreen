@@ -1,47 +1,13 @@
-package s3
+package command
 
 import (
-	"regexp"
+	"errors"
 	"strings"
 
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/util"
-	"github.com/goamz/goamz/s3"
-	"github.com/pkg/errors"
+	"github.com/mitchellh/goamz/s3"
 )
-
-func init() {
-	plugin.Publish(&S3Plugin{})
-}
-
-// S3Plugin handles uploading and downloading from Amazon's S3 service
-type S3Plugin struct {
-}
-
-const (
-	S3GetCmd     = "get"
-	S3PutCmd     = "put"
-	S3PluginName = "s3"
-)
-
-var (
-	// Regular expression for validating S3 bucket names
-	BucketNameRegex = regexp.MustCompile(`^[A-Za-z0-9_\-.]+$`)
-)
-
-// Name returns the name of the plugin. Fulfills Plugin interface.
-func (self *S3Plugin) Name() string {
-	return S3PluginName
-}
-
-// NewCommand returns commands of the given name.
-// Fulfills Plugin interface.
-func (self *S3Plugin) NewCommand(cmdName string) (plugin.Command, error) {
-	if cmdName == S3PutCmd {
-		return &S3PutCommand{}, nil
-	}
-	return nil, errors.Errorf("No such command: %v", cmdName)
-}
 
 func validateS3BucketName(bucket string) error {
 	// if it's an expandable string, we can't expand yet since we don't have

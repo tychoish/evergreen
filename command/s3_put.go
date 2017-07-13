@@ -1,6 +1,7 @@
-package s3
+package command
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -13,15 +14,14 @@ import (
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/thirdparty"
 	"github.com/evergreen-ci/evergreen/util"
-	"github.com/goamz/goamz/aws"
+	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/mapstructure"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
-var (
-	maxS3PutAttempts = 5
+const (
+	maxs3putAttempts = 5
 	s3PutSleep       = 5 * time.Second
 	s3baseURL        = "https://s3.amazonaws.com/"
 )
@@ -30,7 +30,7 @@ var errSkippedFile = errors.New("missing optional file was skipped")
 
 // A plugin command to put a resource to an s3 bucket and download it to
 // the local machine.
-type S3PutCommand struct {
+type s3put struct {
 	// AwsKey and AwsSecret are the user's credentials for
 	// authenticating interactions with s3.
 	AwsKey    string `mapstructure:"aws_key" plugin:"expand"`
@@ -82,16 +82,12 @@ type S3PutCommand struct {
 	Optional bool `mapstructure:"optional"`
 }
 
-func (s3pc *S3PutCommand) Name() string {
-	return S3PutCmd
-}
+func s3PutFactory() Command        { return &s3put{} }
+func (s3pc *s3put) Name() string   { return "put" }
+func (s3pc *s3put) Plugin() string { return "s3" }
 
-func (s3pc *S3PutCommand) Plugin() string {
-	return S3PluginName
-}
-
-// S3PutCommand-specific implementation of ParseParams.
-func (s3pc *S3PutCommand) ParseParams(params map[string]interface{}) error {
+// s3put-specific implementation of ParseParams.
+func (s3pc *s3put) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, s3pc); err != nil {
 		return errors.Wrapf(err, "error decoding %s params", s3pc.Name())
 	}
@@ -101,11 +97,6 @@ func (s3pc *S3PutCommand) ParseParams(params map[string]interface{}) error {
 		return errors.Wrapf(err, "error validating %s params", s3pc.Name())
 	}
 
-	return nil
-}
-
-// Validate that all necessary params are set and valid.
-func (s3pc *S3PutCommand) validateParams() error {
 	if s3pc.AwsKey == "" {
 		return errors.New("aws_key cannot be blank")
 	}
@@ -127,6 +118,7 @@ func (s3pc *S3PutCommand) validateParams() error {
 	if s3pc.ContentType == "" {
 		return errors.New("content_type cannot be blank")
 	}
+
 	if !util.SliceContains(artifact.ValidVisibilities, s3pc.Visibility) {
 		return errors.Errorf("invalid visibility setting: %v", s3pc.Visibility)
 	}
@@ -140,23 +132,22 @@ func (s3pc *S3PutCommand) validateParams() error {
 	if !validS3Permissions(s3pc.Permissions) {
 		return errors.Errorf("permissions '%v' are not valid", s3pc.Permissions)
 	}
-
 	return nil
 }
 
 // Apply the expansions from the relevant task config to all appropriate
-// fields of the S3PutCommand.
-func (s3pc *S3PutCommand) expandParams(conf *model.TaskConfig) error {
+// fields of the s3put.
+func (s3pc *s3put) expandParams(conf *model.TaskConfig) error {
 	return errors.WithStack(plugin.ExpandValues(s3pc, conf.Expansions))
 }
 
 // isMulti returns whether or not this using the multiple file upload
 // capability of the Put command.
-func (s3pc *S3PutCommand) isMulti() bool {
+func (s3pc *s3put) isMulti() bool {
 	return (len(s3pc.LocalFilesIncludeFilter) != 0)
 }
 
-func (s3pc *S3PutCommand) shouldRunForVariant(buildVariantName string) bool {
+func (s3pc *s3put) shouldRunForVariant(buildVariantName string) bool {
 	//No buildvariant filter, so run always
 	if len(s3pc.BuildVariants) == 0 {
 		return true
@@ -168,7 +159,7 @@ func (s3pc *S3PutCommand) shouldRunForVariant(buildVariantName string) bool {
 
 // Implementation of Execute.  Expands the parameters, and then puts the
 // resource to s3.
-func (s3pc *S3PutCommand) Execute(ctx context.Context,
+func (s3pc *s3put) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	// expand necessary params
@@ -200,7 +191,7 @@ func (s3pc *S3PutCommand) Execute(ctx context.Context,
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- errors.WithStack(s3pc.PutWithRetry(comm, logger))
+		errChan <- errors.WithStack(s3pc.putWithRetry(ctx, comm, logger))
 	}()
 
 	select {
@@ -214,10 +205,12 @@ func (s3pc *S3PutCommand) Execute(ctx context.Context,
 }
 
 // Wrapper around the Put() function to retry it.
-func (s3pc *S3PutCommand) PutWithRetry(comm client.Communicator, logger client.LoggerProducer) error {
+func (s3pc *s3put) putWithRetry(ctx context.Context,
+	comm client.Communicator, logger client.LoggerProducer) error {
+
 	retriablePut := util.RetriableFunc(
 		func() error {
-			filesList, err := s3pc.Put()
+			filesList, err := s3pc.put()
 			if err != nil {
 				if err == errSkippedFile {
 					return errors.WithStack(err)
@@ -229,7 +222,7 @@ func (s3pc *S3PutCommand) PutWithRetry(comm client.Communicator, logger client.L
 			catcher := grip.NewCatcher()
 
 			for _, file := range filesList {
-				catcher.Add(errors.Wrapf(s3pc.AttachTaskFiles(comm, logger, file, s3pc.RemoteFile),
+				catcher.Add(errors.Wrapf(s3pc.attachFiles(comm, logger, file, s3pc.RemoteFile),
 					"problem attaching file: %s to %s", file, s3pc.RemoteFile))
 			}
 
@@ -250,8 +243,8 @@ func (s3pc *S3PutCommand) PutWithRetry(comm client.Communicator, logger client.L
 	return nil
 }
 
-// Put the specified resource to s3.
-func (s3pc *S3PutCommand) Put() ([]string, error) {
+// put the specified resource to s3.
+func (s3pc *s3put) put(ctx context.Context) ([]string, error) {
 	var err error
 
 	filesList := []string{s3pc.LocalFile}
@@ -292,9 +285,9 @@ func (s3pc *S3PutCommand) Put() ([]string, error) {
 	return filesList, nil
 }
 
-// AttachTaskFiles is responsible for sending the
+// attachTaskFiles is responsible for sending the
 // specified file to the API Server. Does not support multiple file putting.
-func (s3pc *S3PutCommand) AttachTaskFiles(comm client.Communicator,
+func (s3pc *s3put) attachFiles(comm client.Communicator,
 	logger client.LoggerProducer, localFile, remoteFile string) error {
 
 	remoteFileName := filepath.ToSlash(remoteFile)

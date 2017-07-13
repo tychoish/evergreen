@@ -1,4 +1,4 @@
-package s3
+package command
 
 import (
 	"archive/tar"
@@ -15,6 +15,7 @@ import (
 	"github.com/evergreen-ci/evergreen/thirdparty"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/goamz/goamz/aws"
+	"github.com/jpillora/backoff"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -27,7 +28,7 @@ var (
 
 // A plugin command to fetch a resource from an s3 bucket and download it to
 // the local machine.
-type S3GetCommand struct {
+type s3get struct {
 	// AwsKey and AwsSecret are the user's credentials for
 	// authenticating interactions with s3.
 	AwsKey    string `mapstructure:"aws_key" plugin:"expand"`
@@ -51,16 +52,12 @@ type S3GetCommand struct {
 	ExtractTo string `mapstructure:"extract_to" plugin:"expand"`
 }
 
-func (c *S3GetCommand) Name() string {
-	return S3GetCmd
-}
+func s3GetFactory() Command     { &s3get{} }
+func (c *s3get) Name() string   { return "get" }
+func (c *s3get) Plugin() string { return "s3" }
 
-func (c *S3GetCommand) Plugin() string {
-	return S3PluginName
-}
-
-// S3GetCommand-specific implementation of ParseParams.
-func (c *S3GetCommand) ParseParams(params map[string]interface{}) error {
+// s3get-specific implementation of ParseParams.
+func (c *s3get) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, c); err != nil {
 		return errors.Wrapf(err, "error decoding %v params", c.Name())
 	}
@@ -75,7 +72,7 @@ func (c *S3GetCommand) ParseParams(params map[string]interface{}) error {
 
 // Validate that all necessary params are set, and that only one of
 // local_file and extract_to is specified.
-func (c *S3GetCommand) validateParams() error {
+func (c *s3get) validateParams() error {
 	if c.AwsKey == "" {
 		return errors.New("aws_key cannot be blank")
 	}
@@ -103,7 +100,7 @@ func (c *S3GetCommand) validateParams() error {
 	return nil
 }
 
-func (c *S3GetCommand) shouldRunForVariant(buildVariantName string) bool {
+func (c *s3get) shouldRunForVariant(buildVariantName string) bool {
 	//No buildvariant filter, so run always
 	if len(c.BuildVariants) == 0 {
 		return true
@@ -114,14 +111,14 @@ func (c *S3GetCommand) shouldRunForVariant(buildVariantName string) bool {
 }
 
 // Apply the expansions from the relevant task config to all appropriate
-// fields of the S3GetCommand.
-func (c *S3GetCommand) expandParams(conf *model.TaskConfig) error {
+// fields of the s3get.
+func (c *s3get) expandParams(conf *model.TaskConfig) error {
 	return plugin.ExpandValues(c, conf.Expansions)
 }
 
 // Implementation of Execute.  Expands the parameters, and then fetches the
 // resource from s3.
-func (c *S3GetCommand) Execute(ctx context.Context,
+func (c *s3get) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	// expand necessary params
@@ -151,7 +148,7 @@ func (c *S3GetCommand) Execute(ctx context.Context,
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- errors.WithStack(c.GetWithRetry(ctx, logger))
+		errChan <- errors.WithStack(c.getWithRetry(ctx, logger))
 	}()
 
 	select {
@@ -165,30 +162,40 @@ func (c *S3GetCommand) Execute(ctx context.Context,
 }
 
 // Wrapper around the Get() function to retry it
-func (c *S3GetCommand) GetWithRetry(ctx context.Context, logger client.LoggerProducer) error {
-	retriableGet := util.RetriableFunc(
-		func() error {
-			logger.Task().Infof("Fetching %v from s3 bucket %v", c.RemoteFile, c.Bucket)
-			err := errors.WithStack(c.Get(ctx))
-			if err != nil {
-				logger.Execution().Errorf("Error getting from s3 bucket: %v", err)
-				return util.RetriableError{err}
-			}
-			return nil
-		},
-	)
-
-	retryFail, err := util.Retry(retriableGet, MaxS3GetAttempts, S3GetSleep)
-	err = errors.WithStack(err)
-	if retryFail {
-		logger.Execution().Errorf("S3 get failed with error: %v", err)
-		return err
+func (c *s3get) getWithRetry(ctx context.Context, logger client.LoggerProducer) error {
+	backoffCounter := &backoff.Backoff{
+		Min:    S3GetSleep,
+		Max:    MaxS3GetAttempts * S3GetSleep,
+		Factor: 2,
+		Jitter: true,
 	}
-	return nil
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for i := 1; i <= MaxS3GetAttempts; i++ {
+		logger.Task().Infof("fetching %s from s3 bucket %s (attempt %d of %d)",
+			c.RemoteFile, c.Bucket, i, MaxS3GetAttempts)
+
+		select {
+		case <-ctx.Done():
+			return errors.New("s3 get operation aborted")
+		case <-timer.C:
+			err := errors.WithStack(c.get(ctx))
+			if err == nil {
+				return nil
+			}
+
+			logger.Execution().Errorf("problem getting %s from s3 bucket, retrying. [%v]",
+				c.remoteFile, err)
+			timer.Reset(backoffCounter.Duration())
+		}
+	}
+
+	return errors.Errorf("S3 get failed after $d attempts", MaxS3GetAttempts)
 }
 
 // Fetch the specified resource from s3.
-func (c *S3GetCommand) Get(ctx context.Context) error {
+func (c *s3get) get(ctx context.Context) error {
 	// get the appropriate session and bucket
 	auth := &aws.Auth{
 		AccessKey: c.AwsKey,

@@ -18,6 +18,9 @@ func init() {
 	RegisterCommand("shell.cleanup", shellCleanupFactory)
 	RegisterCommand("shell.track", shellTrackFactory)
 	RegisterCommand("expansions.update", updateExpansionsFactory)
+	RegisterCommand("keyval.inc", keyValIncFactory)
+	RegisterCommand("s3.get", s3GetFactory)
+	RegisterCommand("s3.put", s3PutFactory)
 }
 
 func RegisterCommand(name string, factory CommandFactory) error {
