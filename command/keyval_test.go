@@ -1,4 +1,4 @@
-package keyval_test
+package command
 
 import (
 	"path/filepath"
@@ -10,7 +10,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/plugin"
-	"github.com/evergreen-ci/evergreen/plugin/builtin/keyval"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
@@ -27,7 +26,7 @@ func TestIncKey(t *testing.T) {
 		err := db.Clear(model.KeyValCollection)
 		testutil.HandleTestingErr(err, t, "Couldn't clear test collection: %s", model.KeyValCollection)
 		registry := plugin.NewSimpleRegistry()
-		kvPlugin := &keyval.KeyValPlugin{}
+		kvPlugin := &KeyValPlugin{}
 		err = registry.Register(kvPlugin)
 		testutil.HandleTestingErr(err, t, "Couldn't register keyval plugin")
 

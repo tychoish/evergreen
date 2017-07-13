@@ -1,53 +1,21 @@
-package expansions
+package command
 
 import (
 	"path/filepath"
 
 	"github.com/evergreen-ci/evergreen/model"
-	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
-func init() {
-	plugin.Publish(&ExpansionsPlugin{})
-}
-
-const (
-	ExpansionsPluginName = "expansions"
-	UpdateVarsCmdName    = "update"
-)
-
-// ExpansionsPlugin handles updating expansions in a task at runtime.
-type ExpansionsPlugin struct{}
-
-// Name fulfills the Plugin interface.
-func (p *ExpansionsPlugin) Name() string {
-	return ExpansionsPluginName
-}
-
-func (p *ExpansionsPlugin) Configure(map[string]interface{}) error {
-	return nil
-}
-
-// NewCommand fulfills the Plugin interface.
-func (p *ExpansionsPlugin) NewCommand(cmdName string) (plugin.Command, error) {
-	if cmdName == UpdateVarsCmdName {
-		return &UpdateCommand{}, nil
-	} else if cmdName == FetchVarsCmdname {
-		return &FetchVarsCommand{}, nil
-	}
-	return nil, &plugin.ErrUnknownCommand{cmdName}
-}
-
-// UpdateCommand reads in a set of new expansions and updates the
-// task's expansions at runtime. UpdateCommand can take a list
+// update reads in a set of new expansions and updates the
+// task's expansions at runtime. update can take a list
 // of update expansion pairs and/or a file of expansion pairs
-type UpdateCommand struct {
+type update struct {
 	// Key-value pairs for updating the task's parameters with
-	Updates []PutCommandParams `mapstructure:"updates"`
+	Updates []updateParams `mapstructure:"updates"`
 
 	// Filename for a yaml file containing expansion updates
 	// in the form of
@@ -55,9 +23,9 @@ type UpdateCommand struct {
 	YamlFile string `mapstructure:"file"`
 }
 
-// PutCommandParams are pairings of expansion names
+// updateParams are pairings of expansion names
 // and the value they expand to
-type PutCommandParams struct {
+type updateParams struct {
 	// The name of the expansion
 	Key string
 
@@ -68,17 +36,13 @@ type PutCommandParams struct {
 	Concat string
 }
 
-func (c *UpdateCommand) Name() string {
-	return UpdateVarsCmdName
-}
+func updateExpansionsFactory() Command { return &update{} }
+func (c *update) Name() string         { return "update" }
+func (c *update) Plugin() string       { return "expansions" }
 
-func (c *UpdateCommand) Plugin() string {
-	return ExpansionsPluginName
-}
-
-// ParseParams validates the input to the UpdateCommand, returning and error
+// ParseParams validates the input to the update, returning and error
 // if something is incorrect. Fulfills Command interface.
-func (c *UpdateCommand) ParseParams(params map[string]interface{}) error {
+func (c *update) ParseParams(params map[string]interface{}) error {
 	err := mapstructure.Decode(params, c)
 	if err != nil {
 		return err
@@ -94,7 +58,7 @@ func (c *UpdateCommand) ParseParams(params map[string]interface{}) error {
 	return nil
 }
 
-func (c *UpdateCommand) ExecuteUpdates(ctx context.Context, conf *model.TaskConfig) error {
+func (c *update) ExecuteUpdates(ctx context.Context, conf *model.TaskConfig) error {
 	for _, update := range c.Updates {
 		if ctx.Err() != nil {
 			return errors.New("operation aborted")
@@ -122,7 +86,7 @@ func (c *UpdateCommand) ExecuteUpdates(ctx context.Context, conf *model.TaskConf
 }
 
 // Execute updates the expansions. Fulfills Command interface.
-func (c *UpdateCommand) Execute(ctx context.Context,
+func (c *update) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	err := c.ExecuteUpdates(ctx, conf)

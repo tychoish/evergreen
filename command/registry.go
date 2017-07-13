@@ -12,6 +12,12 @@ var evgRegistry *commandRegistry
 
 func init() {
 	evgRegistry = newCommandRegistry()
+
+	RegisterCommand("git.apply_patch", gitApplyPatchFactory)
+	RegisterCommand("expansions.fetch_vars", fetchVarsFactory)
+	RegisterCommand("shell.cleanup", shellCleanupFactory)
+	RegisterCommand("shell.track", shellTrackFactory)
+	RegisterCommand("expansions.update", updateExpansionsFactory)
 }
 
 func RegisterCommand(name string, factory CommandFactory) error {
@@ -23,7 +29,7 @@ func GetCommandFactory(name string) (CommandFactory, bool) {
 	return evgRegistry.getCommandFactory(name)
 }
 
-type CommandFactory func() (Command, bool)
+type CommandFactory func() Command
 
 type commandRegistry struct {
 	mu   *sync.RWMutex

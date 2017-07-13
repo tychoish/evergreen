@@ -33,8 +33,6 @@ func (self *GitPlugin) NewCommand(cmdName string) (plugin.Command, error) {
 	switch cmdName {
 	case GetProjectCmdName:
 		return &GitGetProjectCommand{}, nil
-	case ApplyPatchCmdName:
-		return &GitApplyPatchCommand{}, nil
 	default:
 		return nil, &plugin.ErrUnknownCommand{cmdName}
 	}

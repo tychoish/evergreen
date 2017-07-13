@@ -1,4 +1,4 @@
-package expansions_test
+package command
 
 import (
 	"testing"
@@ -7,7 +7,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
 	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
-	. "github.com/evergreen-ci/evergreen/plugin/builtin/expansions"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"

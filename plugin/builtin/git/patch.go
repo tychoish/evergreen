@@ -17,19 +17,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-// GitApplyPatchCommand is deprecated. Its functionality is now a part of GitGetProjectCommand.
-type GitApplyPatchCommand struct{}
-
-func (*GitApplyPatchCommand) Name() string                                    { return ApplyPatchCmdName }
-func (*GitApplyPatchCommand) Plugin() string                                  { return GitPluginName }
-func (*GitApplyPatchCommand) ParseParams(params map[string]interface{}) error { return nil }
-func (*GitApplyPatchCommand) Execute(ctx context.Context,
-	client client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
-
-	logger.Task().Warning("git.apply_patch is deprecated. Patches are applied in git.get_project.")
-	return nil
-}
-
 // getPatchContents() dereferences any patch files that are stored externally, fetching them from
 // the API server, and setting them into the patch object.
 func (c GitGetProjectCommand) getPatchContents(ctx context.Context, comm client.Communicator,

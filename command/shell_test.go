@@ -1,14 +1,12 @@
-package shell
+package command
 
 import (
 	"fmt"
 	"runtime"
 	"testing"
 
-	"github.com/evergreen-ci/evergreen/agent/comm"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/task"
-	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
@@ -26,9 +24,6 @@ func TestShellExecuteCommand(t *testing.T) {
 		t.Fatalf("failed to create test server %+v", err)
 	}
 	defer server.Close()
-
-	httpCom := plugintest.TestAgentCommunicator(&modelutil.TestModelData{}, server.URL)
-	jsonCom := &comm.TaskJSONCommunicator{"shell", httpCom}
 
 	conf := &model.TaskConfig{Expansions: &util.Expansions{}, Task: &task.Task{}, Project: &model.Project{}}
 

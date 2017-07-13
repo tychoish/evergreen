@@ -1,93 +1,22 @@
-package shell
+package command
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/evergreen-ci/evergreen/model"
-	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/subprocess"
 	"github.com/mitchellh/mapstructure"
-	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
-func init() {
-	plugin.Publish(&ShellPlugin{})
-}
-
-const (
-	ShellPluginName = "shell"
-	ShellExecCmd    = "exec"
-	CleanupCmd      = "cleanup"
-	TrackCmd        = "track"
-)
-
-// ShellPlugin runs arbitrary shell code on the agent's machine.
-type ShellPlugin struct{}
-
-// Name returns the name of the plugin. Required to fulfill
-// the Plugin interface.
-func (sp *ShellPlugin) Name() string {
-	return ShellPluginName
-}
-
-// NewCommand returns the requested command, or returns an error
-// if a non-existing command is requested.
-func (sp *ShellPlugin) NewCommand(cmdName string) (plugin.Command, error) {
-	if cmdName == TrackCmd {
-		return &TrackCommand{}, nil
-	} else if cmdName == CleanupCmd {
-		return &CleanupCommand{}, nil
-	} else if cmdName == ShellExecCmd {
-		return &ShellExecCommand{}, nil
-	}
-	return nil, errors.Errorf("no such command: %v", cmdName)
-}
-
-type TrackCommand struct{}
-
-func (cc *TrackCommand) Name() string {
-	return TrackCmd
-}
-
-func (cc *TrackCommand) Plugin() string {
-	return ShellPluginName
-}
-
-func (cc *TrackCommand) ParseParams(params map[string]interface{}) error {
-	return nil
-}
-
-// Execute starts the shell with its given parameters.
-func (cc *TrackCommand) Execute(ctx context.Context,
-	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
-
-	logger.Execution().Warning("shell.track is deprecated. Process tracking is now enabled by default.")
-	return nil
-}
-
-type CleanupCommand struct{}
-
-func (cc *CleanupCommand) Name() string                                    { return CleanupCmd }
-func (cc *CleanupCommand) Plugin() string                                  { return ShellPluginName }
-func (cc *CleanupCommand) ParseParams(params map[string]interface{}) error { return nil }
-
-// Execute starts the shell with its given parameters.
-func (cc *CleanupCommand) Execute(ctx context.Context,
-	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
-
-	logger.Execution().Warning("shell.cleanup is deprecated. Process cleanup is now enabled by default.")
-	return nil
-}
-
-// ShellExecCommand is responsible for running the shell code.
-type ShellExecCommand struct {
+// shellExec is responsible for running the shell code.
+type shellExec struct {
 	// Script is the shell code to be run on the agent machine.
 	Script string `mapstructure:"script" plugin:"expand"`
 
@@ -119,20 +48,20 @@ type ShellExecCommand struct {
 	ContinueOnError bool `mapstructure:"continue_on_err"`
 }
 
-func (_ *ShellExecCommand) Name() string   { return ShellExecCmd }
-func (_ *ShellExecCommand) Plugin() string { return ShellPluginName }
+func (*shellExec) Name() string   { return "exec" }
+func (*shellExec) Plugin() string { return "shell" }
 
 // ParseParams reads in the command's parameters.
-func (sec *ShellExecCommand) ParseParams(params map[string]interface{}) error {
-	err := mapstructure.Decode(params, sec)
+func (c *shellExec) ParseParams(params map[string]interface{}) error {
+	err := mapstructure.Decode(params, c)
 	if err != nil {
-		return errors.Wrapf(err, "error decoding %v params", sec.Name())
+		return errors.Wrapf(err, "error decoding %v params", c.Name())
 	}
 	return nil
 }
 
 // Execute starts the shell with its given parameters.
-func (sec *ShellExecCommand) Execute(ctx context.Context,
+func (c *shellExec) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	logger.Execution().Debug("Preparing script...")
@@ -140,7 +69,7 @@ func (sec *ShellExecCommand) Execute(ctx context.Context,
 	var logWriterInfo io.Writer
 	var logWriterErr io.Writer
 
-	if sec.SystemLog {
+	if c.SystemLog {
 		logWriterInfo = logger.SystemWriter(level.Info)
 		logWriterErr = logger.SystemWriter(level.Error)
 	} else {
@@ -149,20 +78,20 @@ func (sec *ShellExecCommand) Execute(ctx context.Context,
 	}
 
 	localCmd := &subprocess.LocalCommand{
-		CmdString:  sec.Script,
+		CmdString:  c.Script,
 		Stdout:     logWriterInfo,
 		Stderr:     logWriterErr,
 		ScriptMode: true,
 	}
 
-	if sec.WorkingDir != "" {
-		localCmd.WorkingDirectory = filepath.Join(conf.WorkDir, sec.WorkingDir)
+	if c.WorkingDir != "" {
+		localCmd.WorkingDirectory = filepath.Join(conf.WorkDir, c.WorkingDir)
 	} else {
 		localCmd.WorkingDirectory = conf.WorkDir
 	}
 
-	if sec.Shell != "" {
-		localCmd.Shell = sec.Shell
+	if c.Shell != "" {
+		localCmd.Shell = c.Shell
 	}
 
 	err := localCmd.PrepToRun(conf.Expansions)
@@ -170,7 +99,7 @@ func (sec *ShellExecCommand) Execute(ctx context.Context,
 		return errors.Wrap(err, "Failed to apply expansions")
 	}
 
-	if sec.Silent {
+	if c.Silent {
 		logger.Execution().Infof("Executing script with %s (source hidden)...",
 			localCmd.Shell)
 	} else {
@@ -194,9 +123,9 @@ func (sec *ShellExecCommand) Execute(ctx context.Context,
 			// Call the platform's process-tracking function. On some OSes this will be a noop,
 			// on others this may need to do some additional work to track the process so that
 			// it can be cleaned up later.
-			trackProcess(conf.Task.Id, localCmd.Cmd.Process.Pid, logger)
+			subprocess.TrackProcess(conf.Task.Id, localCmd.Cmd.Process.Pid, logger)
 
-			if sec.Background {
+			if c.Background {
 				logger.Execution().Debug("running command in the background")
 				close(doneStatus)
 			} else {
@@ -214,7 +143,7 @@ func (sec *ShellExecCommand) Execute(ctx context.Context,
 	select {
 	case err = <-doneStatus:
 		if err != nil {
-			if sec.ContinueOnError {
+			if c.ContinueOnError {
 				logger.Execution().Infof("(ignoring) Script finished with error: %v", err)
 				return nil
 			}
@@ -242,26 +171,4 @@ func (sec *ShellExecCommand) Execute(ctx context.Context,
 	}
 
 	return nil
-}
-
-// envHasMarkers returns a bool indicating if both marker vars are found in an environment var list
-func envHasMarkers(env []string, pidMarker, taskMarker string) bool {
-	hasPidMarker := false
-	hasTaskMarker := false
-	for _, envVar := range env {
-		if envVar == pidMarker {
-			hasPidMarker = true
-		}
-		if envVar == taskMarker {
-			hasTaskMarker = true
-		}
-	}
-	return hasPidMarker && hasTaskMarker
-}
-
-// KillSpawnedProcs cleans up any tasks that were spawned by the given task.
-func KillSpawnedProcs(taskId string, logger grip.Journaler) error {
-	// Clean up all shell processes spawned during the execution of this task by this agent,
-	// by calling the platform-specific "cleanup" function
-	return cleanup(taskId, logger)
 }
