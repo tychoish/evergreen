@@ -1,4 +1,4 @@
-package gotest
+package command
 
 import (
 	"bufio"
@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/evergreen-ci/evergreen"
+	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/pkg/errors"
 )
 
@@ -14,46 +16,26 @@ const (
 	PASS = "PASS"
 	FAIL = "FAIL"
 	SKIP = "SKIP"
-
-	// Match the start prefix and save the group of non-space characters following the word "RUN"
-	StartRegexString = `=== RUN\s+(\S+)`
-
-	// Match the end prefix, save PASS/FAIL/SKIP, save the decimal value for number of seconds
-	EndRegexString = `--- (PASS|SKIP|FAIL): (\S+) \(([0-9.]+[ ]*s)`
-
-	// Match the start prefix and save the group of non-space characters following the word "RUN"
-	GocheckStartRegexString = `START: .*.go:[0-9]+: (\S+)`
-
-	// Match the end prefix, save PASS/FAIL/SKIP, save the decimal value for number of seconds
-	GocheckEndRegexString = `(PASS|SKIP|FAIL): .*.go:[0-9]+: (\S+)\s*([0-9.]+[ ]*s)?`
 )
 
-var startRegex = regexp.MustCompile(StartRegexString)
-var endRegex = regexp.MustCompile(EndRegexString)
-var gocheckStartRegex = regexp.MustCompile(GocheckStartRegexString)
-var gocheckEndRegex = regexp.MustCompile(GocheckEndRegexString)
+var (
+	// Match the start prefix and save the group of non-space characters following the word "RUN"
+	startRegex = regexp.MustCompile(`=== RUN\s+(\S+)`)
 
-// Parser is an interface for parsing go test output, producing
-// test logs and test results
-type Parser interface {
-	// Parse takes a reader for test output, and reads
-	// until the reader is exhausted. Any parsing erros
-	// are returned.
-	Parse(io.Reader) error
+	// Match the end prefix, save PASS/FAIL/SKIP, save the decimal value for number of seconds
+	endRegex = regexp.MustCompile(`--- (PASS|SKIP|FAIL): (\S+) \(([0-9.]+[ ]*s)`)
 
-	// Logs returns an array of strings, each entry a line in
-	// the test output.
-	Logs() []string
+	// Match the start prefix and save the group of non-space characters following the word "RUN"
+	gocheckStartRegex = regexp.MustCompile(`START: .*.go:[0-9]+: (\S+)`)
 
-	// Results returns an array of test results. Parse() must be called
-	// before this.
-	Results() []*TestResult
-}
+	// Match the end prefix, save PASS/FAIL/SKIP, save the decimal value for number of seconds
+	gocheckEndRegex = regexp.MustCompile(`(PASS|SKIP|FAIL): .*.go:[0-9]+: (\S+)\s*([0-9.]+[ ]*s)?`)
+)
 
 // This test result implementation maps more idiomatically to Go's test output
 // than the TestResult type in the model package. Results are converted to the
 // model type before being sent to the server.
-type TestResult struct {
+type goTestResult struct {
 	// The name of the test
 	Name string
 	// The name of the test suite the test is a part of.
@@ -76,25 +58,58 @@ type TestResult struct {
 	LogId string
 }
 
-// VanillaParser parses tests following go test output format.
+// ToModelTestResults converts the implementation of TestResults native
+// to the goTest plugin to the implementation used by MCI tasks
+func ToModelTestResults(results []*goTestResult) task.TestResults {
+	var modelResults []task.TestResult
+	for _, res := range results {
+		// start and end are times that we don't know,
+		// represented as a 64bit floating point (epoch time fraction)
+		var start float64 = float64(time.Now().Unix())
+		var end float64 = start + res.RunTime.Seconds()
+		var status string
+		switch res.Status {
+		// as long as we use a regex, it should be impossible to
+		// get an incorrect status code
+		case PASS:
+			status = evergreen.TestSucceededStatus
+		case SKIP:
+			status = evergreen.TestSkippedStatus
+		case FAIL:
+			status = evergreen.TestFailedStatus
+		}
+		convertedResult := task.TestResult{
+			TestFile:  res.Name,
+			Status:    status,
+			StartTime: start,
+			EndTime:   end,
+			LineNum:   res.StartLine - 1,
+			LogId:     res.LogId,
+		}
+		modelResults = append(modelResults, convertedResult)
+	}
+	return task.TestResults{modelResults}
+}
+
+// goTestParser parses tests following go test output format.
 // This should cover regular go tests as well as those written with the
 // popular testing packages goconvey and gocheck.
-type VanillaParser struct {
+type goTestParser struct {
 	Suite string
 	logs  []string
 	// map for storing tests during parsing
-	tests map[string]*TestResult
+	tests map[string]*goTestResult
 	order []string
 }
 
 // Logs returns an array of logs captured during test execution.
-func (vp *VanillaParser) Logs() []string {
+func (vp *goTestParser) Logs() []string {
 	return vp.logs
 }
 
 // Results returns an array of test results parsed during test execution.
-func (vp *VanillaParser) Results() []*TestResult {
-	out := []*TestResult{}
+func (vp *goTestParser) Results() []*goTestResult {
+	out := []*goTestResult{}
 
 	for _, name := range vp.order {
 		out = append(out, vp.tests[name])
@@ -104,9 +119,9 @@ func (vp *VanillaParser) Results() []*TestResult {
 }
 
 // Parse reads in a test's output and stores the results and logs.
-func (vp *VanillaParser) Parse(testOutput io.Reader) error {
+func (vp *goTestParser) Parse(testOutput io.Reader) error {
 	testScanner := bufio.NewScanner(testOutput)
-	vp.tests = map[string]*TestResult{}
+	vp.tests = map[string]*goTestResult{}
 	for testScanner.Scan() {
 		if err := testScanner.Err(); err != nil {
 			return errors.Wrap(err, "error reading test output")
@@ -123,7 +138,7 @@ func (vp *VanillaParser) Parse(testOutput io.Reader) error {
 }
 
 // handleLine attempts to parse and store any test updates from the given line.
-func (vp *VanillaParser) handleLine(line string) error {
+func (vp *goTestParser) handleLine(line string) error {
 	// This is gross, and could all go away with the resolution of
 	// https://code.google.com/p/go/issues/detail?id=2981
 	switch {
@@ -140,7 +155,7 @@ func (vp *VanillaParser) handleLine(line string) error {
 }
 
 // handleEnd gets the end data from an ending line and stores it.
-func (vp *VanillaParser) handleEnd(line string, rgx *regexp.Regexp) error {
+func (vp *goTestParser) handleEnd(line string, rgx *regexp.Regexp) error {
 	name, status, duration, err := endInfoFromLogLine(line, rgx)
 	if err != nil {
 		return errors.Wrapf(err, "error parsing end line '%s'", line)
@@ -148,7 +163,7 @@ func (vp *VanillaParser) handleEnd(line string, rgx *regexp.Regexp) error {
 	t := vp.tests[name]
 	if t == nil || t.Name == "" {
 		// if there's no existing test, just stub one out
-		t = vp.newTestResult(name)
+		t = vp.newgoTestResult(name)
 		vp.order = append(vp.order, name)
 		vp.tests[name] = t
 	}
@@ -160,12 +175,12 @@ func (vp *VanillaParser) handleEnd(line string, rgx *regexp.Regexp) error {
 }
 
 // handleStart gets the data from a start line and stores it.
-func (vp *VanillaParser) handleStart(line string, rgx *regexp.Regexp, defaultFail bool) error {
+func (vp *goTestParser) handleStart(line string, rgx *regexp.Regexp, defaultFail bool) error {
 	name, err := startInfoFromLogLine(line, rgx)
 	if err != nil {
 		return errors.Wrapf(err, "error parsing start line '%s'", line)
 	}
-	t := vp.newTestResult(name)
+	t := vp.newgoTestResult(name)
 
 	// tasks should start out failed unless they're marked
 	// passing/skipped, although gocheck can't support this
@@ -183,8 +198,8 @@ func (vp *VanillaParser) handleStart(line string, rgx *regexp.Regexp, defaultFai
 
 // newTestResult populates a test result type with the given
 // test name, current suite, and current line number.
-func (vp *VanillaParser) newTestResult(name string) *TestResult {
-	return &TestResult{
+func (vp *goTestParser) newTestResult(name string) *goTestResult {
+	return &goTestResult{
 		Name:      name,
 		SuiteName: vp.Suite,
 		StartLine: len(vp.logs),

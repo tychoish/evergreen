@@ -1,4 +1,4 @@
-package attach
+package command
 
 import (
 	"os"
@@ -14,49 +14,35 @@ import (
 	"golang.org/x/net/context"
 )
 
-// AttachXUnitResultsCommand reads in an xml file of xunit
+// xunitResults reads in an xml file of xunit
 // type results and converts them to a format MCI can use
-type AttachXUnitResultsCommand struct {
+type xunitResults struct {
 	// File describes the relative path of the file to be sent. Supports globbing.
 	// Note that this can also be described via expansions.
 	File  string   `mapstructure:"file" plugin:"expand"`
 	Files []string `mapstructure:"files" plugin:"expand"`
 }
 
-func (c *AttachXUnitResultsCommand) Name() string {
-	return AttachXunitResultsCmd
-}
-
-func (c *AttachXUnitResultsCommand) Plugin() string {
-	return AttachPluginName
-}
+func xunitResultsFactory() Command     { return &xunitResults{} }
+func (c *xunitResults) Name() string   { return "xunit_results" }
+func (c *xunitResults) Plugin() string { return "attach" }
 
 // ParseParams reads and validates the command parameters. This is required
 // to satisfy the 'Command' interface
-func (c *AttachXUnitResultsCommand) ParseParams(
-	params map[string]interface{}) error {
+func (c *xunitResults) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, c); err != nil {
 		return errors.Wrapf(err, "error decoding '%s' params", c.Name())
 	}
 
-	if err := c.validateParams(); err != nil {
-		return errors.Wrapf(err, "error validating '%s' params", c.Name())
-	}
-
-	return nil
-}
-
-// validateParams is a helper function that ensures all
-// the fields necessary for attaching an xunit results are present
-func (c *AttachXUnitResultsCommand) validateParams() (err error) {
 	if c.File == "" && len(c.Files) == 0 {
 		return errors.New("must specify at least one file")
 	}
+
 	return nil
 }
 
 // Expand the parameter appropriately
-func (c *AttachXUnitResultsCommand) expandParams(conf *model.TaskConfig) error {
+func (c *xunitResults) expandParams(conf *model.TaskConfig) error {
 	if c.File != "" {
 		c.Files = append(c.Files, c.File)
 	}
@@ -74,7 +60,7 @@ func (c *AttachXUnitResultsCommand) expandParams(conf *model.TaskConfig) error {
 
 // Execute carries out the AttachResultsCommand command - this is required
 // to satisfy the 'Command' interface
-func (c *AttachXUnitResultsCommand) Execute(ctx context.Context,
+func (c *xunitResults) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	if err := c.expandParams(conf); err != nil {
@@ -107,10 +93,10 @@ func getFilePaths(workDir string, files []string) ([]string, error) {
 		out = append(out, paths...)
 	}
 
-	return out, errors.Wrapf(catcher.Resolve(), "%d incorrect file specifications", catcher.Len())
+	return nil, errors.Wrapf(catcher.Resolve(), "%d incorrect file specifications", catcher.Len())
 }
 
-func (c *AttachXUnitResultsCommand) parseAndUploadResults(ctx context.Context, conf *model.TaskConfig,
+func (c *xunitResults) parseAndUploadResults(ctx context.Context, conf *model.TaskConfig,
 	logger client.LoggerProducer, comm client.Communicator) error {
 
 	tests := []task.TestResult{}

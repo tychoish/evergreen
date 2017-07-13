@@ -1,4 +1,4 @@
-package attach_test
+package command
 
 import (
 	"path/filepath"
@@ -10,7 +10,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/plugin"
-	. "github.com/evergreen-ci/evergreen/plugin/builtin/attach"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"

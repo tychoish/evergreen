@@ -2,11 +2,17 @@ package command
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/goamz/s3"
+)
+
+var (
+	// Regular expression for validating S3 bucket names
+	bucketNameRegex = regexp.MustCompile(`^[A-Za-z0-9_\-.]+$`)
 )
 
 func validateS3BucketName(bucket string) error {
@@ -31,7 +37,7 @@ func validateS3BucketName(bucket string) error {
 	if strings.Contains(bucket, "..") {
 		return errors.New("must not have two consecutive periods")
 	}
-	if !BucketNameRegex.MatchString(bucket) {
+	if !bucketNameRegex.MatchString(bucket) {
 		return errors.New("must contain only combinations of uppercase/lowercase " +
 			"letters, numbers, hyphens, underscores and periods")
 	}

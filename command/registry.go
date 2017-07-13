@@ -21,6 +21,10 @@ func init() {
 	RegisterCommand("keyval.inc", keyValIncFactory)
 	RegisterCommand("s3.get", s3GetFactory)
 	RegisterCommand("s3.put", s3PutFactory)
+	RegisterCommand("s3copy.copy", s3CopyFactory)
+	RegisterCommand("gotest.parse_files", goTestFactory)
+	RegisterCommand("attach.results", attachResultsFactory)
+	RegisterCommand("attach.xunit_results", xunitResultsFactory)
 }
 
 func RegisterCommand(name string, factory CommandFactory) error {

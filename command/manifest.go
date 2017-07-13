@@ -1,32 +1,28 @@
-package manifest
+package command
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
-// ManifestLoadCommand
-type ManifestLoadCommand struct{}
+// manifestLoad
+type manifestLoad struct{}
 
-func (mfc *ManifestLoadCommand) Name() string {
-	return ManifestLoadCmd
-}
+func manifestLoadFactory() Command     { return &manifestLoad{} }
+func (c *manifestLoad) Name() string   { return "load" }
+func (c *manifestLoad) Plugin() string { return "manifest" }
 
-func (mfc *ManifestLoadCommand) Plugin() string {
-	return ManifestPluginName
-}
-
-// ManifestLoadCommand-specific implementation of ParseParams.
-func (mfc *ManifestLoadCommand) ParseParams(params map[string]interface{}) error {
+// manifestLoad-specific implementation of ParseParams.
+func (c *manifestLoad) ParseParams(params map[string]interface{}) error {
 	return nil
 }
 
 // Load performs a GET on /manifest/load
-func (mfc *ManifestLoadCommand) Load(ctx context.Context,
+func (c *manifestLoad) Load(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
@@ -50,12 +46,12 @@ func (mfc *ManifestLoadCommand) Load(ctx context.Context,
 }
 
 // Implementation of Execute.
-func (mfc *ManifestLoadCommand) Execute(ctx context.Context,
+func (c *manifestLoad) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- mfc.Load(ctx, comm, logger, conf)
+		errChan <- c.Load(ctx, comm, logger, conf)
 	}()
 
 	select {

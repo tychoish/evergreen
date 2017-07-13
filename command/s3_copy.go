@@ -1,4 +1,4 @@
-package s3copy
+package command
 
 import (
 	"path/filepath"
@@ -14,10 +14,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-func init() {
-	plugin.Publish(&S3CopyPlugin{})
-}
-
 const (
 	s3CopyCmd         = "copy"
 	s3CopyPluginName  = "s3Copy"
@@ -27,7 +23,7 @@ const (
 
 // The S3CopyPlugin consists of zero or more files that are to be copied
 // from one location in S3 to the other.
-type S3CopyCommand struct {
+type s3copy struct {
 	// AwsKey & AwsSecret are provided to make it possible to transfer
 	// files to/from any bucket using the appropriate keys for each
 	AwsKey    string `mapstructure:"aws_key" plugin:"expand" json:"aws_key"`
@@ -36,9 +32,6 @@ type S3CopyCommand struct {
 	// An array of file copy configurations
 	S3CopyFiles []*s3CopyFile `mapstructure:"s3_copy_files" plugin:"expand"`
 }
-
-// S3CopyPlugin is used to copy files around in s3
-type S3CopyPlugin struct{}
 
 type s3CopyFile struct {
 	// Each source and destination is specified in the
@@ -75,57 +68,33 @@ type s3Loc struct {
 	Path string `mapstructure:"path" plugin:"expand"`
 }
 
-// Name returns the name of this plugin - it serves to satisfy
-// the 'Plugin' interface
-func (scp *S3CopyPlugin) Name() string {
-	return s3CopyPluginName
-}
-
-func (self *S3CopyPlugin) Configure(map[string]interface{}) error {
-	return nil
-}
-
-// NewCommand returns the S3CopyPlugin - this is to satisfy the
-// 'Plugin' interface
-func (scp *S3CopyPlugin) NewCommand(cmdName string) (plugin.Command, error) {
-	if cmdName != s3CopyCmd {
-		return nil, errors.Errorf("No such %v command: %v",
-			s3CopyPluginName, cmdName)
-	}
-	return &S3CopyCommand{}, nil
-}
-
-func (scc *S3CopyCommand) Name() string {
-	return s3CopyCmd
-}
-
-func (scc *S3CopyCommand) Plugin() string {
-	return s3CopyPluginName
-}
+func s3CopyFactory() Command     { return &s3copy{} }
+func (c *s3copy) Name() string   { return "copy" }
+func (c *s3copy) Plugin() string { return "s3copy" }
 
 // ParseParams decodes the S3 push command parameters that are
 // specified as part of an S3CopyPlugin command; this is required
 // to satisfy the 'Command' interface
-func (scc *S3CopyCommand) ParseParams(params map[string]interface{}) error {
-	if err := mapstructure.Decode(params, scc); err != nil {
-		return errors.Wrapf(err, "error decoding %v params", scc.Name())
+func (c *s3copy) ParseParams(params map[string]interface{}) error {
+	if err := mapstructure.Decode(params, c); err != nil {
+		return errors.Wrapf(err, "error decoding %v params", c.Name())
 	}
-	if err := scc.validateParams(); err != nil {
-		return errors.Wrapf(err, "error validating %v params", scc.Name())
+	if err := c.validateParams(); err != nil {
+		return errors.Wrapf(err, "error validating %v params", c.Name())
 	}
 	return nil
 }
 
 // validateParams is a helper function that ensures all
 // the fields necessary for carrying out an S3 copy operation are present
-func (scc *S3CopyCommand) validateParams() (err error) {
-	if scc.AwsKey == "" {
+func (c *s3copy) validateParams() (err error) {
+	if c.AwsKey == "" {
 		return errors.New("s3 AWS key cannot be blank")
 	}
-	if scc.AwsSecret == "" {
+	if c.AwsSecret == "" {
 		return errors.New("s3 AWS secret cannot be blank")
 	}
-	for _, s3CopyFile := range scc.S3CopyFiles {
+	for _, s3CopyFile := range c.S3CopyFiles {
 		if s3CopyFile.Source.Bucket == "" {
 			return errors.New("s3 source bucket cannot be blank")
 		}
@@ -138,18 +107,7 @@ func (scc *S3CopyCommand) validateParams() (err error) {
 		if s3CopyFile.Destination.Path == "" {
 			return errors.New("s3 destination path cannot be blank")
 		}
-	}
 
-	// validate the S3 copy parameters before running the task
-	if err := scc.validateS3CopyParams(); err != nil {
-		return errors.WithStack(err)
-	}
-	return nil
-}
-
-// validateS3CopyParams validates the s3 copy params right before executing
-func (scc *S3CopyCommand) validateS3CopyParams() (err error) {
-	for _, s3CopyFile := range scc.S3CopyFiles {
 		err := validateS3BucketName(s3CopyFile.Source.Bucket)
 		if err != nil {
 			return errors.Wrapf(err, "source bucket '%v' is invalid",
@@ -162,27 +120,28 @@ func (scc *S3CopyCommand) validateS3CopyParams() (err error) {
 				s3CopyFile.Destination.Bucket)
 		}
 	}
+
 	return nil
 }
 
-// Execute carries out the S3CopyCommand command - this is required
+// Execute carries out the s3copy command - this is required
 // to satisfy the 'Command' interface
-func (scc *S3CopyCommand) Execute(ctx context.Context,
+func (c *s3copy) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	// expand the S3 copy parameters before running the task
-	if err := plugin.ExpandValues(scc, conf.Expansions); err != nil {
+	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		return errors.WithStack(err)
 	}
 
 	// validate the S3 copy parameters before running the task
-	if err := scc.validateS3CopyParams(); err != nil {
+	if err := c.validateS3CopyParams(); err != nil {
 		return errors.WithStack(err)
 	}
 
 	errChan := make(chan error)
 	go func() {
-		errChan <- errors.WithStack(scc.S3Copy(ctx, comm, logger, conf))
+		errChan <- errors.WithStack(c.s3Copy(ctx, comm, logger, conf))
 	}()
 
 	select {
@@ -197,12 +156,12 @@ func (scc *S3CopyCommand) Execute(ctx context.Context,
 // S3Copy is responsible for carrying out the core of the S3CopyPlugin's
 // function - it makes an API calls to copy a given staged file to it's final
 // production destination
-func (scc *S3CopyCommand) S3Copy(ctx context.Context,
+func (c *s3copy) s3Copy(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
 
-	for _, s3CopyFile := range scc.S3CopyFiles {
+	for _, s3CopyFile := range c.S3CopyFiles {
 		if len(s3CopyFile.BuildVariants) > 0 && !util.SliceContains(
 			s3CopyFile.BuildVariants, conf.BuildVariant.Name) {
 			continue
@@ -218,8 +177,8 @@ func (scc *S3CopyCommand) S3Copy(ctx context.Context,
 			s3CopyFile.Destination.Path)
 
 		s3CopyReq := apimodels.S3CopyRequest{
-			AwsKey:              scc.AwsKey,
-			AwsSecret:           scc.AwsSecret,
+			AwsKey:              c.AwsKey,
+			AwsSecret:           c.AwsSecret,
 			S3SourceBucket:      s3CopyFile.Source.Bucket,
 			S3SourcePath:        s3CopyFile.Source.Path,
 			S3DestinationBucket: s3CopyFile.Destination.Bucket,
@@ -240,7 +199,7 @@ func (scc *S3CopyCommand) S3Copy(ctx context.Context,
 
 		}
 
-		err = scc.AttachTaskFiles(ctx, comm, logger, td, s3CopyReq)
+		err = c.attachFiles(ctx, comm, logger, td, s3CopyReq)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -250,7 +209,7 @@ func (scc *S3CopyCommand) S3Copy(ctx context.Context,
 
 // AttachTaskFiles is responsible for sending the
 // specified file to the API Server
-func (c *S3CopyCommand) AttachTaskFiles(ctx context.Context, comm client.Communicator,
+func (c *s3copy) attachFiles(ctx context.Context, comm client.Communicator,
 	logger client.LoggerProducer, td client.TaskData, request apimodels.S3CopyRequest) error {
 
 	remotePath := filepath.ToSlash(request.S3DestinationPath)

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/evergreen-ci/evergreen/model"
@@ -17,6 +18,7 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/mapstructure"
+	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 )
 
@@ -216,88 +218,80 @@ func (s3pc *s3put) putWithRetry(ctx context.Context,
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
+retryLoop:
 	for i := 1; i <= maxs3putAttempts; i++ {
-		logger.Task().Infof("performing s3 put to %s of %s", s3pc.Bucket, s3pc.RemoteFile)
+		logger.Task().Infof("performing s3 put to %s of %s [%d of %d]",
+			s3pc.Bucket, s3pc.RemoteFile,
+			i, maxs3putAttempts)
 
-	}
+		select {
+		case <-ctx.Done():
+			return errors.New("s3 put operation canceled")
+		case <-timer.C:
+			filesList := []string{s3pc.LocalFile}
 
-	retriablePut := util.RetriableFunc(
-		func() error {
-			filesList, err := s3pc.put()
-			if err != nil {
-				if err == errSkippedFile {
-					return errors.WithStack(err)
+			if s3pc.isMulti() {
+				filesList, err = util.BuildFileList(".", s3pc.LocalFilesIncludeFilter...)
+				if err != nil {
+					grip.Error(err)
+					return errors.Errorf("could not parse includes filter %s", strings.Join(spc.LocalFilesIncludeFilter, " "))
 				}
-				logger.Execution().Errorf("Error putting to s3 bucket: %v", err)
-				return util.RetriableError{err}
+			}
+		fileUploadLoop:
+			for _, fpath := range filesList {
+				if ctx.Err() != nil {
+					return errors.New("s3 put operation canceled")
+				}
+
+				remoteName := s3pc.RemoteFile
+				if s3pc.isMulti() {
+					fname := filepath.Base(fpath)
+					remoteName = fmt.Sprintf("%s%s", s3pc.RemoteFile, fname)
+				}
+
+				auth := &aws.Auth{
+					AccessKey: s3pc.AwsKey,
+					SecretKey: s3pc.AwsSecret,
+				}
+				s3URL := url.URL{
+					Scheme: "s3",
+					Host:   s3pc.Bucket,
+					Path:   remoteName,
+				}
+
+				err := thirdparty.PutS3File(auth, fpath, s3URL.String(), s3pc.ContentType, s3pc.Permissions)
+				if err != nil {
+					if !s3pc.isMulti() {
+						if s3pc.Optional && os.IsNotExist(err) {
+							// important to *not* wrap this error.
+							return errors.Wrapf(err, "missing file %s", fpath)
+						}
+					}
+
+					grip.Error(err)
+					timer.Reset(backoffCounter.Duration())
+					continue retryLoop
+				}
+
+				err = s3pc.attachFiles(ctx, comm, logger, file, s3pc.RemoteFile)
+				if err != nil {
+					return true, errors.Wrapf(err, "problem attaching file: %s to %s", fpath, s3pc.RemoteFile)
+				}
 			}
 
-		},
-	)
+			if !shouldRetry {
+				if err != nil {
+					return errors.Wrap(err, "encountered error during s3put. Not retrying.")
+				}
+				return nil
+			}
 
-	retryFail, err := util.Retry(retriablePut, maxS3PutAttempts, s3PutSleep)
-	if err == errSkippedFile {
-		logger.Execution().Info("S3 put skipped optional missing file.")
-		return nil
-	}
-	if retryFail {
-		logger.Execution().Errorf("S3 put failed with error: %v", err)
-		return errors.WithStack(err)
+			logger.Execution().Errorf("retrying after error during putting to s3 bucket: %v", err)
+			timer.Reset(backoffCounter.Duration())
+		}
 	}
 
 	return nil
-}
-
-// put the specified resource to s3.
-func (s3pc *s3put) put(ctx context.Context) ([]string, error) {
-	var err error
-
-	filesList := []string{s3pc.LocalFile}
-
-	if s3pc.isMulti() {
-		filesList, err = util.BuildFileList(".", s3pc.LocalFilesIncludeFilter...)
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-	}
-
-	for _, fpath := range filesList {
-		if ctx.Err() != nil {
-			return nil, errors.New("s3 put operation canceled")
-		}
-
-		remoteName := s3pc.RemoteFile
-		if s3pc.isMulti() {
-			fname := filepath.Base(fpath)
-			remoteName = fmt.Sprintf("%s%s", s3pc.RemoteFile, fname)
-		}
-
-		auth := &aws.Auth{
-			AccessKey: s3pc.AwsKey,
-			SecretKey: s3pc.AwsSecret,
-		}
-		s3URL := url.URL{
-			Scheme: "s3",
-			Host:   s3pc.Bucket,
-			Path:   remoteName,
-		}
-		err := thirdparty.PutS3File(auth, fpath, s3URL.String(), s3pc.ContentType, s3pc.Permissions)
-		if err != nil {
-			if !s3pc.isMulti() {
-				if s3pc.Optional && os.IsNotExist(err) {
-					// important to *not* wrap this error.
-					return nil, errSkippedFile
-				}
-			}
-			return nil, errors.WithStack(err)
-		}
-
-		err = s3pc.attachFiles(ctx, comm, logger, file, s3pc.RemoteFile)
-		if err != nil {
-			return errors.Wrapf(err, "problem attaching file: %s to %s", fpath, s3pc.RemoteFile)
-		}
-	}
-	return filesList, nil
 }
 
 // attachTaskFiles is responsible for sending the

@@ -1,4 +1,4 @@
-package xunit
+package command
 
 import (
 	"encoding/xml"

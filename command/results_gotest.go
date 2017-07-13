@@ -1,41 +1,33 @@
-package gotest
+package command
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
-	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
-// ParseFilesCommand is a struct implementing plugin.Command. It is used to parse a file or
+// goTestResults is a struct implementing plugin.Command. It is used to parse a file or
 // series of files containing the output of go tests, and send the results back to the server.
-type ParseFilesCommand struct {
+type goTestResults struct {
 	// a list of filename blobs to include
 	// e.g. "monitor.suite", "output/*"
 	Files []string `mapstructure:"files" plugin:"expand"`
 }
 
-// Name returns the string name for the parse files command.
-func (c *ParseFilesCommand) Name() string {
-	return ParseFilesCommandName
-}
+func goTestFactory() Command            { return &goTestResults{} }
+func (c *goTestResults) Name() string   { return "parse_files" }
+func (c *goTestResults) Plugin() string { return "gotest" }
 
-func (c *ParseFilesCommand) Plugin() string {
-	return GotestPluginName
-}
-
-// ParseParams reads the specified map of parameters into the ParseFilesCommand struct, and
+// ParseParams reads the specified map of parameters into the goTestResults struct, and
 // validates that at least one file pattern is specified.
-func (c *ParseFilesCommand) ParseParams(params map[string]interface{}) error {
+func (c *goTestResults) ParseParams(params map[string]interface{}) error {
 	if err := mapstructure.Decode(params, c); err != nil {
 		return errors.Wrapf(err, "error decoding '%s' params", c.Name())
 	}
@@ -49,12 +41,12 @@ func (c *ParseFilesCommand) ParseParams(params map[string]interface{}) error {
 
 // Execute parses the specified output files and sends the test results found in them
 // back to the server.
-func (c *ParseFilesCommand) Execute(ctx context.Context,
+func (c *goTestResults) Execute(ctx context.Context,
 	comm client.Communicator, logger client.LoggerProducer, conf *model.TaskConfig) error {
 
 	if err := plugin.ExpandValues(c, conf.Expansions); err != nil {
 		err = errors.Wrap(err, "error expanding params")
-		logger.Task().Errorf("Error parsing gotest files: %+v", err)
+		logger.Task().Errorf("Error parsing goTest files: %+v", err)
 		return err
 	}
 
@@ -124,7 +116,7 @@ func (c *ParseFilesCommand) Execute(ctx context.Context,
 
 // AllOutputFiles creates a list of all test output files that will be parsed, by expanding
 // all of the file patterns specified to the command.
-func (c *ParseFilesCommand) AllOutputFiles() ([]string, error) {
+func (c *goTestResultsz) AllOutputFiles() ([]string, error) {
 
 	outputFiles := []string{}
 
@@ -202,37 +194,4 @@ func ParseTestOutputFiles(ctx context.Context, logger client.LoggerProducer,
 
 	}
 	return logs, results, nil
-}
-
-// ToModelTestResults converts the implementation of TestResults native
-// to the gotest plugin to the implementation used by MCI tasks
-func ToModelTestResults(_ *task.Task, results []*TestResult) task.TestResults {
-	var modelResults []task.TestResult
-	for _, res := range results {
-		// start and end are times that we don't know,
-		// represented as a 64bit floating point (epoch time fraction)
-		var start float64 = float64(time.Now().Unix())
-		var end float64 = start + res.RunTime.Seconds()
-		var status string
-		switch res.Status {
-		// as long as we use a regex, it should be impossible to
-		// get an incorrect status code
-		case PASS:
-			status = evergreen.TestSucceededStatus
-		case SKIP:
-			status = evergreen.TestSkippedStatus
-		case FAIL:
-			status = evergreen.TestFailedStatus
-		}
-		convertedResult := task.TestResult{
-			TestFile:  res.Name,
-			Status:    status,
-			StartTime: start,
-			EndTime:   end,
-			LineNum:   res.StartLine - 1,
-			LogId:     res.LogId,
-		}
-		modelResults = append(modelResults, convertedResult)
-	}
-	return task.TestResults{modelResults}
 }

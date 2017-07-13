@@ -1,4 +1,4 @@
-package gotest_test
+package command
 
 import (
 	"os"
@@ -12,7 +12,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/plugin"
-	. "github.com/evergreen-ci/evergreen/plugin/builtin/gotest"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
 	"github.com/evergreen-ci/evergreen/service"
 	"github.com/evergreen-ci/evergreen/testutil"
