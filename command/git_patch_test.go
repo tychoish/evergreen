@@ -1,50 +1,47 @@
-package git
+package command
 
 import (
 	"path/filepath"
 	"testing"
 
 	"github.com/evergreen-ci/evergreen"
-	"github.com/evergreen-ci/evergreen/agent/comm"
-	agentutil "github.com/evergreen-ci/evergreen/agent/testutil"
 	"github.com/evergreen-ci/evergreen/db"
+	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/patch"
 	"github.com/evergreen-ci/evergreen/model/task"
 	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/model/version"
-	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/plugin/plugintest"
-	"github.com/evergreen-ci/evergreen/service"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/testutil"
-	"github.com/mongodb/grip/slogger"
+	"github.com/evergreen-ci/evergreen/util"
 	. "github.com/smartystreets/goconvey/convey"
+	"golang.org/x/net/context"
 )
 
 func TestPatchPluginAPI(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := client.NewMock("http://localhost.com")
+	conf := &model.TaskConfig{Expansions: &util.Expansions{}, Task: &task.Task{}, Project: &model.Project{}}
+	logger := comm.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
+
 	testConfig := testutil.TestConfig()
 	cwd := testutil.GetDirectoryOfFile()
 	Convey("With a running api server and installed plugin", t, func() {
-		registry := plugin.NewSimpleRegistry()
-		gitPlugin := &GitPlugin{}
-		err := registry.Register(gitPlugin)
-		testutil.HandleTestingErr(err, t, "Couldn't register patch plugin")
-		server, err := service.CreateTestServer(testConfig, nil)
-		testutil.HandleTestingErr(err, t, "Couldn't set up testing server")
 		configPath := filepath.Join(cwd, "testdata", "plugin_patch.yml")
 		patchFile := filepath.Join(cwd, "testdata", "test.patch")
 
-		testCommand := GitGetProjectCommand{Directory: "dir"}
+		testCommand := &gitFetchProject{Directory: "dir"}
 		modelData, err := modelutil.SetupAPITestData(testConfig, "testTask", "testvar", configPath, modelutil.NoPatch)
 		testutil.HandleTestingErr(err, t, "Couldn't set up test documents")
 		err = plugintest.SetupPatchData(modelData, patchFile, t)
 		testutil.HandleTestingErr(err, t, "Couldn't set up test documents")
 
-		logger := agentutil.NewTestLogger(slogger.StdOutAppender())
+		var patch *patch.Patch
 
 		Convey("calls to existing tasks with patches should succeed", func() {
-			httpCom := plugintest.TestAgentCommunicator(modelData, server.URL)
-			pluginCom := &comm.TaskJSONCommunicator{gitPlugin.Name(), httpCom}
-			patch, err := testCommand.GetPatch(pluginCom, logger)
+			err = testCommand.getPatchContents(ctx, comm, logger, conf, patch)
 			So(err, ShouldBeNil)
 			So(patch, ShouldNotBeNil)
 			testutil.HandleTestingErr(db.Clear(version.Collection), t,
@@ -56,9 +53,7 @@ func TestPatchPluginAPI(t *testing.T) {
 			modelData.Task = &task.Task{
 				Id: "BAD_TASK_ID",
 			}
-			httpCom := plugintest.TestAgentCommunicator(modelData, server.URL)
-			pluginCom := &comm.TaskJSONCommunicator{gitPlugin.Name(), httpCom}
-			patch, err := testCommand.GetPatch(pluginCom, logger)
+			err := testCommand.getPatchContents(ctx, comm, logger, conf, patch)
 			So(err.Error(), ShouldContainSubstring, "not found")
 			So(err, ShouldNotBeNil)
 			So(patch, ShouldBeNil)
@@ -73,9 +68,8 @@ func TestPatchPluginAPI(t *testing.T) {
 			v := version.Version{Id: ""}
 			testutil.HandleTestingErr(v.Insert(), t, "Couldn't insert dummy version")
 			modelData.Task = &noPatchTask
-			httpCom := plugintest.TestAgentCommunicator(modelData, server.URL)
-			pluginCom := &comm.TaskJSONCommunicator{gitPlugin.Name(), httpCom}
-			patch, err := testCommand.GetPatch(pluginCom, logger)
+
+			err := testCommand.getPatchContents(ctx, comm, logger, conf, patch)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "no patch found for task")
 			So(patch, ShouldBeNil)
@@ -87,23 +81,18 @@ func TestPatchPluginAPI(t *testing.T) {
 }
 
 func TestPatchPlugin(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	cwd := testutil.GetDirectoryOfFile()
 	testConfig := testutil.TestConfig()
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
 	Convey("With patch plugin installed into plugin registry", t, func() {
-		registry := plugin.NewSimpleRegistry()
-		gitPlugin := &GitPlugin{}
-		err := registry.Register(gitPlugin)
-		testutil.HandleTestingErr(err, t, "Couldn't register plugin %v")
 		testutil.HandleTestingErr(db.Clear(version.Collection), t,
 			"unable to clear versions collection")
 		version := &version.Version{
 			Id: "",
 		}
 		So(version.Insert(), ShouldBeNil)
-		server, err := service.CreateTestServer(testConfig, nil)
-		testutil.HandleTestingErr(err, t, "Couldn't set up testing server")
-		defer server.Close()
 
 		patchFile := filepath.Join(cwd, "testdata", "testmodule.patch")
 		configPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "plugin_patch.yml")
@@ -114,9 +103,9 @@ func TestPatchPlugin(t *testing.T) {
 		testutil.HandleTestingErr(err, t, "Couldn't set up patch documents")
 
 		taskConfig := modelData.TaskConfig
-		httpCom := plugintest.TestAgentCommunicator(modelData, server.URL)
 
-		logger := agentutil.NewTestLogger(slogger.StdOutAppender())
+		comm := client.NewMock("http://localhost.com")
+		logger := comm.GetLoggerProducer(client.TaskData{ID: taskConfig.Task.Id, Secret: taskConfig.Task.Secret})
 
 		Convey("all commands in test project should execute successfully", func() {
 			taskConfig.Task.Requester = evergreen.PatchVersionRequester
@@ -124,12 +113,12 @@ func TestPatchPlugin(t *testing.T) {
 			for _, task := range taskConfig.Project.Tasks {
 				So(len(task.Commands), ShouldNotEqual, 0)
 				for _, command := range task.Commands {
-					pluginCmds, err := registry.GetCommands(command, taskConfig.Project.Functions)
+					pluginCmds, err := Render(command, taskConfig.Project.Functions)
 					testutil.HandleTestingErr(err, t, "Couldn't get plugin command: %v")
 					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)
-					pluginCom := &comm.TaskJSONCommunicator{pluginCmds[0].Plugin(), httpCom}
-					err = pluginCmds[0].Execute(logger, pluginCom, taskConfig, make(chan bool))
+
+					err = pluginCmds[0].Execute(ctx, comm, logger, taskConfig)
 					So(err, ShouldBeNil)
 				}
 			}
@@ -157,11 +146,11 @@ func TestGetPatchCommands(t *testing.T) {
 		}
 
 		Convey("on an empty patch module, a set of commands that does not apply the patch should be returned", func() {
-			commands := GetPatchCommands(testPatch.Patches[0], "", "")
+			commands := getPatchCommands(testPatch.Patches[0], "", "")
 			So(len(commands), ShouldEqual, 5)
 		})
 		Convey("on a patch with content, the set of commands should apply the patch", func() {
-			commands := GetPatchCommands(testPatch.Patches[1], "", "")
+			commands := getPatchCommands(testPatch.Patches[1], "", "")
 			So(len(commands), ShouldEqual, 8)
 		})
 	})

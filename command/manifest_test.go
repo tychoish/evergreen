@@ -4,15 +4,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/evergreen-ci/evergreen/agent/comm"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model/manifest"
-	"github.com/evergreen-ci/evergreen/plugin"
-	"github.com/evergreen-ci/evergreen/plugin/builtin/git"
-	"github.com/evergreen-ci/evergreen/plugin/plugintest"
-	"github.com/evergreen-ci/evergreen/service"
+	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/evergreen-ci/evergreen/testutil"
-	"github.com/mongodb/grip/slogger"
+	. "github.com/smartystreets/goconvey/convey"
+	"golang.org/x/net/context"
 )
 
 // ManifestFetchCmd integration tests
@@ -24,41 +22,30 @@ func TestManifestLoad(t *testing.T) {
 		"error clearing test collections")
 
 	testConfig := testutil.TestConfig()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := client.NewMock("http://localhost.com")
 
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
 	testutil.ConfigureIntegrationTest(t, testConfig, "TestManifestFetch")
 	Convey("With a SimpleRegistry and test project file", t, func() {
 
-		registry := plugin.NewSimpleRegistry()
-		manifestPlugin := &ManifestPlugin{}
-		testutil.HandleTestingErr(registry.Register(manifestPlugin), t, "failed to register manifest plugin")
-
-		gitPlugin := &git.GitPlugin{}
-		testutil.HandleTestingErr(registry.Register(gitPlugin), t, "failed to register git plugin")
-
-		server, err := service.CreateTestServer(testConfig, nil)
-		testutil.HandleTestingErr(err, t, "Couldn't set up testing server")
-		defer server.Close()
 		configPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "mongodb-mongo-master.yml")
 		modelData, err := modelutil.SetupAPITestData(testConfig, "test", "rhel55", configPath, modelutil.NoPatch)
 		testutil.HandleTestingErr(err, t, "failed to setup test data")
-		httpCom := plugintest.TestAgentCommunicator(modelData, server.URL)
 		taskConfig := modelData.TaskConfig
-
-		logger := agentutil.NewTestLogger(slogger.StdOutAppender())
+		logger := comm.GetLoggerProducer(client.TaskData{ID: taskConfig.Task.Id, Secret: taskConfig.Task.Secret})
 
 		Convey("the manifest load command should execute successfully", func() {
 			for _, task := range taskConfig.Project.Tasks {
 				So(len(task.Commands), ShouldNotEqual, 0)
 				for _, command := range task.Commands {
-					pluginCmds, err := registry.GetCommands(command, taskConfig.Project.Functions)
+					pluginCmds, err := Render(command, taskConfig.Project.Functions)
 					testutil.HandleTestingErr(err, t, "Couldn't get plugin command: %v")
 					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)
-					pluginCom := &comm.TaskJSONCommunicator{manifestPlugin.Name(),
-						httpCom}
-					err = pluginCmds[0].Execute(logger, pluginCom, taskConfig,
-						make(chan bool))
+
+					err = pluginCmds[0].Execute(ctx, comm, logger, taskConfig)
 					So(err, ShouldBeNil)
 				}
 
@@ -79,14 +66,11 @@ func TestManifestLoad(t *testing.T) {
 				for _, task := range taskConfig.Project.Tasks {
 					So(len(task.Commands), ShouldNotEqual, 0)
 					for _, command := range task.Commands {
-						pluginCmds, err := registry.GetCommands(command, taskConfig.Project.Functions)
+						pluginCmds, err := Render(command, taskConfig.Project.Functions)
 						testutil.HandleTestingErr(err, t, "Couldn't get plugin command: %v")
 						So(pluginCmds, ShouldNotBeNil)
 						So(err, ShouldBeNil)
-						pluginCom := &comm.TaskJSONCommunicator{manifestPlugin.Name(),
-							httpCom}
-						err = pluginCmds[0].Execute(logger, pluginCom, taskConfig,
-							make(chan bool))
+						err = pluginCmds[0].Execute(ctx, comm, logger, taskConfig)
 						So(err, ShouldBeNil)
 					}
 

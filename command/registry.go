@@ -109,27 +109,26 @@ func (r *commandRegistry) renderCommands(cmd model.PluginCommandConf,
 	if name := cmd.Function; name != "" {
 		cmds, ok := funcs[name]
 		if !ok {
-			errs = append(errs, fmt.Spritnf("function '%s' not found in project functions", name))
-			continue
-		}
+			errs = append(errs, fmt.Sprintf("function '%s' not found in project functions", name))
+		} else {
+			for _, c := range cmds.List() {
+				if c.Function != "" {
+					errs = append(errs, fmt.Sprintf("can not reference a function within a "+
+						"function: '%s' referenced within '%s'", c.Function, name))
+					continue
+				}
 
-		for _, c := range cmds.List() {
-			if c.Function != "" {
-				errs = append(errs, fmt.Sprintf("can not reference a function within a "+
-					"function: '%s' referenced within '%s'", c.Function, name))
-				continue
+				// if no command specific type, use the function's command type
+				if c.Type == "" {
+					c.Type = cmd.Type
+				}
+
+				if c.DisplayName == "" {
+					c.DisplayName = fmt.Sprintf(`'%v' in "%v"`, c.Command, name)
+				}
+
+				parsed = append(parsed, c)
 			}
-
-			// if no command specific type, use the function's command type
-			if c.Type == "" {
-				c.Type = cmd.Type
-			}
-
-			if c.DisplayName == "" {
-				c.DisplayName = fmt.Sprintf(`'%v' in "%v"`, c.Command, funcName)
-			}
-
-			parsed = append(parsed, c)
 		}
 	} else {
 		parsed = append(parsed, cmd)

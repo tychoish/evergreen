@@ -123,7 +123,7 @@ func (c *shellExec) Execute(ctx context.Context,
 			// Call the platform's process-tracking function. On some OSes this will be a noop,
 			// on others this may need to do some additional work to track the process so that
 			// it can be cleaned up later.
-			subprocess.TrackProcess(conf.Task.Id, localCmd.Cmd.Process.Pid, logger)
+			subprocess.TrackProcess(conf.Task.Id, localCmd.Cmd.Process.Pid, logger.System())
 
 			if c.Background {
 				logger.Execution().Debug("running command in the background")

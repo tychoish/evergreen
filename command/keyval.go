@@ -1,7 +1,6 @@
 package command
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/evergreen-ci/evergreen/model"
@@ -9,6 +8,7 @@ import (
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type keyValInc struct {
@@ -46,7 +46,7 @@ func (c *keyValInc) Execute(ctx context.Context,
 
 	td := client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret}
 	keyVal := model.KeyVal{Key: c.Key}
-	err := comm.IncrementKey(ctx, td, &keyVal) //.TaskPostJSON(IncRoute, c.Key)
+	err := comm.KeyValInc(ctx, td, &keyVal) //.TaskPostJSON(IncRoute, c.Key)
 	if err != nil {
 		return errors.Wrapf(err, "problem incriminating key %s", c.Key)
 	}
