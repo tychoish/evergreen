@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/evergreen-ci/evergreen/apimodels"
@@ -38,6 +39,7 @@ type Mock struct {
 
 	// data collected by mocked methods
 	logMessages map[string][]apimodels.LogMessage
+	mu          sync.Mutex
 }
 
 // NewMock returns a Communicator for testing.
@@ -116,6 +118,8 @@ func (c *Mock) SendLogMessages(ctx context.Context, taskData TaskData, msgs []ap
 		return errors.New("logging failed")
 	}
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.logMessages[taskData.ID] = append(c.logMessages[taskData.ID], msgs...)
 
 	return nil
@@ -131,7 +135,7 @@ func (c *Mock) GetPatchFile(ctx context.Context, td TaskData, patchFileID string
 }
 
 func (c *Mock) GetTaskPatch(ctx context.Context, td TaskData) (*patchmodel.Patch, error) {
-	return nil, nil
+	return &patchmodel.Patch{}, nil
 }
 
 // GetAllHosts ...
@@ -446,7 +450,7 @@ func (c *Mock) SendTestLog(ctx context.Context, taskData TaskData, log *serviceM
 }
 
 func (c *Mock) GetManifest(ctx context.Context, td TaskData) (*manifest.Manifest, error) {
-	return nil, nil
+	return &manifest.Manifest{}, nil
 }
 
 func (c *Mock) S3Copy(ctx context.Context, td TaskData, req *apimodels.S3CopyRequest) error {

@@ -30,7 +30,7 @@ func TestManifestLoad(t *testing.T) {
 	testutil.ConfigureIntegrationTest(t, testConfig, "TestManifestFetch")
 	Convey("With a SimpleRegistry and test project file", t, func() {
 
-		configPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "mongodb-mongo-master.yml")
+		configPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "manifest", "mongodb-mongo-master.yml")
 		modelData, err := modelutil.SetupAPITestData(testConfig, "test", "rhel55", configPath, modelutil.NoPatch)
 		testutil.HandleTestingErr(err, t, "failed to setup test data")
 		taskConfig := modelData.TaskConfig
@@ -53,7 +53,7 @@ func TestManifestLoad(t *testing.T) {
 			Convey("the manifest should be inserted properly into the database", func() {
 				currentManifest, err := manifest.FindOne(manifest.ById(taskConfig.Task.Version))
 				So(err, ShouldBeNil)
-				So(currentManifest, ShouldNotBeEmpty)
+				So(currentManifest, ShouldNotBeNil)
 				So(currentManifest.ProjectName, ShouldEqual, taskConfig.ProjectRef.Identifier)
 				So(currentManifest.Modules, ShouldNotBeNil)
 				So(len(currentManifest.Modules), ShouldEqual, 1)
@@ -78,7 +78,7 @@ func TestManifestLoad(t *testing.T) {
 				Convey("the manifest should be inserted properly into the database", func() {
 					currentManifest, err := manifest.FindOne(manifest.ById(taskConfig.Task.Version))
 					So(err, ShouldBeNil)
-					So(currentManifest, ShouldNotBeEmpty)
+					So(currentManifest, ShouldNotBeNil)
 					So(currentManifest.ProjectName, ShouldEqual, taskConfig.ProjectRef.Identifier)
 					So(currentManifest.Modules, ShouldNotBeNil)
 					So(len(currentManifest.Modules), ShouldEqual, 1)

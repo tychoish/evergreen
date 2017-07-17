@@ -29,8 +29,8 @@ func TestPatchPluginAPI(t *testing.T) {
 	testConfig := testutil.TestConfig()
 	cwd := testutil.GetDirectoryOfFile()
 	Convey("With a running api server and installed plugin", t, func() {
-		configPath := filepath.Join(cwd, "testdata", "plugin_patch.yml")
-		patchFile := filepath.Join(cwd, "testdata", "test.patch")
+		configPath := filepath.Join(cwd, "testdata", "git", "plugin_patch.yml")
+		patchFile := filepath.Join(cwd, "testdata", "git", "test.patch")
 
 		testCommand := &gitFetchProject{Directory: "dir"}
 		modelData, err := modelutil.SetupAPITestData(testConfig, "testTask", "testvar", configPath, modelutil.NoPatch)
@@ -38,7 +38,7 @@ func TestPatchPluginAPI(t *testing.T) {
 		err = plugintest.SetupPatchData(modelData, patchFile, t)
 		testutil.HandleTestingErr(err, t, "Couldn't set up test documents")
 
-		var patch *patch.Patch
+		patch := &patch.Patch{}
 
 		Convey("calls to existing tasks with patches should succeed", func() {
 			err = testCommand.getPatchContents(ctx, comm, logger, conf, patch)
@@ -54,8 +54,8 @@ func TestPatchPluginAPI(t *testing.T) {
 				Id: "BAD_TASK_ID",
 			}
 			err := testCommand.getPatchContents(ctx, comm, logger, conf, patch)
-			So(err.Error(), ShouldContainSubstring, "not found")
 			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "not found")
 			So(patch, ShouldBeNil)
 			testutil.HandleTestingErr(db.Clear(version.Collection), t,
 				"unable to clear versions collection")
@@ -94,8 +94,8 @@ func TestPatchPlugin(t *testing.T) {
 		}
 		So(version.Insert(), ShouldBeNil)
 
-		patchFile := filepath.Join(cwd, "testdata", "testmodule.patch")
-		configPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "plugin_patch.yml")
+		patchFile := filepath.Join(cwd, "testdata", "git", "testmodule.patch")
+		configPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "git", "plugin_patch.yml")
 		modelData, err := modelutil.SetupAPITestData(testConfig, "testTask", "testvar", configPath, modelutil.InlinePatch)
 		testutil.HandleTestingErr(err, t, "Couldn't set up test documents")
 

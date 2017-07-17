@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +27,6 @@ func TestAttachResults(t *testing.T) {
 	resetTasks(t)
 	testConfig := testutil.TestConfig()
 	cwd := testutil.GetDirectoryOfFile()
-	fmt.Println(cwd)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -37,8 +35,8 @@ func TestAttachResults(t *testing.T) {
 
 	Convey("With attachResults plugin installed into plugin registry", t, func() {
 
-		configFile := filepath.Join(cwd, "testdata", "plugin_attach_results.yml")
-		resultsLoc := filepath.Join(cwd, "testdata", "plugin_attach_results.json")
+		configFile := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results.yml")
+		resultsLoc := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results.json")
 
 		modelData, err := modelutil.SetupAPITestData(testConfig, "test", "rhel55", configFile, modelutil.NoPatch)
 		testutil.HandleTestingErr(err, t, "failed to setup test data")
@@ -86,8 +84,8 @@ func TestAttachRawResults(t *testing.T) {
 	comm := client.NewMock("http://localhost.com")
 
 	Convey("With attachResults plugin installed into plugin registry", t, func() {
-		configFile := filepath.Join(cwd, "testdata", "plugin_attach_results_raw.yml")
-		resultsLoc := filepath.Join(cwd, "testdata", "plugin_attach_results_raw.json")
+		configFile := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results_raw.yml")
+		resultsLoc := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results_raw.json")
 
 		modelData, err := modelutil.SetupAPITestData(testConfig, "test", "rhel55", configFile, modelutil.NoPatch)
 		testutil.HandleTestingErr(err, t, "failed to setup test data")

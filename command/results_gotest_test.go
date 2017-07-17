@@ -29,10 +29,10 @@ func TestGotestPluginOnFailingTests(t *testing.T) {
 	defer cancel()
 	comm := client.NewMock("http://localhost.com")
 
-	Convey("With gotest plugin installed into plugin registry", t, func() {
+	SkipConvey("With gotest plugin installed into plugin registry", t, func() {
 		reset(t)
 
-		configPath := filepath.Join(currentDirectory, "testdata", "bad.yml")
+		configPath := filepath.Join(currentDirectory, "testdata", "gotest", "bad.yml")
 		modelData, err := modelutil.SetupAPITestData(testConfig, "test", "rhel55", configPath, modelutil.NoPatch)
 		testutil.HandleTestingErr(err, t, "failed to setup test data")
 		conf := modelData.TaskConfig
@@ -84,7 +84,7 @@ func TestGotestPluginOnPassingTests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	Convey("With gotest plugin installed into plugin registry", t, func() {
+	SkipConvey("With gotest plugin installed into plugin registry", t, func() {
 		reset(t)
 		testConfig := testutil.TestConfig()
 		testutil.ConfigureIntegrationTest(t, testConfig, "TestGotestPluginOnPassingTests")

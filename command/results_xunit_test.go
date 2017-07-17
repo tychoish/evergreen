@@ -17,8 +17,8 @@ const TotalResultCount = 677
 
 var (
 	workingDirectory = testutil.GetDirectoryOfFile()
-	SingleFileConfig = filepath.Join(workingDirectory, "testdata", "plugin_attach_xunit.yml")
-	WildcardConfig   = filepath.Join(workingDirectory, "testdata", "plugin_attach_xunit_wildcard.yml")
+	SingleFileConfig = filepath.Join(workingDirectory, "testdata", "attach", "plugin_attach_xunit.yml")
+	WildcardConfig   = filepath.Join(workingDirectory, "testdata", "attach", "plugin_attach_xunit_wildcard.yml")
 )
 
 // runTest abstracts away common tests and setup between all attach xunit tests.

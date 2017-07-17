@@ -62,7 +62,7 @@ type s3Loc struct {
 
 func s3CopyFactory() Command     { return &s3copy{} }
 func (c *s3copy) Name() string   { return "copy" }
-func (c *s3copy) Plugin() string { return "s3copy" }
+func (c *s3copy) Plugin() string { return "s3Copy" }
 
 // ParseParams decodes the S3 push command parameters that are
 // specified as part of an S3CopyPlugin command; this is required

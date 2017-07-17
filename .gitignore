@@ -68,3 +68,4 @@ fabfile.py
 *.pyc
 Plugins
 .idea
+command/testdata/target.tgz
