@@ -50,6 +50,7 @@ func (c *keyValInc) Execute(ctx context.Context,
 	if err != nil {
 		return errors.Wrapf(err, "problem incriminating key %s", c.Key)
 	}
+	fmt.Printf("%+v", keyVal)
 
 	conf.Expansions.Put(c.Destination, fmt.Sprintf("%d", keyVal.Value))
 	return nil

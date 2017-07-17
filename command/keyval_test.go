@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -49,6 +50,7 @@ func TestIncKey(t *testing.T) {
 						So(err, ShouldBeNil)
 					}
 				}
+				fmt.Printf("%+v\n", conf.Expansions)
 				So(conf.Expansions.Get("testkey"), ShouldEqual, "2")
 				So(conf.Expansions.Get("testkey_x"), ShouldEqual, "1")
 			}
