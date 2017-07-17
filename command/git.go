@@ -254,7 +254,7 @@ func (c gitFetchProject) getPatchContents(ctx context.Context, comm client.Commu
 			return errors.Wrapf(err, "problem getting patch file")
 		}
 
-		patch.Patches[i].PatchSet.Patch = string(result)
+		patch.Patches[i].PatchSet.Patch = result
 	}
 	return nil
 }

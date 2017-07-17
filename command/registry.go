@@ -16,25 +16,31 @@ var evgRegistry *commandRegistry
 func init() {
 	evgRegistry = newCommandRegistry()
 
-	RegisterCommand("archive.targz_pack", tarballCreateFactory)
-	RegisterCommand("archive.targz_unpack", tarballExtractFactory)
-	RegisterCommand("attach.results", attachResultsFactory)
-	RegisterCommand("attach.xunit_results", xunitResultsFactory)
-	RegisterCommand("expansions.fetch_vars", fetchVarsFactory)
-	RegisterCommand("expansions.update", updateExpansionsFactory)
-	RegisterCommand("git.apply_patch", gitApplyPatchFactory)
-	RegisterCommand("git.get_project", gitFetchProjectFactory)
-	RegisterCommand("gotest.parse_files", goTestFactory)
-	RegisterCommand("json.get", taskDataGetFactory)
-	RegisterCommand("json.history", taskDataHistoryFactory)
-	RegisterCommand("json.send", taskDataSendFactory)
-	RegisterCommand("keyval.inc", keyValIncFactory)
-	RegisterCommand("manifest.load", manifestLoadFactory)
-	RegisterCommand("s3.get", s3GetFactory)
-	RegisterCommand("s3.put", s3PutFactory)
-	RegisterCommand("s3Copy.copy", s3CopyFactory)
-	RegisterCommand("shell.cleanup", shellCleanupFactory)
-	RegisterCommand("shell.track", shellTrackFactory)
+	cmds := map[string]CommandFactory{
+		"archive.targz_pack":    tarballCreateFactory,
+		"archive.targz_unpack":  tarballExtractFactory,
+		"attach.results":        attachResultsFactory,
+		"attach.xunit_results":  xunitResultsFactory,
+		"expansions.fetch_vars": fetchVarsFactory,
+		"expansions.update":     updateExpansionsFactory,
+		"git.apply_patch":       gitApplyPatchFactory,
+		"git.get_project":       gitFetchProjectFactory,
+		"gotest.parse_files":    goTestFactory,
+		"json.get":              taskDataGetFactory,
+		"json.history":          taskDataHistoryFactory,
+		"json.send":             taskDataSendFactory,
+		"keyval.inc":            keyValIncFactory,
+		"manifest.load":         manifestLoadFactory,
+		"s3.get":                s3GetFactory,
+		"s3.put":                s3PutFactory,
+		"s3Copy.copy":           s3CopyFactory,
+		"shell.cleanup":         shellCleanupFactory,
+		"shell.track":           shellTrackFactory,
+	}
+
+	for name, factory := range cmds {
+		grip.EmergencyPanic(RegisterCommand(name, factory))
+	}
 }
 
 func RegisterCommand(name string, factory CommandFactory) error {
