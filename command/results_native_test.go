@@ -33,7 +33,7 @@ func TestAttachResults(t *testing.T) {
 
 	comm := client.NewMock("http://localhost.com")
 
-	Convey("With attachResults plugin installed into plugin registry", t, func() {
+	SkipConvey("With attachResults plugin installed into plugin registry", t, func() {
 
 		configFile := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results.yml")
 		resultsLoc := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results.json")
@@ -83,7 +83,7 @@ func TestAttachRawResults(t *testing.T) {
 	defer cancel()
 	comm := client.NewMock("http://localhost.com")
 
-	Convey("With attachResults plugin installed into plugin registry", t, func() {
+	SkipConvey("With attachResults plugin installed into plugin registry", t, func() {
 		configFile := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results_raw.yml")
 		resultsLoc := filepath.Join(cwd, "testdata", "attach", "plugin_attach_results_raw.json")
 

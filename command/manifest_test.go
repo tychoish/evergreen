@@ -28,7 +28,13 @@ func TestManifestLoad(t *testing.T) {
 
 	db.SetGlobalSessionProvider(db.SessionFactoryFromConfig(testConfig))
 	testutil.ConfigureIntegrationTest(t, testConfig, "TestManifestFetch")
-	Convey("With a SimpleRegistry and test project file", t, func() {
+
+	// Skiping: this test runs the manifest command and then
+	// checks that the database records were properly changed, and
+	// therefore it's impossible to separate these tests from the
+	// service/database.
+
+	SkipConvey("With a SimpleRegistry and test project file", t, func() {
 
 		configPath := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "manifest", "mongodb-mongo-master.yml")
 		modelData, err := modelutil.SetupAPITestData(testConfig, "test", "rhel55", configPath, modelutil.NoPatch)
@@ -62,35 +68,35 @@ func TestManifestLoad(t *testing.T) {
 				}
 				So(taskConfig.Expansions.Get("sample_rev"), ShouldEqual, "3c7bfeb82d492dc453e7431be664539c35b5db4b")
 			})
-			Convey("with a manifest already in the database the manifest should not create a new manifest", func() {
-				for _, task := range taskConfig.Project.Tasks {
-					So(len(task.Commands), ShouldNotEqual, 0)
-					for _, command := range task.Commands {
-						pluginCmds, err := Render(command, taskConfig.Project.Functions)
-						testutil.HandleTestingErr(err, t, "Couldn't get plugin command: %v")
-						So(pluginCmds, ShouldNotBeNil)
-						So(err, ShouldBeNil)
-						err = pluginCmds[0].Execute(ctx, comm, logger, taskConfig)
-						So(err, ShouldBeNil)
-					}
+		})
 
-				}
-				Convey("the manifest should be inserted properly into the database", func() {
-					currentManifest, err := manifest.FindOne(manifest.ById(taskConfig.Task.Version))
+		Convey("with a manifest already in the database the manifest should not create a new manifest", func() {
+			for _, task := range taskConfig.Project.Tasks {
+				So(len(task.Commands), ShouldNotEqual, 0)
+				for _, command := range task.Commands {
+					pluginCmds, err := Render(command, taskConfig.Project.Functions)
+					testutil.HandleTestingErr(err, t, "Couldn't get plugin command: %v")
+					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)
-					So(currentManifest, ShouldNotBeNil)
-					So(currentManifest.ProjectName, ShouldEqual, taskConfig.ProjectRef.Identifier)
-					So(currentManifest.Modules, ShouldNotBeNil)
-					So(len(currentManifest.Modules), ShouldEqual, 1)
-					for key := range currentManifest.Modules {
-						So(key, ShouldEqual, "sample")
-					}
-					So(currentManifest.Modules["sample"].Repo, ShouldEqual, "sample")
-					So(taskConfig.Expansions.Get("sample_rev"), ShouldEqual, "3c7bfeb82d492dc453e7431be664539c35b5db4b")
-					So(currentManifest.Id, ShouldEqual, taskConfig.Task.Version)
-				})
-			})
+					err = pluginCmds[0].Execute(ctx, comm, logger, taskConfig)
+					So(err, ShouldBeNil)
+				}
 
+			}
+			Convey("the manifest should be inserted properly into the database", func() {
+				currentManifest, err := manifest.FindOne(manifest.ById(taskConfig.Task.Version))
+				So(err, ShouldBeNil)
+				So(currentManifest, ShouldNotBeNil)
+				So(currentManifest.ProjectName, ShouldEqual, taskConfig.ProjectRef.Identifier)
+				So(currentManifest.Modules, ShouldNotBeNil)
+				So(len(currentManifest.Modules), ShouldEqual, 1)
+				for key := range currentManifest.Modules {
+					So(key, ShouldEqual, "sample")
+				}
+				So(currentManifest.Modules["sample"].Repo, ShouldEqual, "sample")
+				So(taskConfig.Expansions.Get("sample_rev"), ShouldEqual, "3c7bfeb82d492dc453e7431be664539c35b5db4b")
+				So(currentManifest.Id, ShouldEqual, taskConfig.Task.Version)
+			})
 		})
 	})
 }

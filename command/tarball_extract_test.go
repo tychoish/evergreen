@@ -68,7 +68,7 @@ func TestTarGzCommandUnpackArchive(t *testing.T) {
 	logger := comm.GetLoggerProducer(client.TaskData{ID: conf.Task.Id, Secret: conf.Task.Secret})
 
 	Convey("With a targz unpack command", t, func() {
-		testDataDir := filepath.Join(testutil.GetDirectoryOfFile(), "testdata")
+		testDataDir := filepath.Join(testutil.GetDirectoryOfFile(), "testdata", "archive")
 
 		Convey("when unpacking an archive", func() {
 			Convey("the archive's contents should be expanded into the"+

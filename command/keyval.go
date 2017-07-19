@@ -1,7 +1,7 @@
 package command
 
 import (
-	"fmt"
+	"strconv"
 
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/rest/client"
@@ -29,7 +29,7 @@ func (c *keyValInc) ParseParams(params map[string]interface{}) error {
 	}
 
 	if c.Key == "" || c.Destination == "" {
-		return fmt.Errorf("error parsing '%v' params: key and destination may not be blank",
+		return errors.Errorf("error parsing '%v' params: key and destination may not be blank",
 			c.Name())
 	}
 
@@ -50,8 +50,7 @@ func (c *keyValInc) Execute(ctx context.Context,
 	if err != nil {
 		return errors.Wrapf(err, "problem incriminating key %s", c.Key)
 	}
-	fmt.Printf("%+v", keyVal)
 
-	conf.Expansions.Put(c.Destination, fmt.Sprintf("%d", keyVal.Value))
+	conf.Expansions.Put(c.Destination, strconv.FormatInt(keyVal.Value, 10))
 	return nil
 }

@@ -30,7 +30,7 @@ func runTest(t *testing.T, configPath string, customTests func(string)) {
 	defer cancel()
 	comm := client.NewMock("http://localhost.com")
 
-	Convey("With attachResults plugin installed into plugin registry", t, func() {
+	SkipConvey("With attachResults plugin installed into plugin registry", t, func() {
 		modelData, err := modelutil.SetupAPITestData(testConfig, "test", "rhel55", configPath, modelutil.NoPatch)
 		testutil.HandleTestingErr(err, t, "failed to setup test data")
 

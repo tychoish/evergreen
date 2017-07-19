@@ -62,7 +62,7 @@ func TestParserFunctionality(t *testing.T) {
 	cwd := testutil.GetDirectoryOfFile()
 
 	Convey("With a simple log file and parser", t, func() {
-		logdata, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "1_simple.log"))
+		logdata, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "gotest", "1_simple.log"))
 		testutil.HandleTestingErr(err, t, "couldn't open log file")
 		parser := &goTestParser{Suite: "test"}
 
@@ -99,7 +99,7 @@ func TestParserFunctionality(t *testing.T) {
 		})
 	})
 	Convey("With a gocheck log file and parser", t, func() {
-		logdata, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "2_simple.log"))
+		logdata, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "gotest", "2_simple.log"))
 		testutil.HandleTestingErr(err, t, "couldn't open log file")
 		parser := &goTestParser{Suite: "gocheck_test"}
 
@@ -129,7 +129,7 @@ func TestParserFunctionality(t *testing.T) {
 		})
 	})
 	Convey("un-terminated tests are failures", t, func() {
-		logdata, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "3_simple.log"))
+		logdata, err := ioutil.ReadFile(filepath.Join(cwd, "testdata", "gotest", "3_simple.log"))
 		testutil.HandleTestingErr(err, t, "couldn't open log file")
 		parser := &goTestParser{Suite: "gocheck_test"}
 		err = parser.Parse(bytes.NewBuffer(logdata))

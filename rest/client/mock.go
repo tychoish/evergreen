@@ -40,6 +40,7 @@ type Mock struct {
 	// data collected by mocked methods
 	logMessages map[string][]apimodels.LogMessage
 	PatchFiles  map[string]string
+	keyVal      map[string]*serviceModel.KeyVal
 	mu          sync.Mutex
 }
 
@@ -51,6 +52,7 @@ func NewMock(serverURL string) *Mock {
 		timeoutMax:   defaultTimeoutMax,
 		logMessages:  make(map[string][]apimodels.LogMessage),
 		PatchFiles:   make(map[string]string),
+		keyVal:       make(map[string]*serviceModel.KeyVal),
 		serverURL:    serverURL,
 		httpClient:   &http.Client{},
 		ShouldFail:   false,
@@ -469,6 +471,12 @@ func (c *Mock) S3Copy(ctx context.Context, td TaskData, req *apimodels.S3CopyReq
 }
 
 func (c *Mock) KeyValInc(ctx context.Context, td TaskData, kv *serviceModel.KeyVal) error {
+	if cached, ok := c.keyVal[kv.Key]; ok {
+		*kv = *cached
+	} else {
+		c.keyVal[kv.Key] = kv
+	}
+	kv.Value++
 	return nil
 }
 

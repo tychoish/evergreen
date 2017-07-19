@@ -52,6 +52,10 @@ npm-debug.log
 clients
 testdata/target.tgz
 !command/testdata/archive/artifacts.tar.gz
+command/testdata/archive/output/
+command/testdata/archive/target.tgz
+command/testdata/target.tgz
+
 
 plugin/config/build_baron.go
 plugin/config/keyval.go
@@ -68,4 +72,3 @@ fabfile.py
 *.pyc
 Plugins
 .idea
-command/testdata/target.tgz

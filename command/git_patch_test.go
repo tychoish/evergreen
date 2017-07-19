@@ -28,6 +28,11 @@ func TestPatchPluginAPI(t *testing.T) {
 
 	testConfig := testutil.TestConfig()
 	cwd := testutil.GetDirectoryOfFile()
+
+	// skipping because, to work, this test requires that the
+	// command work against a running service.
+	// it really ought to be rewritten to test the mock rather
+	// than the service playing the roll of a mock.
 	SkipConvey("With a running api server and installed plugin", t, func() {
 		configPath := filepath.Join(cwd, "testdata", "git", "plugin_patch.yml")
 		patchFile := filepath.Join(cwd, "testdata", "git", "test.patch")
