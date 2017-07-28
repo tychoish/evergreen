@@ -3,11 +3,12 @@ package proto
 import (
 	"time"
 
-	"github.com/evergreen-ci/evergreen/agent/comm"
+	"github.com/evergreen-ci/evergreen/rest/client"
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/sometimes"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -17,19 +18,18 @@ const (
 	// a certain number of iterations and then falls back to a
 	// second interval: these values configure those intervals.
 	procInfoFirstInterval   = 5 * time.Second
-	procInfoFirstIterations = 12
-	procInfoSecondInterval  = 20 * time.Second
+	procInfoFirstIterations = 30
+	procInfoSecondInterval  = 10 * time.Second
 )
 
 // metricsCollector holds the functionality for running two system
 // information (metrics) collecting go-routines. The structure holds a TaskCommunicator object
 type metricsCollector struct {
-	comm comm.TaskCommunicator
-	stop <-chan bool
+	comm client.Communicator
 }
 
 // start validates the struct and launches two go routines.
-func (c *metricsCollector) start() error {
+func (c *metricsCollector) start(ctx context.Context) error {
 	if c.stop == nil {
 		return errors.New("no channel specified")
 	}
@@ -38,8 +38,8 @@ func (c *metricsCollector) start() error {
 		return errors.New("no task communicator specified")
 	}
 
-	go c.sysInfoCollector(sysInfoCollectorInterval)
-	go c.processInfoCollector(procInfoFirstInterval, procInfoSecondInterval,
+	go c.sysInfoCollector(ctx, sysInfoCollectorInterval)
+	go c.processInfoCollector(ctx, procInfoFirstInterval, procInfoSecondInterval,
 		procInfoFirstIterations)
 
 	return nil
@@ -53,8 +53,8 @@ func (c *metricsCollector) start() error {
 // iterations. The intention of these intervals is to collect data with a
 // high granularity after beginning to run a task and with a lower
 // granularity throughout the life of a commit.
-func (c *metricsCollector) processInfoCollector(firstInterval, secondInterval time.Duration,
-	numFirstIterations int) {
+func (c *metricsCollector) processInfoCollector(ctx context.Context,
+	firstInterval, secondInterval time.Duration, numFirstIterations int) {
 
 	grip.Info("starting process metrics collector")
 
@@ -64,7 +64,7 @@ func (c *metricsCollector) processInfoCollector(firstInterval, secondInterval ti
 
 	for {
 		select {
-		case <-c.stop:
+		case <-ctx.Done():
 			grip.Info("process metrics collector terminated.")
 			return
 		case <-timer.C:
@@ -87,14 +87,14 @@ func (c *metricsCollector) processInfoCollector(firstInterval, secondInterval ti
 // sysInfoCollector collects aggregated system stats on the specified
 // interval as long as the metrics collector is running, and sends these
 // data to the API server.
-func (c *metricsCollector) sysInfoCollector(interval time.Duration) {
+func (c *metricsCollector) sysInfoCollector(ctx context.Context, interval time.Duration) {
 	grip.Info("starting system metrics collector")
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
 	for {
 		select {
-		case <-c.stop:
+		case <-ctx.Done():
 			grip.Info("system metrics collector terminated.")
 			return
 		case <-timer.C:
