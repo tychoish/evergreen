@@ -1,7 +1,6 @@
 package client
 
 import (
-	"net/http"
 	"sync"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/evergreen-ci/evergreen/model/task"
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/rest/model"
+	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -24,7 +24,6 @@ type Mock struct {
 	timeoutStart time.Duration
 	timeoutMax   time.Duration
 	serverURL    string
-	httpClient   *http.Client
 
 	// these fields have setters
 	hostID     string
@@ -39,6 +38,10 @@ type Mock struct {
 	NextTaskResponse       *apimodels.NextTaskResponse
 	EndTaskResponse        *apimodels.EndTaskResponse
 	EndTaskShouldFail      bool
+
+	// metrics collection
+	ProcInfo map[string][]*message.ProcessInfo
+	SysInfo  map[string]*message.SystemInfo
 
 	// data collected by mocked methods
 	logMessages map[string][]apimodels.LogMessage
@@ -56,8 +59,9 @@ func NewMock(serverURL string) *Mock {
 		logMessages:  make(map[string][]apimodels.LogMessage),
 		PatchFiles:   make(map[string]string),
 		keyVal:       make(map[string]*serviceModel.KeyVal),
+		ProcInfo:     make(map[string][]*message.ProcessInfo),
+		SysInfo:      make(map[string]*message.SystemInfo),
 		serverURL:    serverURL,
-		httpClient:   &http.Client{},
 	}
 }
 
@@ -497,4 +501,14 @@ func (c *Mock) GetJSONData(ctx context.Context, td TaskData, tn, dn, vn string) 
 }
 func (c *Mock) GetJSONHistory(ctx context.Context, td TaskData, tags bool, tn, dn string) ([]byte, error) {
 	return nil, nil
+}
+
+func (c *Mock) SendProcessInfo(ctx context.Context, td TaskData, procs []*message.ProcessInfo) error {
+	c.ProcInfo[td.ID] = procs
+	return nil
+}
+
+func (c *Mock) SendSystemInfo(ctx context.Context, td TaskData, sysinfo *message.SystemInfo) error {
+	c.SysInfo[td.ID] = sysinfo
+	return nil
 }
