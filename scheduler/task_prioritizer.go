@@ -56,8 +56,7 @@ func NewCmpBasedTaskComparator() *CmpBasedTaskComparator {
 		comparators: []taskPriorityCmp{
 			byPriority,
 			byNumDeps,
-			byRevisionOrderNumber,
-			byCreateTime,
+			byAge,
 			bySimilarFailing,
 			byRecentlyFailing,
 		},
@@ -128,7 +127,7 @@ func (self *CmpBasedTaskComparator) taskMoreImportantThan(task1,
 	task2 task.Task) (bool, error) {
 
 	// run through the comparators, and return the first definitive decision on
-	// which task is more important
+
 	for _, cmp := range self.comparators {
 		ret, err := cmp(task1, task2, self)
 		if err != nil {

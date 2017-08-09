@@ -90,24 +90,24 @@ func TestTaskImportanceComparators(t *testing.T) {
 			" whose commit order number is higher, providing the tasks are"+
 			" part of the same project", func() {
 
-			cmpResult, err := byRevisionOrderNumber(tasks[0], tasks[1],
+			cmpResult, err := byAge(tasks[0], tasks[1],
 				taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 0)
 
 			tasks[0].RevisionOrderNumber = 1
-			cmpResult, err = byRevisionOrderNumber(tasks[0], tasks[1],
+			cmpResult, err = byAge(tasks[0], tasks[1],
 				taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 1)
 
-			cmpResult, err = byRevisionOrderNumber(tasks[1], tasks[0],
+			cmpResult, err = byAge(tasks[1], tasks[0],
 				taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, -1)
 
 			tasks[0].Project = "project"
-			cmpResult, err = byRevisionOrderNumber(tasks[0], tasks[1],
+			cmpResult, err = byAge(tasks[0], tasks[1],
 				taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 0)
@@ -118,35 +118,34 @@ func TestTaskImportanceComparators(t *testing.T) {
 			" create time is higher, providing the tasks are from different"+
 			" projects", func() {
 
-			cmpResult, err := byCreateTime(tasks[0], tasks[1], taskComparator)
+			cmpResult, err := byAge(tasks[0], tasks[1], taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 0)
 
 			// change one create time - should still be zero since the
 			// projects are the same
 			tasks[0].CreateTime = time.Now()
-			cmpResult, err = byCreateTime(tasks[0], tasks[1], taskComparator)
+			cmpResult, err = byAge(tasks[0], tasks[1], taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 0)
 
 			tasks[0].Project = "project"
-			cmpResult, err = byCreateTime(tasks[0], tasks[1], taskComparator)
-			So(err, ShouldBeNil)
-			So(cmpResult, ShouldEqual, 1)
-
-			cmpResult, err = byCreateTime(tasks[1], tasks[0], taskComparator)
+			cmpResult, err = byAge(tasks[0], tasks[1], taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, -1)
 
+			cmpResult, err = byAge(tasks[1], tasks[0], taskComparator)
+			So(err, ShouldBeNil)
+			So(cmpResult, ShouldEqual, 1)
+
 			tasks[1].CreateTime = tasks[0].CreateTime
-			cmpResult, err = byCreateTime(tasks[0], tasks[1], taskComparator)
+			cmpResult, err = byAge(tasks[0], tasks[1], taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 0)
 
-			cmpResult, err = byCreateTime(tasks[1], tasks[0], taskComparator)
+			cmpResult, err = byAge(tasks[1], tasks[0], taskComparator)
 			So(err, ShouldBeNil)
 			So(cmpResult, ShouldEqual, 0)
-
 		})
 
 		Convey("the recent failure comparator should prioritize a task"+
