@@ -125,7 +125,7 @@ func (e *envState) GetSession() (db.Session, error) {
 		return nil, errors.New("no session defined")
 	}
 
-	return db.WrapSession(e.session.Clone()), nil
+	return db.WrapSession(e.session.Copy()), nil
 }
 
 func (e *envState) GetQueue() (amboy.Queue, error) {

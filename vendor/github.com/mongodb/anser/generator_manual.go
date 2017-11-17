@@ -73,11 +73,20 @@ func (j *manualMigrationGenerator) Run() {
 	defer session.Close()
 
 	coll := session.DB(j.NS.DB).C(j.NS.Collection)
-	iter := coll.Find(j.Query).Select(bson.M{"_id": 1}).Iter()
+	query := coll.Find(j.Query).Select(bson.M{"_id": 1})
+	if j.Limit > 0 {
+		query = query.Limit(j.Limit)
+	}
+	iter := query.Iter()
 
+	grip.Debug(iter)
+	grip.Info(j.NS)
+	grip.Info(j.Query)
 	network.AddGroup(j.ID(), j.generateJobs(env, iter))
 
 	if err := iter.Close(); err != nil {
+		grip.Warning(err)
+		grip.Critical(iter)
 		j.AddError(err)
 		return
 	}
@@ -92,7 +101,9 @@ func (j *manualMigrationGenerator) generateJobs(env Environment, iter db.Iterato
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	count := 0
+	grip.Info("before next")
 	for iter.Next(&doc) {
+		grip.Info("in next")
 		count++
 		m := NewManualMigration(env, model.Manual{
 			ID:            doc.ID,

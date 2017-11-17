@@ -13,7 +13,7 @@ import (
 func init() {
 	sender := grip.GetSender()
 	l := sender.Level()
-	l.Threshold = level.Info
+	l.Threshold = level.Trace
 	grip.CatchEmergencyPanic(sender.SetLevel(l))
 }
 

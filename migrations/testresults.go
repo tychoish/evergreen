@@ -115,17 +115,17 @@ func makeTaskMigrationFunction(database, collection string) db.MigrationOperatio
 
 // testResultsGeneratorFactory returns generators for the tasks and old_tasks collections.
 func testResultsGeneratorFactory(env anser.Environment, db string, limit int) []anser.Generator {
-	noExecutionOpts := model.GeneratorOptions{
-		NS: model.Namespace{
-			DB:         db,
-			Collection: tasksCollection,
-		},
-		Limit: limit,
-		Query: bson.M{
-			"execution": bson.M{"$exists": false},
-		},
-		JobID: "migration-testresults-legacy-no-execution",
-	}
+	// noExecutionOpts := model.GeneratorOptions{
+	// 	NS: model.Namespace{
+	// 		DB:         db,
+	// 		Collection: tasksCollection,
+	// 	},
+	// 	Limit: limit,
+	// 	Query: bson.M{
+	// 		"execution": bson.M{"$exists": false},
+	// 	},
+	// 	JobID: "migration-testresults-legacy-no-execution",
+	// }
 
 	tasksOpts := model.GeneratorOptions{
 		NS: model.Namespace{
@@ -141,24 +141,24 @@ func testResultsGeneratorFactory(env anser.Environment, db string, limit int) []
 		DependsOn: []string{"migration-testresults-legacy-no-execution"},
 	}
 
-	oldTasksopts := model.GeneratorOptions{
-		NS: model.Namespace{
-			DB:         db,
-			Collection: oldTasksCollection,
-		},
-		Limit: limit,
-		Query: bson.M{
-			"test_results.0": bson.M{"$exists": true},
-			"execution":      bson.M{"$exists": true},
-		},
-		JobID:     "migration-testresults-oldtasks",
-		DependsOn: []string{"migration-testresults-legacy-no-execution"},
-	}
+	// oldTasksopts := model.GeneratorOptions{
+	// 	NS: model.Namespace{
+	// 		DB:         db,
+	// 		Collection: oldTasksCollection,
+	// 	},
+	// 	Limit: limit,
+	// 	Query: bson.M{
+	// 		"test_results.0": bson.M{"$exists": true},
+	// 		"execution":      bson.M{"$exists": true},
+	// 	},
+	// 	JobID:     "migration-testresults-oldtasks",
+	// 	DependsOn: []string{"migration-testresults-legacy-no-execution"},
+	// }
 
 	return []anser.Generator{
-		anser.NewManualMigrationGenerator(env, noExecutionOpts, "tasks_testresults_noexecution"),
+		// anser.NewManualMigrationGenerator(env, noExecutionOpts, "tasks_testresults_noexecution"),
 		anser.NewManualMigrationGenerator(env, tasksOpts, "tasks_testresults"),
-		anser.NewManualMigrationGenerator(env, oldTasksopts, "old_tasks_testresults"),
+		// anser.NewManualMigrationGenerator(env, oldTasksopts, "old_tasks_testresults"),
 	}
 }
 

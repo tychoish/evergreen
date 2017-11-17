@@ -27,25 +27,25 @@
 package mgo
 
 import (
-	"fmt"
 	"sync"
+
+	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/logging"
 )
 
 // ---------------------------------------------------------------------------
 // Logging integration.
 
-// Avoid importing the log type information unnecessarily.  There's a small cost
-// associated with using an interface rather than the type.  Depending on how
-// often the logger is plugged in, it would be worth using the type instead.
-type log_Logger interface {
-	Output(calldepth int, s string) error
-}
-
 var (
-	globalLogger log_Logger
+	globalLogger grip.Journaler
 	globalDebug  bool
 	globalMutex  sync.Mutex
 )
+
+func init() {
+	globalLogger = logging.MakeGrip(grip.GetSender())
+
+}
 
 // RACE WARNING: There are known data races when logging, which are manually
 // silenced when the race detector is in use. These data races won't be
@@ -54,12 +54,7 @@ var (
 // should elide the locks altogether in actual use.
 
 // Specify the *log.Logger object where log messages should be sent to.
-func SetLogger(logger log_Logger) {
-	if raceDetector {
-		globalMutex.Lock()
-		defer globalMutex.Unlock()
-	}
-	globalLogger = logger
+func SetLogger(logger interface{}) {
 }
 
 // Enable the delivery of debug messages to the logger.  Only meaningful
@@ -78,7 +73,7 @@ func log(v ...interface{}) {
 		defer globalMutex.Unlock()
 	}
 	if globalLogger != nil {
-		globalLogger.Output(2, fmt.Sprint(v...))
+		grip.Infoln(v...)
 	}
 }
 
@@ -88,7 +83,7 @@ func logln(v ...interface{}) {
 		defer globalMutex.Unlock()
 	}
 	if globalLogger != nil {
-		globalLogger.Output(2, fmt.Sprintln(v...))
+		grip.Infoln(v...)
 	}
 }
 
@@ -98,7 +93,7 @@ func logf(format string, v ...interface{}) {
 		defer globalMutex.Unlock()
 	}
 	if globalLogger != nil {
-		globalLogger.Output(2, fmt.Sprintf(format, v...))
+		grip.Infof(format, v...)
 	}
 }
 
@@ -108,7 +103,7 @@ func debug(v ...interface{}) {
 		defer globalMutex.Unlock()
 	}
 	if globalDebug && globalLogger != nil {
-		globalLogger.Output(2, fmt.Sprint(v...))
+		grip.Debugln(v...)
 	}
 }
 
@@ -118,7 +113,7 @@ func debugln(v ...interface{}) {
 		defer globalMutex.Unlock()
 	}
 	if globalDebug && globalLogger != nil {
-		globalLogger.Output(2, fmt.Sprintln(v...))
+		grip.Debugln(v...)
 	}
 }
 
@@ -128,6 +123,6 @@ func debugf(format string, v ...interface{}) {
 		defer globalMutex.Unlock()
 	}
 	if globalDebug && globalLogger != nil {
-		globalLogger.Output(2, fmt.Sprintf(format, v...))
+		grip.Debugf(format, v...)
 	}
 }
