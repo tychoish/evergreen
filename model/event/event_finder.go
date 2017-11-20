@@ -22,7 +22,7 @@ func Find(coll string, query db.Q) ([]Event, error) {
 // return a count of all system events captured.
 func CountSystemEvents(taskId string) (int, error) {
 	filter := bson.M{
-		DataKey + "." + ResourceTypeKey: EventTaskSystemInfo,
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): EventTaskSystemInfo,
 		TypeKey: EventTaskSystemInfo,
 	}
 
@@ -38,7 +38,7 @@ func CountSystemEvents(taskId string) (int, error) {
 // return a count of all process metrics captured.
 func CountProcessEvents(taskId string) (int, error) {
 	filter := bson.M{
-		DataKey + "." + ResourceTypeKey: EventTaskProcessInfo,
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): EventTaskProcessInfo,
 		TypeKey: EventTaskProcessInfo,
 	}
 
@@ -53,14 +53,22 @@ func CountProcessEvents(taskId string) (int, error) {
 
 // Host Events
 func HostEventsForId(id string) db.Q {
-	return db.Query(bson.D{
-		{DataKey + "." + ResourceTypeKey, ResourceTypeHost},
-		{ResourceIdKey, id},
+	return db.Query(bson.M{
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): ResourceTypeHost,
+		ResourceIdKey: id,
 	})
 }
 
 func MostRecentHostEvents(id string, n int) db.Q {
 	return HostEventsForId(id).Sort([]string{"-" + TimestampKey}).Limit(n)
+}
+
+func MostRecentHostEventsPeriod(id string, dur time.Duration) db.Q {
+	return db.Query(bson.M{
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): ResourceTypeHost,
+		ResourceIdKey: id,
+		TimestampKey:  bson.M{"$gte": time.Now().Add(-dur)},
+	}).Sort([]string{"-" + TimestampKey})
 }
 
 func HostEventsInOrder(id string) db.Q {
@@ -69,9 +77,9 @@ func HostEventsInOrder(id string) db.Q {
 
 // Task Events
 func TaskEventsForId(id string) db.Q {
-	return db.Query(bson.D{
-		{DataKey + "." + ResourceTypeKey, ResourceTypeTask},
-		{ResourceIdKey, id},
+	return db.Query(bson.M{
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): ResourceTypeTask,
+		ResourceIdKey: id,
 	})
 }
 
@@ -85,9 +93,9 @@ func TaskEventsInOrder(id string) db.Q {
 
 // Distro Events
 func DistroEventsForId(id string) db.Q {
-	return db.Query(bson.D{
-		{DataKey + "." + ResourceTypeKey, ResourceTypeDistro},
-		{ResourceIdKey, id},
+	return db.Query(bson.M{
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): ResourceTypeDistro,
+		ResourceIdKey: id,
 	})
 }
 
@@ -101,9 +109,9 @@ func DistroEventsInOrder(id string) db.Q {
 
 // Scheduler Events
 func SchedulerEventsForId(distroId string) db.Q {
-	return db.Query(bson.D{
-		{DataKey + "." + ResourceTypeKey, ResourceTypeScheduler},
-		{ResourceIdKey, distroId},
+	return db.Query(bson.M{
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): ResourceTypeScheduler,
+		ResourceIdKey: distroId,
 	})
 }
 
@@ -115,8 +123,8 @@ func RecentSchedulerEvents(distroId string, n int) db.Q {
 // RecentAdminEvents returns the N most recent admin events
 func RecentAdminEvents(n int) db.Q {
 	return db.Query(bson.M{
-		DataKey + "." + ResourceTypeKey: ResourceTypeAdmin,
-		ResourceIdKey:                   "",
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): ResourceTypeAdmin,
+		ResourceIdKey: "",
 	}).Sort([]string{"-" + TimestampKey}).Limit(n)
 }
 
@@ -129,9 +137,9 @@ func RecentAdminEvents(n int) db.Q {
 // will return all matching events that occur after the specified time.
 func TaskSystemInfoEvents(taskId string, ts time.Time, limit, sort int) db.Q {
 	filter := bson.M{
-		DataKey + "." + ResourceTypeKey: EventTaskSystemInfo,
-		ResourceIdKey:                   taskId,
-		TypeKey:                         EventTaskSystemInfo,
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): EventTaskSystemInfo,
+		ResourceIdKey: taskId,
+		TypeKey:       EventTaskSystemInfo,
 	}
 
 	sortSpec := TimestampKey
@@ -155,9 +163,9 @@ func TaskSystemInfoEvents(taskId string, ts time.Time, limit, sort int) db.Q {
 // will return all matching events that occur after the specified time.
 func TaskProcessInfoEvents(taskId string, ts time.Time, limit, sort int) db.Q {
 	filter := bson.M{
-		DataKey + "." + ResourceTypeKey: EventTaskProcessInfo,
-		ResourceIdKey:                   taskId,
-		TypeKey:                         EventTaskProcessInfo,
+		bsonutil.GetDottedFieldName(DataKey, ResourceTypeKey): EventTaskProcessInfo,
+		ResourceIdKey: taskId,
+		TypeKey:       EventTaskProcessInfo,
 	}
 
 	sortSpec := TimestampKey
