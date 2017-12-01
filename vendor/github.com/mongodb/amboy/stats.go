@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/sometimes"
 )
 
@@ -25,9 +26,13 @@ func (s QueueStats) String() string {
 }
 
 func (s QueueStats) isComplete() bool {
-	grip.DebugWhenf(sometimes.Fifth(),
-		"%d jobs complete of %d total (blocked=%d, running=%d)",
-		s.Completed, s.Total, s.Blocked, s.Running)
+	grip.InfoWhen(sometimes.Fifth(), message.Fields{
+		"message":  "queue status",
+		"complete": s.Completed,
+		"total":    s.Total,
+		"blocked":  s.Blocked,
+		"running":  s.Running,
+	})
 
 	if s.Total == s.Completed {
 		return true

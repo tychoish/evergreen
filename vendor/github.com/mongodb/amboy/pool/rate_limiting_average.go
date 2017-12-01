@@ -10,6 +10,7 @@ import (
 	"github.com/VividCortex/ewma"
 	"github.com/mongodb/amboy"
 	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/message"
 	"github.com/mongodb/grip/recovery"
 	"github.com/pkg/errors"
 )
@@ -170,8 +171,11 @@ func (p *ewmaRateLimiting) runJob(ctx context.Context, j amboy.Job) time.Duratio
 
 	interval := p.getNextTime(duration)
 
-	grip.Debugf("task %s completed in %s, next job in %s",
-		j.ID(), duration, interval)
+	grip.Info(message.Fields{
+		"id":       j.ID(),
+		"duration": duration,
+		"interval": interval,
+	})
 
 	return interval
 }

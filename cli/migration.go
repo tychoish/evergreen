@@ -41,6 +41,8 @@ func (c *MigrationCommand) Execute(_ []string) error {
 		Database: settings.Database.DB,
 	}
 
+	opts.Session.SetSocketTimeout(time.Hour)
+
 	anserEnv, err := opts.Setup(ctx)
 	if err != nil {
 		return errors.Wrap(err, "problem setting up migration environment")

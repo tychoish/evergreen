@@ -63,7 +63,7 @@ func (opts Options) Application(env anser.Environment) (*anser.Application, erro
 	}
 
 	generatorFactories := []migrationGeneratorFactory{
-		addExecutionToTasksGenerator,
+		// addExecutionToTasksGenerator,
 		oldTestResultsGenerator,
 		testResultsGenerator,
 	}
