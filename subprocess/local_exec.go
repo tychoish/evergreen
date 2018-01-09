@@ -69,7 +69,7 @@ func (c *localExec) Run(ctx context.Context) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	return errors.Wrap(c.cmd.Wait())
+	return errors.WithStack(c.cmd.Wait())
 }
 
 func (c *localExec) Wait() error {
