@@ -3,12 +3,8 @@ package hostutil
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/evergreen-ci/evergreen/model/distro"
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/subprocess"
 	"github.com/evergreen-ci/evergreen/util"
@@ -18,56 +14,9 @@ import (
 )
 
 const (
-	// SSHTimeout is the timeout for SSH commands.
-	SSHTimeout = 2 * time.Minute
+	// sshTimeout is the timeout for SSH commands.
+	sshTimeout = 2 * time.Minute
 )
-
-// ExecutableSubPath returns the directory containing the compiled agents.
-func executableSubPath(d *distro.Distro) string {
-	return filepath.Join(d.Arch, binaryName(d))
-}
-
-// BinaryName returns the name of the evergreen binary.
-func binaryName(d *distro.Distro) string {
-	name := "evergreen"
-	if IsWindows(d) {
-		return name + ".exe"
-	}
-	return name
-}
-
-// IsWindows returns true if a distro is a Windows distro.
-func IsWindows(d *distro.Distro) bool {
-	return strings.HasPrefix(d.Arch, "windows")
-}
-
-// CurlCommand returns a command for curling an agent binary to a host
-func CurlCommand(url string, host *host.Host) string {
-	return fmt.Sprintf("cd ~ && curl -LO '%s/clients/%s' && chmod +x %s",
-		url,
-		executableSubPath(&host.Distro),
-		binaryName(&host.Distro))
-}
-
-// SetupCommand returns a command for running the setup script on a host
-func SetupCommand(host *host.Host) string {
-	cmd := fmt.Sprintf("%s host setup",
-		filepath.Join("~", binaryName(&host.Distro)))
-	if host.Distro.SetupAsSudo {
-		cmd += " --setup_as_sudo"
-	}
-
-	cmd += fmt.Sprintf(" --working_directory=%s", host.Distro.WorkDir)
-
-	return cmd
-}
-
-// TearDownCommand returns a command for running a teardown script on a host.
-func TearDownCommand(host *host.Host) string {
-	cmd := fmt.Sprintf("%s host teardown",
-		filepath.Join("~", binaryName(&host.Distro)))
-	return cmd
-}
 
 // RunSSHCommand runs an SSH command on a remote host.
 func RunSSHCommand(ctx context.Context, cmd string, sshOptions []string, host host.Host) (string, error) {
@@ -109,7 +58,7 @@ func RunSSHCommand(ctx context.Context, cmd string, sshOptions []string, host ho
 	})
 
 	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, SSHTimeout)
+	ctx, cancel = context.WithTimeout(ctx, sshTimeout)
 	defer cancel()
 
 	err = proc.Run(ctx)

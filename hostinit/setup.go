@@ -770,7 +770,7 @@ func (init *HostInit) LoadClient(ctx context.Context, target *host.Host) (*LoadC
 
 	// place the binary into the directory
 	curlSetupCmd := subprocess.NewRemoteCommand(
-		hostutil.CurlCommand(init.Settings.Ui.Url, target),
+		curlCommand(init.Settings.Ui.Url, target),
 		hostSSHInfo.Hostname,
 		target.User,
 		nil,   // env

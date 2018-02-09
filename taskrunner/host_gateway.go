@@ -155,7 +155,7 @@ func (agbh *AgentHostGateway) GetAgentRevision() (string, error) {
 // Prepare the remote machine to run a task.
 func (agbh *AgentHostGateway) prepRemoteHost(ctx context.Context, hostObj host.Host, sshOptions []string, settings *evergreen.Settings) (string, error) {
 	// copy over the correct agent binary to the remote host
-	if logs, err := hostutil.RunSSHCommand(ctx, hostutil.CurlCommand(settings.Ui.Url, &hostObj), sshOptions, hostObj); err != nil {
+	if logs, err := hostutil.RunSSHCommand(ctx, curlCommand(settings.Ui.Url, &hostObj), sshOptions, hostObj); err != nil {
 		return "", errors.Wrapf(err, "error downloading agent binary on remote host: %s", logs)
 	}
 
@@ -191,7 +191,7 @@ func (agbh *AgentHostGateway) prepRemoteHost(ctx context.Context, hostObj host.H
 func startAgentOnRemote(settings *evergreen.Settings, hostObj *host.Host, sshOptions []string) error {
 	// the path to the agent binary on the remote machine
 	pathToExecutable := filepath.Join("~", "evergreen")
-	if hostutil.IsWindows(&hostObj.Distro) {
+	if hostObj.Distro.IsWindows() {
 		pathToExecutable += ".exe"
 	}
 
