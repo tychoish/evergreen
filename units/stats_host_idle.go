@@ -58,7 +58,7 @@ func NewCollectHostIdleDataJob(h host.Host, startTime, finishTime time.Time) amb
 	return j
 }
 
-func (j *collecHostIdleDataJob) Run() {
+func (j *collecHostIdleDataJob) Run(ctx context.Context) {
 	defer j.MarkComplete()
 	var err error
 
@@ -78,7 +78,8 @@ func (j *collecHostIdleDataJob) Run() {
 	settings := j.env.Settings()
 
 	var cost float64
-	ctx, cancel := context.WithCancel(context.Background())
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
 	manager, err := cloud.GetCloudManager(ctx, j.host.Provider, settings)

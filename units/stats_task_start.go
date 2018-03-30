@@ -1,6 +1,7 @@
 package units
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -56,7 +57,7 @@ func NewCollectTaskStartDataJob(t *task.Task, h host.Host) amboy.Job {
 	return j
 }
 
-func (j *collectTaskStartDataJob) Run() {
+func (j *collectTaskStartDataJob) Run(_ context.Context) {
 	defer j.MarkComplete()
 	var err error
 	if j.task == nil {
