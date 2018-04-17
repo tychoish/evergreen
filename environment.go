@@ -318,11 +318,12 @@ func (e *envState) initSenders() (err error) {
 	}
 	e.senders[SenderEvergreenWebhook] = sender
 
+	catcher := grip.NewBasicCatcher()
 	for _, s := range e.senders {
-		s.SetLevel(levelInfo)
+		catcher.Add(s.SetLevel(levelInfo))
 	}
 
-	return nil
+	return catcher.Resolve()
 }
 
 type bbProject struct {
