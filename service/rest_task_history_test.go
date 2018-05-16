@@ -18,8 +18,8 @@ import (
 	"github.com/evergreen-ci/evergreen/model/version"
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/gimlet"
-	"github.com/gorilla/mux"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/urfave/negroni"
 )
 
 var testConfig = testutil.TestConfig()
@@ -45,10 +45,13 @@ func TestGetTestHistory(t *testing.T) {
 		DisableCache: true,
 	})
 
-	testutil.HandleTestingErr(uis.InitPlugins(), t, "problem installing plugins")
-	router := mux.NewRouter()
-	err = uis.AttachRoutes(router)
-	testutil.HandleTestingErr(err, t, "Failed to create ui server router")
+	app, err := GetRESTv1App(&uis)
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.Resolve()
+	router, err := app.Handler()
+	testutil.HandleTestingErr(err, t, "error setting up router")
 
 	Convey("When retrieving the test history", t, func() {
 		testutil.HandleTestingErr(db.ClearCollections(task.Collection, version.Collection, testresult.Collection), t,
@@ -181,11 +184,9 @@ func TestGetTestHistory(t *testing.T) {
 		So(testresult.InsertMany(task3results), ShouldBeNil)
 
 		Convey("response should be a list of test results", func() {
+			url := "/rest/v1/" + project + "/test_history"
 
-			url, err := router.Get("test_history").URL("project_id", project)
-			So(err, ShouldBeNil)
-
-			request, err := http.NewRequest("GET", url.String()+"?tasks=test,test2&limit=20&requestSource=any", nil)
+			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=any", nil)
 			So(err, ShouldBeNil)
 
 			response := httptest.NewRecorder()
@@ -215,10 +216,9 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response when only requesting patches should have one result ", func() {
-			url, err := router.Get("test_history").URL("project_id", project)
-			So(err, ShouldBeNil)
+			url := "/rest/v1/" + project + "/test_history"
 
-			request, err := http.NewRequest("GET", url.String()+"?tasks=test,test2&limit=20&requestSource=patch", nil)
+			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=patch", nil)
 			So(err, ShouldBeNil)
 
 			response := httptest.NewRecorder()
@@ -235,10 +235,9 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response with invalid build request source should be an error", func() {
-			url, err := router.Get("test_history").URL("project_id", project)
-			So(err, ShouldBeNil)
+			url := "/rest/v1/" + project + "/test_history"
 
-			request, err := http.NewRequest("GET", url.String()+"?tasks=test,test2&limit=20&requestSource=INVALID", nil)
+			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=INVALID", nil)
 			So(err, ShouldBeNil)
 
 			response := httptest.NewRecorder()
@@ -249,10 +248,9 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response with commit requests should have the expected results", func() {
-			url, err := router.Get("test_history").URL("project_id", project)
-			So(err, ShouldBeNil)
+			url := "/rest/v1/" + project + "/test_history"
 
-			request, err := http.NewRequest("GET", url.String()+"?tasks=test,test2&limit=20&requestSource=commit", nil)
+			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=commit", nil)
 			So(err, ShouldBeNil)
 
 			response := httptest.NewRecorder()
@@ -268,10 +266,9 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response with no request source argument should have the same results as commit", func() {
-			url, err := router.Get("test_history").URL("project_id", project)
-			So(err, ShouldBeNil)
+			url := "/rest/v1/" + project + "/test_history"
 
-			request, err := http.NewRequest("GET", url.String()+"?tasks=test,test2&limit=20", nil)
+			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20", nil)
 			So(err, ShouldBeNil)
 
 			response := httptest.NewRecorder()

@@ -265,7 +265,7 @@ phony += vendor-clean
 #    run. (The "build" target is intentional and makes these targetsb
 #    rerun as expected.)
 testRunDeps := $(name)
-testArgs := -test.v
+testArgs := ""
 testRunEnv := EVGHOME=$(shell pwd)
 ifeq ($(OS),Windows_NT)
 testRunEnv := EVGHOME=$(shell cygpath -m `pwd`)

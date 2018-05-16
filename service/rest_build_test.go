@@ -17,8 +17,8 @@ import (
 	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/gimlet"
+	"github.com/urfave/negroni"
 
-	"github.com/gorilla/mux"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -34,7 +34,6 @@ func TestGetBuildInfo(t *testing.T) {
 		Settings:    *buildTestConfig,
 		UserManager: userManager,
 	}
-	testutil.HandleTestingErr(uis.InitPlugins(), t, "error installing plugins")
 
 	home := evergreen.FindEvergreenHome()
 
@@ -43,9 +42,13 @@ func TestGetBuildInfo(t *testing.T) {
 		DisableCache: true,
 	})
 
-	router := mux.NewRouter()
-	err = uis.AttachRoutes(router)
-	testutil.HandleTestingErr(err, t, "Failed to create ui server router")
+	app, err := GetRESTv1App(&uis)
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.Resolve()
+	router, err := app.Handler()
+	testutil.HandleTestingErr(err, t, "error setting up router")
 
 	Convey("When finding info on a particular build", t, func() {
 		testutil.HandleTestingErr(db.Clear(build.Collection), t,
@@ -90,10 +93,9 @@ func TestGetBuildInfo(t *testing.T) {
 		}
 		So(build.Insert(), ShouldBeNil)
 
-		url, err := router.Get("build_info").URL("build_id", buildId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/builds/" + buildId
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()
@@ -168,10 +170,9 @@ func TestGetBuildInfo(t *testing.T) {
 	Convey("When finding info on a nonexistent build", t, func() {
 		buildId := "not-present"
 
-		url, err := router.Get("build_info").URL("build_id", buildId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/builds/" + buildId
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()
@@ -207,11 +208,14 @@ func TestGetBuildStatus(t *testing.T) {
 		Directory:    filepath.Join(home, WebRootPath, Templates),
 		DisableCache: true,
 	})
-	testutil.HandleTestingErr(uis.InitPlugins(), t, "problem loading plugins")
 
-	router := mux.NewRouter()
-	err = uis.AttachRoutes(router)
-	testutil.HandleTestingErr(err, t, "Failed to create ui server router")
+	app, err := GetRESTv1App(&uis)
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.Resolve()
+	router, err := app.Handler()
+	testutil.HandleTestingErr(err, t, "error setting up router")
 
 	Convey("When finding the status of a particular build", t, func() {
 		testutil.HandleTestingErr(db.Clear(build.Collection), t,
@@ -235,10 +239,9 @@ func TestGetBuildStatus(t *testing.T) {
 		}
 		So(build.Insert(), ShouldBeNil)
 
-		url, err := router.Get("build_status").URL("build_id", buildId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/builds/" + buildId + "/status"
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()
@@ -280,10 +283,9 @@ func TestGetBuildStatus(t *testing.T) {
 	Convey("When finding the status of a nonexistent build", t, func() {
 		buildId := "not-present"
 
-		url, err := router.Get("build_status").URL("build_id", buildId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/builds/" + buildId + "status"
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()

@@ -19,10 +19,10 @@ import (
 	"github.com/evergreen-ci/evergreen/model/testresult"
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/gimlet"
-	"github.com/gorilla/mux"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/negroni"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -87,10 +87,14 @@ func TestGetTaskInfo(t *testing.T) {
 		Directory:    filepath.Join(home, WebRootPath, Templates),
 		DisableCache: true,
 	})
-	testutil.HandleTestingErr(uis.InitPlugins(), t, "problem loading plugins")
-	router := mux.NewRouter()
-	err = uis.AttachRoutes(router)
-	testutil.HandleTestingErr(err, t, "Failed to create ui server router")
+
+	app, err := GetRESTv1App(&uis)
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.Resolve()
+	router, err := app.Handler()
+	testutil.HandleTestingErr(err, t, "error setting up router")
 
 	Convey("When finding info on a particular task", t, func() {
 		testutil.HandleTestingErr(db.ClearCollections(task.Collection, testresult.Collection), t,
@@ -122,10 +126,9 @@ func TestGetTaskInfo(t *testing.T) {
 		}
 		So(a.Upsert(), ShouldBeNil)
 
-		url, err := router.Get("task_info").URL("task_id", taskId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/tasks/" + taskId
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()
@@ -249,10 +252,9 @@ func TestGetTaskInfo(t *testing.T) {
 	Convey("When finding info on a nonexistent task", t, func() {
 		taskId := "not-present"
 
-		url, err := router.Get("task_info").URL("task_id", taskId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/tasks/" + taskId
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()
@@ -288,11 +290,14 @@ func TestGetTaskStatus(t *testing.T) {
 		Directory:    filepath.Join(home, WebRootPath, Templates),
 		DisableCache: true,
 	})
-	testutil.HandleTestingErr(uis.InitPlugins(), t, "problem loading plugins")
 
-	router := mux.NewRouter()
-	err = uis.AttachRoutes(router)
-	testutil.HandleTestingErr(err, t, "Failed to create ui server router")
+	app, err := GetRESTv1App(&uis)
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.Resolve()
+	router, err := app.Handler()
+	testutil.HandleTestingErr(err, t, "error setting up router")
 
 	Convey("When finding the status of a particular task", t, func() {
 		testutil.HandleTestingErr(db.ClearCollections(task.Collection, testresult.Collection), t,
@@ -321,10 +326,9 @@ func TestGetTaskStatus(t *testing.T) {
 		So(testTask.Insert(), ShouldBeNil)
 		So(testresult.InsertMany([]testresult.TestResult{testResult}), ShouldBeNil)
 
-		url, err := router.Get("task_status").URL("task_id", taskId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/tasks/" + taskId
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()
@@ -381,10 +385,9 @@ func TestGetTaskStatus(t *testing.T) {
 	Convey("When finding the status of a nonexistent task", t, func() {
 		taskId := "not-present"
 
-		url, err := router.Get("task_status").URL("task_id", taskId)
-		So(err, ShouldBeNil)
+		url := "/rest/v1/tasks/" + taskId + "/status"
 
-		request, err := http.NewRequest("GET", url.String(), nil)
+		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
 
 		response := httptest.NewRecorder()
@@ -422,10 +425,13 @@ func TestGetDisplayTaskInfo(t *testing.T) {
 		DisableCache: true,
 	})
 
-	require.NoError(uis.InitPlugins())
-	router := mux.NewRouter()
-	err = uis.AttachRoutes(router)
-	require.NoError(err)
+	app, err := GetRESTv1App(&uis)
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
+	testutil.HandleTestingErr(err, t, "error setting up router")
+	app.Resolve()
+	router, err := app.Handler()
+	testutil.HandleTestingErr(err, t, "error setting up router")
 
 	require.NoError(db.ClearCollections(task.Collection, testresult.Collection))
 
@@ -456,10 +462,9 @@ func TestGetDisplayTaskInfo(t *testing.T) {
 		}})
 	require.NoError(err)
 
-	url, err := router.Get("task_info").URL("task_id", displayTaskId)
-	require.NoError(err)
+	url := "/rest/v1/tasks/" + displayTaskId
 
-	request, err := http.NewRequest("GET", url.String(), nil)
+	request, err := http.NewRequest("GET", url, nil)
 	require.NoError(err)
 
 	response := httptest.NewRecorder()
@@ -470,8 +475,10 @@ func TestGetDisplayTaskInfo(t *testing.T) {
 	var jsonBody map[string]interface{}
 	err = json.Unmarshal(response.Body.Bytes(), &jsonBody)
 
-	assert.NoError(err)
-	assert.Equal(displayTask.Id, jsonBody["id"])
-	found := jsonBody["test_results"].(map[string]interface{})
-	assert.Contains(found, "some-test")
+	if assert.NoError(err) {
+		assert.Equal(displayTask.Id, jsonBody["id"])
+		found, ok := jsonBody["test_results"].(map[string]interface{})
+		assert.True(ok)
+		assert.Contains(found, "some-test")
+	}
 }
