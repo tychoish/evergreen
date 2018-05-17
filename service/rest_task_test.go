@@ -22,7 +22,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/negroni"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -88,11 +87,8 @@ func TestGetTaskInfo(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, uis.UserManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -142,7 +138,6 @@ func TestGetTaskInfo(t *testing.T) {
 			var jsonBody map[string]interface{}
 			err = json.Unmarshal(response.Body.Bytes(), &jsonBody)
 			So(err, ShouldBeNil)
-			fmt.Println(response.Body.String())
 
 			rawJSONBody := map[string]*json.RawMessage{}
 			err = json.Unmarshal(response.Body.Bytes(), &rawJSONBody)
@@ -291,11 +286,8 @@ func TestGetTaskStatus(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, uis.UserManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -326,7 +318,7 @@ func TestGetTaskStatus(t *testing.T) {
 		So(testTask.Insert(), ShouldBeNil)
 		So(testresult.InsertMany([]testresult.TestResult{testResult}), ShouldBeNil)
 
-		url := "/rest/v1/tasks/" + taskId
+		url := "/rest/v1/tasks/" + taskId + "/status"
 
 		request, err := http.NewRequest("GET", url, nil)
 		So(err, ShouldBeNil)
@@ -425,11 +417,8 @@ func TestGetDisplayTaskInfo(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, userManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -475,10 +464,9 @@ func TestGetDisplayTaskInfo(t *testing.T) {
 	var jsonBody map[string]interface{}
 	err = json.Unmarshal(response.Body.Bytes(), &jsonBody)
 
-	if assert.NoError(err) {
-		assert.Equal(displayTask.Id, jsonBody["id"])
-		found, ok := jsonBody["test_results"].(map[string]interface{})
-		assert.True(ok)
-		assert.Contains(found, "some-test")
-	}
+	assert.NoError(err)
+	assert.Equal(displayTask.Id, jsonBody["id"])
+	found, ok := jsonBody["test_results"].(map[string]interface{})
+	assert.True(ok)
+	assert.Contains(found, "some-test")
 }

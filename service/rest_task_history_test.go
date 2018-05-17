@@ -19,7 +19,6 @@ import (
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/gimlet"
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/urfave/negroni"
 )
 
 var testConfig = testutil.TestConfig()
@@ -45,11 +44,8 @@ func TestGetTestHistory(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, uis.UserManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -184,9 +180,9 @@ func TestGetTestHistory(t *testing.T) {
 		So(testresult.InsertMany(task3results), ShouldBeNil)
 
 		Convey("response should be a list of test results", func() {
-			url := "/rest/v1/" + project + "/test_history"
+			url := "/rest/v1/projects/" + project + "/test_history?tasks=test,test2&limit=20&requestSource=any"
 
-			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=any", nil)
+			request, err := http.NewRequest("GET", url, nil)
 			So(err, ShouldBeNil)
 
 			response := httptest.NewRecorder()
@@ -216,7 +212,7 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response when only requesting patches should have one result ", func() {
-			url := "/rest/v1/" + project + "/test_history"
+			url := "/rest/v1/projects/" + project + "/test_history"
 
 			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=patch", nil)
 			So(err, ShouldBeNil)
@@ -235,7 +231,7 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response with invalid build request source should be an error", func() {
-			url := "/rest/v1/" + project + "/test_history"
+			url := "/rest/v1/projects/" + project + "/test_history"
 
 			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=INVALID", nil)
 			So(err, ShouldBeNil)
@@ -248,7 +244,7 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response with commit requests should have the expected results", func() {
-			url := "/rest/v1/" + project + "/test_history"
+			url := "/rest/v1/projects/" + project + "/test_history"
 
 			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20&requestSource=commit", nil)
 			So(err, ShouldBeNil)
@@ -266,7 +262,7 @@ func TestGetTestHistory(t *testing.T) {
 		})
 
 		Convey("response with no request source argument should have the same results as commit", func() {
-			url := "/rest/v1/" + project + "/test_history"
+			url := "/rest/v1/projects/" + project + "/test_history"
 
 			request, err := http.NewRequest("GET", url+"?tasks=test,test2&limit=20", nil)
 			So(err, ShouldBeNil)

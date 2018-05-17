@@ -14,7 +14,6 @@ import (
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/gimlet"
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/urfave/negroni"
 )
 
 var projectTestConfig = testutil.TestConfig()
@@ -31,11 +30,8 @@ func TestProjectRoutes(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, uis.UserManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	n, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -102,7 +98,7 @@ func TestProjectRoutes(t *testing.T) {
 			Enabled:    true,
 			Private:    true,
 			Repo:       "repo1",
-			Admins:     []string{},
+			Admins:     []string{"testuser"},
 		}
 		So(private.Insert(), ShouldBeNil)
 		response := httptest.NewRecorder()

@@ -34,7 +34,7 @@ func GetServer(addr string, n http.Handler) *http.Server {
 func GetRouter(as *APIServer, uis *UIServer) (http.Handler, error) {
 	app := gimlet.NewApp()
 
-	restv1, err := GetRESTv1App(as)
+	restv1, err := GetRESTv1App(as, as.UserManager)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -63,11 +63,6 @@ func GetRouter(as *APIServer, uis *UIServer) (http.Handler, error) {
 	}
 
 	app.AddApp(legacyApp)
-
-	err = app.Resolve()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
 
 	return app.Handler()
 }

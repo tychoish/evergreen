@@ -17,7 +17,6 @@ import (
 	modelutil "github.com/evergreen-ci/evergreen/model/testutil"
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/gimlet"
-	"github.com/urfave/negroni"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -42,11 +41,8 @@ func TestGetBuildInfo(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, uis.UserManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -102,7 +98,6 @@ func TestGetBuildInfo(t *testing.T) {
 		// Need match variables to be set so can call mux.Vars(request)
 		// in the actual handler function
 		router.ServeHTTP(response, request)
-
 		So(response.Code, ShouldEqual, http.StatusOK)
 
 		Convey("response should match contents of database", func() {
@@ -209,11 +204,8 @@ func TestGetBuildStatus(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, userManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 

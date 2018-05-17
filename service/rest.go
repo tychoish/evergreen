@@ -4,10 +4,11 @@ import (
 	"net/http"
 
 	"github.com/evergreen-ci/evergreen"
+	"github.com/evergreen-ci/evergreen/auth"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/gimlet"
-	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/urfave/negroni"
 )
 
 // restContextKey is the type used to store
@@ -29,16 +30,8 @@ type restV1middleware struct {
 }
 
 func (ra *restV1middleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	vars := mux.Vars(r)
-	taskId := vars["task_id"]
-	buildId := vars["build_id"]
-	versionId := vars["version_id"]
-	patchId := vars["patch_id"]
-	projectId := vars["project_id"]
-	ctx, err := model.LoadContext(taskId, buildId, versionId, patchId, projectId)
-
-	// vars := gimlet.GetVars(r)
-	// ctx, err := model.LoadContext(vars["task_id"], vars["build_id"], vars["version_id"], vars["patch_id"], vars["project_id"])
+	vars := gimlet.GetVars(r)
+	ctx, err := model.LoadContext(vars["task_id"], vars["build_id"], vars["version_id"], vars["patch_id"], vars["project_id"])
 	if err != nil {
 		// Some database lookup failed when fetching the data - log it
 		ra.LoggedError(rw, r, http.StatusInternalServerError, errors.Wrap(err, "Error loading project context"))
@@ -57,7 +50,6 @@ func (ra *restV1middleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, n
 
 	r = setRestContext(r, &ctx)
 	next(rw, r)
-
 }
 
 // MustHaveRESTContext fetches the model.Context stored with the request, and panics if the key
@@ -72,14 +64,14 @@ func MustHaveRESTContext(r *http.Request) *model.Context {
 
 // AttachRESTHandler attaches a router at the given root that hooks up REST endpoint URIs to be
 // handled by the given restAPIService.
-func GetRESTv1App(evgService restAPIService) (*gimlet.APIApp, error) {
+func GetRESTv1App(evgService restAPIService, um auth.UserManager) (*gimlet.APIApp, error) {
 	rest := &restAPI{evgService}
 	app := gimlet.NewApp()
 	app.ResetMiddleware()
-	app.StrictSlash = true
 	app.SetPrefix(evergreen.RestRoutePrefix)
-	app.AddMiddleware(&restV1middleware{rest})
 	app.AddMiddleware(NewRecoveryLogger())
+	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(um)))
+	app.AddMiddleware(&restV1middleware{rest})
 
 	// REST routes
 	app.AddRoute("/builds/{build_id}").Version(1).Get().Handler(rest.getBuildInfo)
@@ -103,10 +95,5 @@ func GetRESTv1App(evgService restAPIService) (*gimlet.APIApp, error) {
 	app.AddRoute("/versions/{version_id}/config").Version(1).Get().Handler(rest.getVersionConfig)
 	app.AddRoute("/versions/{version_id}/status").Version(1).Get().Handler(rest.getVersionStatus)
 
-	if err := app.Resolve(); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
 	return app, nil
-
 }

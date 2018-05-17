@@ -20,20 +20,9 @@ import (
 	serviceutil "github.com/evergreen-ci/evergreen/service/testutil"
 	"github.com/evergreen-ci/evergreen/testutil"
 	"github.com/evergreen-ci/gimlet"
-	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/level"
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/smartystreets/goconvey/convey/reporting"
 	"github.com/urfave/negroni"
 )
-
-func init() {
-	reporting.QuietMode()
-	sender := grip.GetSender()
-	lvl := sender.Level()
-	lvl.Threshold = level.Alert
-	grip.CatchAlert(sender.SetLevel(lvl))
-}
 
 var versionTestConfig = testutil.TestConfig()
 
@@ -55,11 +44,8 @@ func TestGetRecentVersions(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, userManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -263,11 +249,8 @@ func TestGetVersionInfo(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, uis.UserManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -325,8 +308,6 @@ func TestGetVersionInfo(t *testing.T) {
 		// in the actual handler function
 		router.ServeHTTP(response, request)
 
-		fmt.Println(response.Body)
-
 		So(response.Code, ShouldEqual, http.StatusOK)
 		validateVersionInfo(v, response)
 	})
@@ -372,11 +353,8 @@ func TestGetVersionInfoViaRevision(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, userManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -470,11 +448,8 @@ func TestActivateVersion(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, uis.UserManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
@@ -615,11 +590,8 @@ func TestGetVersionStatus(t *testing.T) {
 		DisableCache: true,
 	})
 
-	app, err := GetRESTv1App(&uis)
+	app, err := GetRESTv1App(&uis, userManager)
 	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(uis.UserManager)))
-	testutil.HandleTestingErr(err, t, "error setting up router")
-	app.Resolve()
 	router, err := app.Handler()
 	testutil.HandleTestingErr(err, t, "error setting up router")
 
