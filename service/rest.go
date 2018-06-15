@@ -7,7 +7,6 @@ import (
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/gimlet"
 	"github.com/pkg/errors"
-	"github.com/urfave/negroni"
 )
 
 // restContextKey is the type used to store
@@ -69,7 +68,7 @@ func GetRESTv1App(evgService restAPIService, um gimlet.UserManager) (*gimlet.API
 	app.ResetMiddleware()
 	app.SetPrefix(evergreen.RestRoutePrefix)
 	app.AddMiddleware(NewRecoveryLogger())
-	app.AddMiddleware(negroni.HandlerFunc(UserMiddleware(um)))
+	app.AddMiddleware(gimlet.UserMiddleware(um, GetUserMiddlewareConf()))
 	app.AddWrapper(&restV1middleware{rest})
 
 	// REST routes
