@@ -69,8 +69,8 @@ func MustHaveProjectContext(r *http.Request) projectContext {
 // MustHaveUser gets the user from the request or
 // panics if it does not exist.
 func MustHaveUser(r *http.Request) *user.DBUser {
-	u, ok := gimlet.GetUser(r.Context())
-	if !ok {
+	u := gimlet.GetUser(r.Context())
+	if u == nil {
 		panic("no user attached to request")
 	}
 	usr, ok := u.(*user.DBUser)
@@ -115,7 +115,7 @@ func (uis *UIServer) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		ctx := r.Context()
 		// get the project context
 		projCtx := MustHaveProjectContext(r)
-		if dbUser, ok := gimlet.GetUser(ctx); ok && dbUser != nil {
+		if dbUser := gimlet.GetUser(ctx); dbUser != nil {
 			if uis.isSuperUser(dbUser) || isAdmin(dbUser, projCtx.ProjectRef) {
 				next(w, r)
 				return
@@ -131,7 +131,7 @@ func (uis *UIServer) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 // execute the onFail handler. If onFail is nil, a simple "unauthorized" error will be sent.
 func requireUser(onSuccess, onFail http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := gimlet.GetUser(r.Context()); !ok {
+		if user := gimlet.GetUser(r.Context()); user == nil {
 			if onFail != nil {
 				onFail(w, r)
 				return
@@ -154,8 +154,8 @@ func (uis *UIServer) requireSuperUser(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		usr, ok := gimlet.GetUser(r.Context())
-		if ok && uis.isSuperUser(usr) {
+		usr := gimlet.GetUser(r.Context())
+		if usr != nil && uis.isSuperUser(usr) {
 			next(w, r)
 			return
 		}
@@ -167,9 +167,6 @@ func (uis *UIServer) requireSuperUser(next http.HandlerFunc) http.HandlerFunc {
 // A user has these permission if they are in the super users list or if the list is empty,
 // in which case all users are super users.
 func (uis *UIServer) isSuperUser(u gimlet.User) bool {
-	if u == nil {
-		return false
-	}
 	if util.StringSliceContains(uis.Settings.SuperUsers, u.Username()) ||
 		len(uis.Settings.SuperUsers) == 0 {
 		return true
@@ -182,9 +179,6 @@ func (uis *UIServer) isSuperUser(u gimlet.User) bool {
 // isAdmin returns false if the user is nil or if its id is not
 // located in ProjectRef's Admins field.
 func isAdmin(u gimlet.User, project *model.ProjectRef) bool {
-	if u == nil {
-		return false
-	}
 	return util.StringSliceContains(project.Admins, u.Username())
 }
 
@@ -218,7 +212,7 @@ func (uis *UIServer) loadCtx(next http.HandlerFunc) http.HandlerFunc {
 			uis.LoggedError(w, r, http.StatusInternalServerError, errors.Wrap(err, "Error loading project context"))
 			return
 		}
-		usr, _ := gimlet.GetUser(r.Context())
+		usr := gimlet.GetUser(r.Context())
 
 		if projCtx.ProjectRef != nil && projCtx.ProjectRef.Private && usr == nil {
 			uis.RedirectToLogin(w, r)
@@ -294,7 +288,7 @@ func (uis *UIServer) getRequestProjectId(r *http.Request) string {
 // This is done by reading in specific variables and inferring other required
 // context variables when necessary (e.g. loading a project based on the task).
 func (uis *UIServer) LoadProjectContext(rw http.ResponseWriter, r *http.Request) (projectContext, error) {
-	dbUser, _ := gimlet.GetUser(r.Context())
+	dbUser := gimlet.GetUser(r.Context())
 
 	vars := gimlet.GetVars(r)
 	taskId := vars["task_id"]

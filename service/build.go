@@ -89,7 +89,7 @@ func (uis *UIServer) buildPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	user, _ := gimlet.GetUser(ctx)
+	user := gimlet.GetUser(ctx)
 
 	// set data for plugin data function injection
 	pluginContext := projCtx.ToPluginContext(uis.Settings, user)

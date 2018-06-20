@@ -29,24 +29,27 @@ type restV1middleware struct {
 
 func (ra *restV1middleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	vars := gimlet.GetVars(r)
-	ctx, err := model.LoadContext(vars["task_id"], vars["build_id"], vars["version_id"], vars["patch_id"], vars["project_id"])
+	ctx := r.Context()
+	pctx, err := model.LoadContext(vars["task_id"], vars["build_id"], vars["version_id"], vars["patch_id"], vars["project_id"])
 	if err != nil {
 		// Some database lookup failed when fetching the data - log it
 		ra.LoggedError(rw, r, http.StatusInternalServerError, errors.Wrap(err, "Error loading project context"))
 		return
 	}
 
-	if ctx.ProjectRef != nil && ctx.ProjectRef.Private && GetUser(r) == nil {
+	usr := gimlet.GetUser(ctx)
+
+	if pctx.ProjectRef != nil && pctx.ProjectRef.Private && usr == nil {
 		gimlet.WriteTextResponse(rw, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	if ctx.Patch != nil && GetUser(r) == nil {
+	if pctx.Patch != nil && usr == nil {
 		gimlet.WriteTextResponse(rw, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	r = setRestContext(r, &ctx)
+	r = setRestContext(r, &pctx)
 	next(rw, r)
 }
 

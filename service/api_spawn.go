@@ -196,8 +196,8 @@ func (as *APIServer) modifyHost(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	user, ok := gimlet.GetUser(ctx)
-	if !ok || user.Username() != h.StartedBy {
+	user := gimlet.GetUser(ctx)
+	if user == nil || user.Username() != h.StartedBy {
 		message := fmt.Sprintf("Only %v is authorized to terminate this host", h.StartedBy)
 		http.Error(w, message, http.StatusUnauthorized)
 		return

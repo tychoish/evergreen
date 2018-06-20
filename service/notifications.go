@@ -7,7 +7,7 @@ import (
 )
 
 func (uis *UIServer) notificationsPage(w http.ResponseWriter, r *http.Request) {
-	currentUser, _ := gimlet.GetUser(r.Context())
+	currentUser := gimlet.GetUser(r.Context())
 	if currentUser == nil {
 		http.Error(w, "No user logged in", http.StatusUnauthorized)
 		return

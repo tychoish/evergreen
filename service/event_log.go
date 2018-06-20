@@ -15,7 +15,7 @@ func (uis *UIServer) fullEventLogs(w http.ResponseWriter, r *http.Request) {
 	resourceType := strings.ToUpper(vars["resource_type"])
 	resourceID := vars["resource_id"]
 	ctx := r.Context()
-	u, _ := gimlet.GetUser(ctx)
+	u := gimlet.GetUser(ctx)
 
 	var eventQuery db.Q
 	switch resourceType {

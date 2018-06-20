@@ -11,7 +11,7 @@ import (
 func (uis *UIServer) GetPluginHandler(uiPage *plugin.UIPage, pluginName string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		projCtx := MustHaveProjectContext(r)
-		u, _ := gimlet.GetUser(r.Context())
+		u := gimlet.GetUser(r.Context())
 		pluginCtx := plugin.UIContext{
 			Settings:   uis.Settings,
 			User:       u,
