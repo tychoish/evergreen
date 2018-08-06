@@ -182,5 +182,7 @@ func (s *GithubWebhookRouteSuite) TestPushEventTriggersRepoTracker() {
 	ctx := context.Background()
 
 	resp := s.h.Run(ctx)
-	s.Equal(http.StatusOK, resp.Status())
+	if s.NotNil(resp) {
+		s.Equal(http.StatusOK, resp.Status())
+	}
 }
