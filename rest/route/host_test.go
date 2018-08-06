@@ -124,11 +124,10 @@ func (s *hostTerminateHostHandlerSuite) TestExecuteWithTerminatedHost() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
-	data, err := h.Run(ctx)
-	s.Empty(data.Result)
-	s.NotNil(err)
-	s.IsType(gimlet.ErrorResponse{}, err)
-	apiErr := err.(gimlet.ErrorResponse)
+	resp := h.Run(ctx)
+	s.Equal(http.StatusBadRequest, resp.Status())
+
+	apiErr := resp.Data().(gimlet.ErrorResponse)
 	s.Equal(http.StatusBadRequest, apiErr.StatusCode)
 	s.Equal(evergreen.HostTerminated, s.sc.CachedHosts[0].Status)
 }
@@ -141,9 +140,8 @@ func (s *hostTerminateHostHandlerSuite) TestExecuteWithUninitializedHost() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
-	data, err := h.Run(ctx)
-	s.Empty(data.Result)
-	s.NoError(err)
+	resp := h.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 	s.Equal(evergreen.HostTerminated, s.sc.CachedHosts[2].Status)
 }
 
@@ -155,9 +153,8 @@ func (s *hostTerminateHostHandlerSuite) TestExecuteWithRunningHost() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
-	data, err := h.Run(ctx)
-	s.Empty(data.Result)
-	s.NoError(err)
+	resp := h.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 	s.Equal(evergreen.HostRunning, s.sc.CachedHosts[1].Status)
 }
 
@@ -169,9 +166,8 @@ func (s *hostTerminateHostHandlerSuite) TestSuperUserCanTerminateAnyHost() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["root"])
 
-	data, err := h.Run(ctx)
-	s.Empty(data.Result)
-	s.NoError(err)
+	resp := h.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 	s.Equal(evergreen.HostTerminated, s.sc.CachedHosts[2].Status)
 }
 
@@ -183,9 +179,9 @@ func (s *hostTerminateHostHandlerSuite) TestRegularUserCannotTerminateAnyHost() 
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user1"])
 
-	data, err := h.Run(ctx)
-	s.Empty(data.Result)
-	s.Error(err)
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
+	s.Equal(http.StatusUnauthorized, resp.Status())
 	s.Equal(evergreen.HostRunning, s.sc.CachedHosts[1].Status)
 }
 
@@ -220,7 +216,7 @@ func (s *hostChangeRDPPasswordHandlerSuite) TestExecute() {
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
 	resp := h.Run(ctx)
-	s.Contains(resp.Data().(gimlet.ErrorResponse), "Error constructing host RDP password: No known provider for ''")
+	s.Contains(resp.Data().(gimlet.ErrorResponse).Message, "Error constructing host RDP password: No known provider for ''")
 }
 
 func (s *hostChangeRDPPasswordHandlerSuite) TestExecuteWithUninitializedHostFails() {
@@ -231,9 +227,8 @@ func (s *hostChangeRDPPasswordHandlerSuite) TestExecuteWithUninitializedHostFail
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
 }
 
 func (s *hostChangeRDPPasswordHandlerSuite) TestExecuteWithInvalidHost() {
@@ -243,9 +238,8 @@ func (s *hostChangeRDPPasswordHandlerSuite) TestExecuteWithInvalidHost() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
 }
 
 func (s *hostChangeRDPPasswordHandlerSuite) TestParseAndValidateRejectsInvalidPasswords() {
@@ -276,9 +270,9 @@ func (s *hostChangeRDPPasswordHandlerSuite) TestSuperUserCanChangeAnyHost() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["root"])
 
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Contains(err.Error(), "Error constructing host RDP password: No known provider for ''")
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
+	s.Contains(resp.Data().(gimlet.ErrorResponse).Message, "Error constructing host RDP password: No known provider for ''")
 }
 func (s *hostChangeRDPPasswordHandlerSuite) TestRegularUserCannotChangeAnyHost() {
 	h := s.rm.Factory().(*hostChangeRDPPasswordHandler)
@@ -288,22 +282,21 @@ func (s *hostChangeRDPPasswordHandlerSuite) TestRegularUserCannotChangeAnyHost()
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user1"])
 
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
 }
 
 func (s *hostChangeRDPPasswordHandlerSuite) tryParseAndValidate(mod model.APISpawnHostModify) error {
 	r, err := makeMockHostRequest(mod)
 	s.NoError(err)
 
-	h := s.rm.Methods[0].Handler().(*hostChangeRDPPasswordHandler)
+	h := s.rm.Factory().(*hostChangeRDPPasswordHandler)
 
-	return h.ParseAndValidate(context.TODO(), r)
+	return h.Parse(context.TODO(), r)
 }
 
 type hostExtendExpirationHandlerSuite struct {
-	rm *RouteManager
+	rm gimlet.RouteHandler
 	sc *data.MockConnector
 	suite.Suite
 }
@@ -314,25 +307,24 @@ func TestHostExtendExpirationHandler(t *testing.T) {
 }
 
 func (s *hostExtendExpirationHandlerSuite) SetupTest() {
-	s.rm = getHostExtendExpirationRouteManager("", 2)
 	s.sc = getMockHostsConnector()
+	s.rm = makeExtendHostExpiration(s.sc)
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestHostExtendExpirationWithNoUserPanics() {
 	s.PanicsWithValue("no user attached to request", func() {
-		_, _ = s.rm.Methods[0].Execute(context.TODO(), s.sc)
+		_ = s.rm.Run(context.TODO())
 	})
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestExecuteWithInvalidHost() {
-	h := s.rm.Methods[0].Handler().(*hostExtendExpirationHandler)
+	h := s.rm.Factory().(*hostExtendExpirationHandler)
 	h.hostID = "host-that-doesn't-exist"
 
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestParseAndValidateRejectsInvalidExpirations() {
@@ -358,77 +350,72 @@ func (s *hostExtendExpirationHandlerSuite) TestParseAndValidateRejectsInvalidExp
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestExecuteWithLargeExpirationFails() {
-	h := s.rm.Methods[0].Handler().(*hostExtendExpirationHandler)
+	h := s.rm.Factory().(*hostExtendExpirationHandler)
 	h.hostID = "host2"
 	h.addHours = 9001 * time.Hour
 
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
-	s.IsType(gimlet.ErrorResponse{}, err)
-	apiErr := err.(gimlet.ErrorResponse)
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
+	apiErr := resp.Data().(gimlet.ErrorResponse)
 	s.Equal(http.StatusBadRequest, apiErr.StatusCode)
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestExecute() {
 	expectedTime := s.sc.CachedHosts[1].ExpirationTime.Add(8 * time.Hour)
 
-	h := s.rm.Methods[0].Handler().(*hostExtendExpirationHandler)
+	h := s.rm.Factory().(*hostExtendExpirationHandler)
 	h.hostID = "host2"
 	h.addHours = 8 * time.Hour
 
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.NoError(err)
+	resp := h.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 	s.Equal(expectedTime, s.sc.CachedHosts[1].ExpirationTime)
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestExecuteWithTerminatedHostFails() {
 	expectedTime := s.sc.CachedHosts[0].ExpirationTime
 
-	h := s.rm.Methods[0].Handler().(*hostExtendExpirationHandler)
+	h := s.rm.Factory().(*hostExtendExpirationHandler)
 	h.hostID = "host1"
 	h.addHours = 8 * time.Hour
 
-	ctx := context.Background()
-	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
+	ctx := gimlet.AttachUser(context.Background(), s.sc.MockUserConnector.CachedUsers["user0"])
+	resp := h.Run(ctx)
+	s.Equal(http.StatusBadRequest, resp.Status())
 	s.Equal(expectedTime, s.sc.CachedHosts[0].ExpirationTime)
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestSuperUserCanExtendAnyHost() {
 	expectedTime := s.sc.CachedHosts[1].ExpirationTime.Add(8 * time.Hour)
 
-	h := s.rm.Methods[0].Handler().(*hostExtendExpirationHandler)
+	h := s.rm.Factory().(*hostExtendExpirationHandler)
 	h.hostID = "host2"
 	h.addHours = 8 * time.Hour
 
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["root"])
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.NoError(err)
+
+	resp := h.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 	s.Equal(expectedTime, s.sc.CachedHosts[1].ExpirationTime)
 }
 
 func (s *hostExtendExpirationHandlerSuite) TestRegularUserCannotExtendOtherUsersHosts() {
 	expectedTime := s.sc.CachedHosts[1].ExpirationTime
 
-	h := s.rm.Methods[0].Handler().(*hostExtendExpirationHandler)
+	h := s.rm.Factory().(*hostExtendExpirationHandler)
 	h.hostID = "host2"
 	h.addHours = 8 * time.Hour
 
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user1"])
-	data, err := h.Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
+
+	resp := h.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
 	s.Equal(expectedTime, s.sc.CachedHosts[1].ExpirationTime)
 }
 
@@ -436,9 +423,9 @@ func (s *hostExtendExpirationHandlerSuite) tryParseAndValidate(mod model.APISpaw
 	r, err := makeMockHostRequest(mod)
 	s.NoError(err)
 
-	h := s.rm.Methods[0].Handler().(*hostExtendExpirationHandler)
+	h := s.rm.Factory().(*hostExtendExpirationHandler)
 
-	return h.ParseAndValidate(context.TODO(), r)
+	return h.Parse(context.TODO(), r)
 }
 
 func makeMockHostRequest(mod model.APISpawnHostModify) (*http.Request, error) {

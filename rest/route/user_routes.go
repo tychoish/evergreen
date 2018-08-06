@@ -11,13 +11,10 @@ import (
 	"github.com/evergreen-ci/evergreen/rest/model"
 	"github.com/evergreen-ci/evergreen/thirdparty"
 	"github.com/evergreen-ci/evergreen/util"
+	"github.com/evergreen-ci/gimlet"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
 )
-
-type userSettingsPostHandler struct {
-	settings model.APIUserSettings
-}
 
 func getUserSettingsRouteManager(route string, version int) *RouteManager {
 	h := userSettingsPostHandler{}
@@ -41,16 +38,33 @@ func getUserSettingsRouteManager(route string, version int) *RouteManager {
 	}
 }
 
-func (h *userSettingsPostHandler) Handler() RequestHandler {
-	return &userSettingsPostHandler{}
+////////////////////////////////////////////////////////////////////////
+//
+// POST /rest/v2/users/settings
+
+type userSettingsPostHandler struct {
+	settings model.APIUserSettings
+	sc       data.Connector
 }
 
-func (h *userSettingsPostHandler) ParseAndValidate(ctx context.Context, r *http.Request) error {
+func makeSetUserConfig(sc data.Connector) gimlet.RouteHandler {
+	return &userSettingsPostHandler{
+		sc: sc,
+	}
+}
+
+func (h *userSettingsPostHandler) Factory() gimlet.RouteHandler {
+	return &userSettingsPostHandler{
+		sc: h.sc,
+	}
+}
+
+func (h *userSettingsPostHandler) Parse(ctx context.Context, r *http.Request) error {
 	h.settings = model.APIUserSettings{}
-	return util.ReadJSONInto(r.Body, &h.settings)
+	return errors.WithStack(util.ReadJSONInto(r.Body, &h.settings))
 }
 
-func (h *userSettingsPostHandler) Execute(ctx context.Context, sc data.Connector) (ResponseData, error) {
+func (h *userSettingsPostHandler) Run(ctx context.Context) gimlet.Responder {
 	u := MustHaveUser(ctx)
 	adminSettings, err := evergreen.GetConfig()
 	if err != nil {
@@ -102,24 +116,26 @@ func (h *userSettingsPostHandler) Execute(ctx context.Context, sc data.Connector
 	}, nil
 }
 
+////////////////////////////////////////////////////////////////////////
+//
+// GET /rest/v2/users/settings
+
 type userSettingsGetHandler struct{}
 
-func (h *userSettingsGetHandler) Handler() RequestHandler {
+func makeFetchUserConfig() gimlet.RouteHandler {
 	return &userSettingsGetHandler{}
 }
 
-func (h *userSettingsGetHandler) ParseAndValidate(ctx context.Context, r *http.Request) error {
-	return nil
-}
+func (h *userSettingsGetHandler) Factory() gimlet.RouteHandler                     { return h }
+func (h *userSettingsGetHandler) Parse(ctx context.Context, r *http.Request) error { return nil }
 
-func (h *userSettingsGetHandler) Execute(ctx context.Context, sc data.Connector) (ResponseData, error) {
+func (h *userSettingsGetHandler) Run(ctx context.Context) gimlet.Responder {
 	u := MustHaveUser(ctx)
+
 	apiSettings := model.APIUserSettings{}
 	if err := apiSettings.BuildFromService(u.Settings); err != nil {
-		return ResponseData{}, errors.Wrap(err, "error formatting user settings")
+		return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "error formatting user settings"))
 	}
 
-	return ResponseData{
-		Result: []model.Model{&apiSettings},
-	}, nil
+	return gimlet.NewJSONResponse(apiSettings)
 }
