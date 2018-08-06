@@ -21,11 +21,6 @@ const (
 	RequestContext requestContextKey = 0
 )
 
-// PrefetchFunc is a function signature that defines types of functions which may
-// be used to fetch data before the main request handler is called. They should
-// fetch data using data.Connector set them on the request context.
-type PrefetchFunc func(context.Context, data.Connector, *http.Request) (context.Context, error)
-
 type projCtxMiddleware struct {
 	sc data.Connector
 }
