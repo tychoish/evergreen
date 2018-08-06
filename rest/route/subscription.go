@@ -22,7 +22,7 @@ type subscriptionPostHandler struct {
 	sc              data.Connector
 }
 
-func makeSetSubscrition(sc data.Connector) {
+func makeSetSubscrition(sc data.Connector) gimlet.RouteHandler {
 	return &subscriptionPostHandler{
 		sc: sc,
 	}
@@ -155,7 +155,7 @@ func makeFetchSubscription(sc data.Connector) gimlet.RouteHandler {
 
 func (s *subscriptionGetHandler) Factory() gimlet.RouteHandler {
 	return &subscriptionGetHandler{
-		sc: sc,
+		sc: s.sc,
 	}
 }
 
@@ -210,7 +210,7 @@ func makeDeleteSubscription(sc data.Connector) gimlet.RouteHandler {
 }
 
 func (s *subscriptionDeleteHandler) Factory() gimlet.RouteHandler {
-	return &subscriptionDeleteHandler{sc: sc}
+	return &subscriptionDeleteHandler{sc: s.sc}
 }
 
 func (s *subscriptionDeleteHandler) Parse(ctx context.Context, r *http.Request) error {

@@ -16,28 +16,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func getUserSettingsRouteManager(route string, version int) *RouteManager {
-	h := userSettingsPostHandler{}
-	userSettingsPost := MethodHandler{
-		Authenticator:  &RequireUserAuthenticator{},
-		RequestHandler: h.Handler(),
-		MethodType:     http.MethodPost,
-	}
-
-	i := userSettingsGetHandler{}
-	userSettingsGet := MethodHandler{
-		Authenticator:  &RequireUserAuthenticator{},
-		RequestHandler: i.Handler(),
-		MethodType:     http.MethodGet,
-	}
-
-	return &RouteManager{
-		Route:   route,
-		Methods: []MethodHandler{userSettingsGet, userSettingsPost},
-		Version: version,
-	}
-}
-
 ////////////////////////////////////////////////////////////////////////
 //
 // POST /rest/v2/users/settings
@@ -68,19 +46,19 @@ func (h *userSettingsPostHandler) Run(ctx context.Context) gimlet.Responder {
 	u := MustHaveUser(ctx)
 	adminSettings, err := evergreen.GetConfig()
 	if err != nil {
-		return ResponseData{}, errors.Wrap(err, "Error retrieving Evergreen settings")
+		return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "Error retrieving Evergreen settings"))
 	}
 	changedSettings, err := model.ApplyUserChanges(u.Settings, h.settings)
 	if err != nil {
-		return ResponseData{}, errors.Wrapf(err, "problem applying user settings")
+		return gimlet.MakeJSONErrorResponder(errors.Wrapf(err, "problem applying user settings"))
 	}
 	userSettingsInterface, err := changedSettings.ToService()
 	if err != nil {
-		return ResponseData{}, errors.Wrap(err, "Error parsing user settings")
+		return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "Error parsing user settings"))
 	}
 	userSettings, ok := userSettingsInterface.(user.UserSettings)
 	if !ok {
-		return ResponseData{}, errors.New("Unable to parse settings object")
+		return gimlet.MakeJSONErrorResponder(errors.New("Unable to parse settings object"))
 	}
 
 	if len(userSettings.GithubUser.LastKnownAs) == 0 {
@@ -90,7 +68,7 @@ func (h *userSettingsPostHandler) Run(ctx context.Context) gimlet.Responder {
 		var ghUser *github.User
 		token, err = adminSettings.GetGithubOauthToken()
 		if err != nil {
-			return ResponseData{}, errors.Wrap(err, "Error retrieving Github token")
+			return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "Error retrieving Github token"))
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -98,7 +76,7 @@ func (h *userSettingsPostHandler) Run(ctx context.Context) gimlet.Responder {
 
 		ghUser, err = thirdparty.GetGithubUser(ctx, token, userSettings.GithubUser.LastKnownAs)
 		if err != nil {
-			return ResponseData{}, errors.Wrap(err, "Error fetching user from Github")
+			return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "Error fetching user from Github"))
 		}
 
 		userSettings.GithubUser.LastKnownAs = *ghUser.Login
@@ -107,13 +85,11 @@ func (h *userSettingsPostHandler) Run(ctx context.Context) gimlet.Responder {
 		userSettings.GithubUser.UID = u.Settings.GithubUser.UID
 	}
 
-	if err = sc.UpdateSettings(u, userSettings); err != nil {
-		return ResponseData{}, errors.Wrap(err, "Error saving user settings")
+	if err = h.sc.UpdateSettings(u, userSettings); err != nil {
+		return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "Error saving user settings"))
 	}
 
-	return ResponseData{
-		Result: []model.Model{},
-	}, nil
+	return gimlet.NewJSONResponse(struct{}{})
 }
 
 ////////////////////////////////////////////////////////////////////////

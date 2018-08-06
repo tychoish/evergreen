@@ -21,7 +21,7 @@ import (
 type SubscriptionRouteSuite struct {
 	sc data.Connector
 	suite.Suite
-	postHandler MethodHandler
+	postHandler gimlet.RouteHandler
 }
 
 func TestSubscriptionRouteSuiteWithDB(t *testing.T) {

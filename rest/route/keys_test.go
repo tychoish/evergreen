@@ -3,6 +3,7 @@ package route
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 
 type UserConnectorSuite struct {
 	sc *data.MockConnector
-	rm *RouteManager
+	rm gimlet.RouteHandler
 	suite.Suite
 }
 
@@ -26,7 +27,6 @@ func TestUserConnectorSuite(t *testing.T) {
 }
 
 func (s *UserConnectorSuite) SetupTest() {
-	s.rm = getKeysRouteManager("", 2)
 	s.sc = &data.MockConnector{MockUserConnector: data.MockUserConnector{
 		CachedUsers: map[string]*user.DBUser{
 			"user0": {
@@ -52,11 +52,12 @@ func (s *UserConnectorSuite) SetupTest() {
 			},
 		},
 	}}
+	s.rm = makeFetchKeys(s.sc)
 }
 
 func (s *UserConnectorSuite) TestGetSshKeysWithNoUserPanics() {
 	s.PanicsWithValue("no user attached to request", func() {
-		_, _ = s.rm.Methods[0].Execute(context.TODO(), s.sc)
+		_ = s.rm.Run(context.TODO())
 	})
 }
 
@@ -64,10 +65,12 @@ func (s *UserConnectorSuite) TestGetSshKeys() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
-	data, err := s.rm.Methods[0].Execute(ctx, s.sc)
-	s.Len(data.Result, 2)
-	s.NoError(err)
-	for i, result := range data.Result {
+	resp := s.rm.Run(ctx)
+
+	s.Equal(http.StatusOK, resp.Status())
+	payload := resp.Data().([]interface{})
+	s.Len(payload, 2)
+	for i, result := range payload {
 		s.IsType(new(model.APIPubKey), result)
 		key := result.(*model.APIPubKey)
 		s.Equal(key.Name, model.ToAPIString(fmt.Sprintf("user0_pubkey%d", i)))
@@ -78,17 +81,16 @@ func (s *UserConnectorSuite) TestGetSshKeysWithEmptyPubKeys() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user1"])
 
-	data, err := s.rm.Methods[0].Execute(ctx, s.sc)
-	s.Len(data.Result, 0)
-	s.NoError(err)
+	resp := s.rm.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 }
 
 func (s *UserConnectorSuite) TestAddSshKeyWithNoUserPanics() {
-	s.rm.Methods[1].RequestHandler.(*keysPostHandler).keyName = "Test"
-	s.rm.Methods[1].RequestHandler.(*keysPostHandler).keyValue = "ssh-rsa 12345"
+	s.rm.(*keysPostHandler).keyName = "Test"
+	s.rm.(*keysPostHandler).keyValue = "ssh-rsa 12345"
 
 	s.PanicsWithValue("no user attached to request", func() {
-		_, _ = s.rm.Methods[1].Execute(context.TODO(), s.sc)
+		_, _ = s.rm.Run(context.TODO())
 	})
 }
 
@@ -96,12 +98,10 @@ func (s *UserConnectorSuite) TestAddSshKey() {
 	ctx := context.Background()
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
-	s.rm.Methods[1].RequestHandler.(*keysPostHandler).keyName = "Test"
-	s.rm.Methods[1].RequestHandler.(*keysPostHandler).keyValue = "ssh-dss 12345"
-	data, err := s.rm.Methods[1].Execute(ctx, s.sc)
-
-	s.Empty(data.Result)
-	s.NoError(err)
+	s.rm.(*keysPostHandler).keyName = "Test"
+	s.rm.(*keysPostHandler).keyValue = "ssh-dss 12345"
+	resp := s.rm.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 
 	s.Len(s.sc.MockUserConnector.CachedUsers["user0"].PubKeys, 3)
 	s.Equal("Test", s.sc.MockUserConnector.CachedUsers["user0"].PubKeys[2].Name)
@@ -149,7 +149,7 @@ func TestKeyValidation(t *testing.T) {
 
 type UserConnectorDeleteSuite struct {
 	sc *data.MockConnector
-	rm *RouteManager
+	rm gimlet.RouteHandler
 	suite.Suite
 }
 
@@ -187,9 +187,8 @@ func (s *UserConnectorDeleteSuite) TestDeleteSshKeys() {
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 
 	s.rm.Methods[0].RequestHandler.(*keysDeleteHandler).keyName = "user0_pubkey0"
-	data, err := s.rm.Methods[0].Execute(ctx, s.sc)
-	s.NoError(err)
-	s.Empty(data.Result)
+	resp := s.rm.Run(ctx)
+	s.Equal(http.StatusOK, resp.Status())
 	s.Len(s.sc.MockUserConnector.CachedUsers["user0"].PubKeys, 1)
 
 	s.rm.Methods[0].RequestHandler.(*keysDeleteHandler).keyName = "user0_pubkey1"
@@ -204,9 +203,8 @@ func (s *UserConnectorDeleteSuite) TestDeleteSshKeysWithEmptyPubKeys() {
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user1"])
 
 	s.rm.Methods[0].RequestHandler.(*keysDeleteHandler).keyName = "keythatdoesntexist"
-	data, err := s.rm.Methods[0].Execute(ctx, s.sc)
-	s.Empty(data.Result)
-	s.Error(err)
+	resp := s.rm.Run(ctx)
+	s.NotEqual(http.StatusOK, resp.Status())
 }
 
 func (s *UserConnectorDeleteSuite) TestDeleteSshKeysWithNoUserFails() {

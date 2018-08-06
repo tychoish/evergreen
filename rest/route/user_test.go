@@ -19,7 +19,7 @@ import (
 type UserRouteSuite struct {
 	sc data.Connector
 	suite.Suite
-	postHandler MethodHandler
+	postHandler gimlet.RouteHandler
 }
 
 func TestUserRouteSuiteWithDB(t *testing.T) {

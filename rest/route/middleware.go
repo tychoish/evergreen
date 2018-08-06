@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/evergreen-ci/evergreen"
+	"github.com/evergreen-ci/evergreen/auth"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/user"
 	"github.com/evergreen-ci/evergreen/rest/data"
@@ -100,4 +102,11 @@ func MustHaveUser(ctx context.Context) *user.DBUser {
 	}
 
 	return usr
+}
+
+func validPriority(priority int64, user gimlet.User, sc data.Connector) bool {
+	if priority > evergreen.MaxTaskPriority {
+		return auth.IsSuperUser(sc.GetSuperUsers(), user)
+	}
+	return true
 }
