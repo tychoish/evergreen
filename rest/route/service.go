@@ -18,20 +18,15 @@ func AttachHandler(app *gimlet.APIApp, queue amboy.Queue, URL string, superUsers
 	sc.SetSuperUsers(superUsers)
 
 	routes := map[string]routeManagerFactory{
-		"/distros":                           getDistroRouteManager,
-		"/hooks/github":                      getGithubHooksRouteManager(queue, githubSecret),
-		"/hosts/{host_id}/change_password":   getHostChangeRDPPasswordRouteManager,
-		"/hosts/{host_id}/extend_expiration": getHostExtendExpirationRouteManager,
-		"/hosts/{host_id}/terminate":         getHostTerminateRouteManager,
-		"/keys":                                  getKeysRouteManager,
-		"/keys/{key_name}":                       getKeysDeleteRouteManager,
-		"/patches/{patch_id}/abort":              getPatchAbortManager,
-		"/patches/{patch_id}/restart":            getPatchRestartManager,
-		"/projects/{project_id}/recent_versions": getRecentVersionsManager,
-		"/subscriptions":                         getSubscriptionRouteManager,
-		"/user/settings":                         getUserSettingsRouteManager,
-		"/versions/{version_id}/abort":           getAbortVersionRouteManager,
-		"/versions/{version_id}/restart":         getRestartVersionRouteManager,
+		"/hooks/github":                  getGithubHooksRouteManager(queue, githubSecret),
+		"/keys":                          getKeysRouteManager,
+		"/keys/{key_name}":               getKeysDeleteRouteManager,
+		"/patches/{patch_id}/abort":      getPatchAbortManager,
+		"/patches/{patch_id}/restart":    getPatchRestartManager,
+		"/subscriptions":                 getSubscriptionRouteManager,
+		"/user/settings":                 getUserSettingsRouteManager,
+		"/versions/{version_id}/abort":   getAbortVersionRouteManager,
+		"/versions/{version_id}/restart": getRestartVersionRouteManager,
 	}
 
 	for path, getManager := range routes {
@@ -64,16 +59,21 @@ func AttachHandler(app *gimlet.APIApp, queue amboy.Queue, URL string, superUsers
 	app.AddRoute("/cost/distro/{distro_id}").Version(2).Get().Wrap(checkUser).RouteHandler(makeCostByDistroHandler(sc))
 	app.AddRoute("/cost/project/{project_id}/tasks").Version(2).Get().Wrap(checkUser).RouteHandler(makeTaskCostByProjectRoute(sc))
 	app.AddRoute("/cost/version/{version_id}").Version(2).Get().Wrap(checkUser).RouteHandler(makeCostByVersionHandler(sc))
+	app.AddRoute("/distros").Version(2).Get().Wrap(checkUser).RouteHandler(makeDistroRoute(sc))
 	app.AddRoute("/hosts").Version(2).Get().RouteHandler(makeFetchHosts(sc))
 	app.AddRoute("/hosts").Version(2).Post().Wrap(checkUser).RouteHandler(makeSpawnHostCreateRoute(sc))
 	app.AddRoute("/hosts/{host_id}").Version(2).Get().RouteHandler(makeGetHostByID(sc))
+	app.AddRoute("/hosts/{host_id}/change_password").Version(2).Post().Wrap(checkUser).RouteHandler(makeHostChangePassword(sc))
+	app.AddRoute("/hosts/{host_id}/extend_expiration").Version(2).Post().Wrap(checkUser).RouteHandler(makeExtendHostExpiration(sc))
+	app.AddRoute("/hosts/{host_id}/terminate").Version(2).Post().Wrap(checkUser).RouteHandler(makeTerminateHostRoute(sc))
 	app.AddRoute("/hosts/{task_id}/create").Version(2).Post().RouteHandler(makeHostCreateRouteManager(sc))
 	app.AddRoute("/hosts/{task_id}/list").Version(2).Get().RouteHandler(makeHostListRouteManager(sc))
 	app.AddRoute("/patches/{patch_id}").Version(2).Get().RouteHandler(makeFetchPatchByID(sc))
 	app.AddRoute("/patches/{patch_id}").Version(2).Patch().Wrap(checkUser).RouteHandler(makeChangePatchStatus(sc))
 	app.AddRoute("/projects").Version(2).Get().RouteHandler(makeFetchProjectsRoute(sc))
-	app.AddRoute("/projects/{project_id}/revisions/{commit_hash}/tasks").Version(2).Get().Wrap(checkUser).RouteHandler(makeTasksByProjectAndCommitHandler(sc))
 	app.AddRoute("/projects/{project_id}/patches").Version(2).Get().Wrap(checkUser).RouteHandler(makePatchesByProjectRoute(sc))
+	app.AddRoute("/projects/{project_id}/recent_versions").Version(2).Get().RouteHandler(makeFetchProjectVersions(sc))
+	app.AddRoute("/projects/{project_id}/revisions/{commit_hash}/tasks").Version(2).Get().Wrap(checkUser).RouteHandler(makeTasksByProjectAndCommitHandler(sc))
 	app.AddRoute("/status/cli_version").Version(2).Get().RouteHandler(makeFetchCLIVersionRoute(sc))
 	app.AddRoute("/status/hosts/distros").Version(2).Get().Wrap(checkUser).RouteHandler(makeHostStatusByDistroRoute(sc))
 	app.AddRoute("/status/notifications").Version(2).Get().Wrap(checkUser).RouteHandler(makeFetchNotifcationStatusRoute(sc))

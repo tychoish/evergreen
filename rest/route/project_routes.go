@@ -125,27 +125,22 @@ type versionsGetHandler struct {
 	project string
 	limit   int
 	offset  int
+	sc      data.Connector
 }
 
-func getRecentVersionsManager(route string, version int) *RouteManager {
-	return &RouteManager{
-		Route: route,
-		Methods: []MethodHandler{
-			{
-				Authenticator:  &NoAuthAuthenticator{},
-				RequestHandler: &versionsGetHandler{},
-				MethodType:     http.MethodGet,
-			},
-		},
-		Version: version,
+func makeFetchProjectVersions(sc data.Connector) gimlet.RouteHandler {
+	return &versionsGetHandler{
+		sc: sc,
 	}
 }
 
-func (h *versionsGetHandler) Handler() RequestHandler {
-	return &versionsGetHandler{}
+func (h *versionsGetHandler) Factory() gimlet.RouteHandler {
+	return &versionsGetHandler{
+		sc: h.sc,
+	}
 }
 
-func (h *versionsGetHandler) ParseAndValidate(ctx context.Context, r *http.Request) error {
+func (h *versionsGetHandler) Parse(ctx context.Context, r *http.Request) error {
 	var err error
 	h.project = gimlet.GetVars(r)["project_id"]
 	var query = r.URL.Query()
@@ -179,26 +174,27 @@ func (h *versionsGetHandler) ParseAndValidate(ctx context.Context, r *http.Reque
 	return nil
 }
 
-func (h *versionsGetHandler) Execute(ctx context.Context, sc data.Connector) (ResponseData, error) {
+func (h *versionsGetHandler) Run(ctx context.Context) gimlet.Responder {
 	projRef, err := dbModel.FindOneProjectRef(h.project)
 	if err != nil {
-		return ResponseData{}, gimlet.ErrorResponse{
+		return gimlet.MakeJSONErrorResponder(gimlet.ErrorResponse{
 			StatusCode: http.StatusBadRequest,
 			Message:    "Project not found",
-		}
+		})
 	}
+
 	proj, err := dbModel.FindProject("", projRef)
 	if err != nil {
-		return ResponseData{}, gimlet.ErrorResponse{
+		return gimlet.MakeJSONErrorResponder(gimlet.ErrorResponse{
 			StatusCode: http.StatusBadRequest,
 			Message:    "Project not found",
-		}
+		})
 	}
-	versions, err := sc.GetVersionsAndVariants(h.offset, h.limit, proj)
+
+	versions, err := h.sc.GetVersionsAndVariants(h.offset, h.limit, proj)
 	if err != nil {
-		return ResponseData{}, errors.Wrap(err, "Error retrieving versions")
+		return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "Error retrieving versions"))
 	}
-	return ResponseData{
-		Result: []model.Model{versions},
-	}, nil
+
+	return gimlet.NewJSONResponse(versions)
 }

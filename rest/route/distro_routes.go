@@ -6,48 +6,52 @@ import (
 
 	"github.com/evergreen-ci/evergreen/rest/data"
 	"github.com/evergreen-ci/evergreen/rest/model"
+	"github.com/evergreen-ci/gimlet"
 	"github.com/pkg/errors"
 )
 
-type distroGetHandler struct{}
+type distroGetHandler struct {
+	sc data.Connector
+}
 
-func getDistroRouteManager(route string, version int) *RouteManager {
-	return &RouteManager{
-		Route: route,
-		Methods: []MethodHandler{
-			{
-				Authenticator:  &RequireUserAuthenticator{},
-				RequestHandler: &distroGetHandler{},
-				MethodType:     http.MethodGet,
-			},
-		},
-		Version: version,
+func makeDistroRoute(sc data.Connector) gimlet.RouteHandler {
+	return &distroGetHandler{
+		sc: sc,
 	}
 }
 
-func (dgh *distroGetHandler) Handler() RequestHandler {
-	return &distroGetHandler{}
+func (dgh *distroGetHandler) Factory() gimlet.RouteHandler {
+	return &distroGetHandler{
+		sc: dgh.sc,
+	}
 }
 
-func (dgh *distroGetHandler) ParseAndValidate(ctx context.Context, r *http.Request) error {
+func (dgh *distroGetHandler) Parse(ctx context.Context, r *http.Request) error {
 	return nil
 }
 
-func (dgh *distroGetHandler) Execute(ctx context.Context, sc data.Connector) (ResponseData, error) {
-	distros, err := sc.FindAllDistros()
+func (dgh *distroGetHandler) Run(ctx context.Context) gimlet.Responder {
+	distros, err := dgh.sc.FindAllDistros()
 	if err != nil {
-		return ResponseData{}, errors.Wrap(err, "Database error")
-	}
-	models := make([]model.Model, len(distros))
-	for i, d := range distros {
-		distroModel := &model.APIDistro{}
-		if err := distroModel.BuildFromService(d); err != nil {
-			return ResponseData{}, err
-		}
-		models[i] = distroModel
+		return gimlet.MakeJSONErrorResponder(errors.Wrap(err, "Database error"))
 	}
 
-	return ResponseData{
-		Result: models,
-	}, nil
+	resp := gimlet.NewResponseBuilder()
+	if err = resp.SetFormat(gimlet.JSON); err != nil {
+		return gimlet.MakeJSONErrorResponder(err)
+	}
+
+	for _, d := range distros {
+		distroModel := &model.APIDistro{}
+		if err = distroModel.BuildFromService(d); err != nil {
+			return gimlet.MakeJSONErrorResponder(err)
+		}
+
+		err = resp.AddData(distroModel)
+		if err != nil {
+			return gimlet.MakeJSONErrorResponder(err)
+		}
+	}
+
+	return resp
 }
