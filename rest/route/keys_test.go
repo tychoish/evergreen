@@ -115,6 +115,11 @@ func (s *UserConnectorSuite) TestAddDuplicateSshKeyFails() {
 	ctx = gimlet.AttachUser(ctx, s.sc.MockUserConnector.CachedUsers["user0"])
 	s.TestAddSshKey()
 
+	s.Len(s.sc.MockUserConnector.CachedUsers["user0"].PubKeys, 3)
+
+	s.post.(*keysPostHandler).keyName = "Test"
+	s.post.(*keysPostHandler).keyValue = "ssh-dss 12345"
+
 	resp := s.post.Run(ctx)
 	s.NotEqual(http.StatusOK, resp.Status())
 

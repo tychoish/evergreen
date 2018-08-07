@@ -33,7 +33,7 @@ func TestSubscriptionRouteSuiteWithDB(t *testing.T) {
 }
 
 func (s *SubscriptionRouteSuite) SetupSuite() {
-	s.postHandler = makeFetchSubscription(s.sc)
+	s.postHandler = makeSetSubscrition(s.sc)
 }
 
 func (s *SubscriptionRouteSuite) SetupTest() {
@@ -66,7 +66,7 @@ func (s *SubscriptionRouteSuite) TestSubscriptionPost() {
 
 	// test creating a new subscription
 	resp := s.postHandler.Run(ctx)
-	s.NotEqual(http.StatusOK, resp.Status())
+	s.Equal(http.StatusOK, resp.Status())
 
 	s.NotNil(resp)
 
@@ -176,16 +176,16 @@ func (s *SubscriptionRouteSuite) TestProjectSubscription() {
 	s.Equal(http.StatusOK, resp.Status())
 
 	// get the updated subscription
-	h := &subscriptionGetHandler{}
+	h := &subscriptionGetHandler{sc: s.sc}
 	h.owner = "myproj"
 	h.ownerType = string(event.OwnerTypeProject)
 	resp = h.Run(ctx)
 	s.Equal(http.StatusOK, resp.Status())
-	sub := resp.Data().(*model.APISubscription)
-	s.Equal("new type", model.FromAPIString(sub.ResourceType))
+	sub := resp.Data().([]model.APISubscription)
+	s.Equal("new type", model.FromAPIString(sub[0].ResourceType))
 
 	// delete the subscription
-	d := &subscriptionDeleteHandler{id: id}
+	d := &subscriptionDeleteHandler{sc: s.sc, id: id}
 	resp = d.Run(ctx)
 	s.Equal(http.StatusOK, resp.Status())
 	subscription, err := event.FindSubscriptionByID(id)

@@ -164,6 +164,7 @@ func (s *subscriptionGetHandler) Parse(ctx context.Context, r *http.Request) err
 	s.owner = r.FormValue("owner")
 	s.ownerType = r.FormValue("type")
 	if !event.IsValidOwnerType(s.ownerType) {
+		fmt.Println(s.ownerType)
 		return gimlet.ErrorResponse{
 			StatusCode: http.StatusBadRequest,
 			Message:    "Invalid owner type",

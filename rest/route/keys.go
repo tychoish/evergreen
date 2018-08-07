@@ -145,7 +145,7 @@ func (h *keysPostHandler) Run(ctx context.Context) gimlet.Responder {
 	u := MustHaveUser(ctx)
 
 	if _, err := u.GetPublicKey(h.keyName); err == nil {
-		return gimlet.NewJSONResponse(gimlet.ErrorResponse{
+		return gimlet.MakeJSONErrorResponder(gimlet.ErrorResponse{
 			StatusCode: http.StatusBadRequest,
 			Message:    "a public key with this name already exists for user",
 		})
@@ -193,7 +193,7 @@ func (h *keysDeleteHandler) Run(ctx context.Context) gimlet.Responder {
 	user := MustHaveUser(ctx)
 
 	if _, err := user.GetPublicKey(h.keyName); err != nil {
-		return gimlet.NewJSONErrorResponse(gimlet.ErrorResponse{
+		return gimlet.MakeJSONErrorResponder(gimlet.ErrorResponse{
 			StatusCode: http.StatusBadRequest,
 			Message:    fmt.Sprintf("key with name '%s' does not exist", h.keyName),
 		})
