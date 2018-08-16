@@ -560,6 +560,7 @@ type APIJiraConfig struct {
 	Username       APIString `json:"username"`
 	Password       APIString `json:"password"`
 	DefaultProject APIString `json:"default_project"`
+	Disabled       bool      `json:"disabled"`
 }
 
 func (a *APIJiraConfig) BuildFromService(h interface{}) error {
@@ -569,6 +570,7 @@ func (a *APIJiraConfig) BuildFromService(h interface{}) error {
 		a.Username = ToAPIString(v.Username)
 		a.Password = ToAPIString(v.Password)
 		a.DefaultProject = ToAPIString(v.DefaultProject)
+		a.Disabled = v.Disabled
 	default:
 		return errors.Errorf("%T is not a supported type", h)
 	}
@@ -581,6 +583,7 @@ func (a *APIJiraConfig) ToService() (interface{}, error) {
 		Username:       FromAPIString(a.Username),
 		Password:       FromAPIString(a.Password),
 		DefaultProject: FromAPIString(a.DefaultProject),
+		Disabled:       a.Disabled,
 	}, nil
 }
 
@@ -1023,9 +1026,10 @@ type APIServiceFlags struct {
 }
 
 type APISlackConfig struct {
-	Options *APISlackOptions `json:"options"`
-	Token   APIString        `json:"token"`
-	Level   APIString        `json:"level"`
+	Options  *APISlackOptions `json:"options"`
+	Token    APIString        `json:"token"`
+	Level    APIString        `json:"level"`
+	Disabled bool             `json:"disabled"`
 }
 
 func (a *APISlackConfig) BuildFromService(h interface{}) error {
@@ -1033,6 +1037,7 @@ func (a *APISlackConfig) BuildFromService(h interface{}) error {
 	case evergreen.SlackConfig:
 		a.Token = ToAPIString(v.Token)
 		a.Level = ToAPIString(v.Level)
+		a.Disabled = v.Disabled
 		if v.Options != nil {
 			a.Options = &APISlackOptions{}
 			if err := a.Options.BuildFromService(*v.Options); err != nil { //nolint: vet
@@ -1052,9 +1057,10 @@ func (a *APISlackConfig) ToService() (interface{}, error) {
 	}
 	options := i.(send.SlackOptions) //nolint: vet
 	return evergreen.SlackConfig{
-		Token:   FromAPIString(a.Token),
-		Level:   FromAPIString(a.Level),
-		Options: &options,
+		Token:    FromAPIString(a.Token),
+		Level:    FromAPIString(a.Level),
+		Options:  &options,
+		Disabled: a.Disabled,
 	}, nil
 }
 
