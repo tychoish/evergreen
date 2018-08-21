@@ -107,11 +107,8 @@ var (
 )
 
 // ById creates a query that finds a task by its _id.
-func ById(id string) db.Q {
-	return db.Query(bson.D{{
-		Name:  IdKey,
-		Value: id,
-	}})
+func ById(id string) bson.M {
+	return bson.M{IdKey: id}
 }
 
 func ByIDPrefix(id string) db.Q {
@@ -125,21 +122,15 @@ func ByIDPrefix(id string) db.Q {
 }
 
 // ByIds creates a query that finds all tasks with the given ids.
-func ByIds(ids []string) db.Q {
-	return db.Query(bson.D{{
-		Name: IdKey,
-		Value: bson.D{{
-			Name:  "$in",
-			Value: ids,
-		}},
-	}})
+func ByIds(ids []string) bson.M {
+	return bson.M{IdKey: bson.M{"$in": ids}}
 }
 
 // ByBuildId creates a query to return tasks with a certain build id
-func ByBuildId(buildId string) db.Q {
-	return db.Query(bson.M{
+func ByBuildId(buildId string) bson.M {
+	return bson.M{
 		BuildIdKey: buildId,
-	})
+	}
 }
 
 // ByAborted creates a query to return tasks with an aborted state
@@ -164,14 +155,14 @@ func ByVersion(version string) db.Q {
 }
 
 // ByIdsBuildIdAndStatus creates a query to return tasks with a certain build id and statuses
-func ByIdsBuildAndStatus(taskIds []string, buildId string, statuses []string) db.Q {
-	return db.Query(bson.M{
+func ByIdsBuildAndStatus(taskIds []string, buildId string, statuses []string) bson.M {
+	return bson.M{
 		IdKey:      bson.M{"$in": taskIds},
 		BuildIdKey: buildId,
 		StatusKey: bson.M{
 			"$in": statuses,
 		},
-	})
+	}
 }
 
 // ByStaleRunningTask creates a query that finds any running tasks
@@ -193,14 +184,14 @@ func ByStaleRunningTask(staleness time.Duration) db.Q {
 }
 
 // ByCommit creates a query on Evergreen as the requester on a revision, buildVariant, displayName and project.
-func ByCommit(revision, buildVariant, displayName, project, requester string) db.Q {
-	return db.Query(bson.M{
+func ByCommit(revision, buildVariant, displayName, project, requester string) bson.M {
+	return bson.M{
 		RevisionKey:     revision,
 		RequesterKey:    requester,
 		BuildVariantKey: buildVariant,
 		DisplayNameKey:  displayName,
 		ProjectKey:      project,
-	})
+	}
 }
 
 // ByStatusAndActivation creates a query that returns tasks of a certain status and activation state.
@@ -226,8 +217,8 @@ func ByVersionsForNameAndVariant(versions []string, displayName, buildVariant st
 // ByIntermediateRevisions creates a query that returns the tasks existing
 // between two revision order numbers, exclusive.
 func ByIntermediateRevisions(previousRevisionOrder, currentRevisionOrder int,
-	buildVariant, displayName, project, requester string) db.Q {
-	return db.Query(bson.M{
+	buildVariant, displayName, project, requester string) bson.M {
+	return bson.M{
 		BuildVariantKey: buildVariant,
 		DisplayNameKey:  displayName,
 		RequesterKey:    requester,
@@ -236,7 +227,7 @@ func ByIntermediateRevisions(previousRevisionOrder, currentRevisionOrder int,
 			"$gt": previousRevisionOrder,
 		},
 		ProjectKey: project,
-	})
+	}
 }
 
 func ByBeforeRevision(revisionOrder int, buildVariant, displayName, project, requester string) db.Q {
@@ -308,21 +299,20 @@ func ByBeforeRevisionWithStatusesAndRequester(revisionOrder int, statuses []stri
 }
 
 // ByTimeRun returns all tasks that are running in between two given times.
-func ByTimeRun(startTime, endTime time.Time) db.Q {
-	return db.Query(
-		bson.M{
-			"$or": []bson.M{
-				bson.M{
-					StartTimeKey:  bson.M{"$lte": endTime},
-					FinishTimeKey: bson.M{"$gte": startTime},
-					StatusKey:     evergreen.TaskFailed,
-				},
-				bson.M{
-					StartTimeKey:  bson.M{"$lte": endTime},
-					FinishTimeKey: bson.M{"$gte": startTime},
-					StatusKey:     evergreen.TaskSucceeded,
-				},
-			}})
+func ByTimeRun(startTime, endTime time.Time) bson.M {
+	return bson.M{
+		"$or": []bson.M{
+			bson.M{
+				StartTimeKey:  bson.M{"$lte": endTime},
+				FinishTimeKey: bson.M{"$gte": startTime},
+				StatusKey:     evergreen.TaskFailed,
+			},
+			bson.M{
+				StartTimeKey:  bson.M{"$lte": endTime},
+				FinishTimeKey: bson.M{"$gte": startTime},
+				StatusKey:     evergreen.TaskSucceeded,
+			},
+		}}
 }
 
 // ByTimeStartedAndFailed returns all failed tasks that started between 2 given times
@@ -402,28 +392,24 @@ func ByRecentlyFinished(finishTime time.Time, project string, requester string) 
 	return db.Query(query)
 }
 
-func ByDispatchedWithIdsVersionAndStatus(taskIds []string, versionId string, statuses []string) db.Q {
-	return db.Query(bson.M{
+func ByDispatchedWithIdsVersionAndStatus(taskIds []string, versionId string, statuses []string) bson.M {
+	return bson.M{
 		IdKey: bson.M{
 			"$in": taskIds,
 		},
 		VersionKey:      versionId,
 		DispatchTimeKey: bson.M{"$ne": util.ZeroTime},
 		StatusKey:       bson.M{"$in": statuses},
-	})
+	}
 }
 
-func ByExecutionTask(taskId string) db.Q {
-	return db.Query(bson.M{
-		ExecutionTasksKey: taskId,
-	})
+func ByExecutionTask(taskId string) bson.M {
+	return bson.M{ExecutionTasksKey: taskId}
 }
 
-var (
-	IsDispatchedOrStarted = db.Query(bson.M{
-		StatusKey: bson.M{"$in": []string{evergreen.TaskStarted, evergreen.TaskDispatched}},
-	})
-)
+var IsDispatchedOrStarted = bson.M{
+	StatusKey: bson.M{"$in": []string{evergreen.TaskStarted, evergreen.TaskDispatched}},
+}
 
 func scheduleableTasksQuery() bson.M {
 	return bson.M{
@@ -600,9 +586,9 @@ func GetRecentTasks(period time.Duration) ([]Task, error) {
 // DB Boilerplate
 
 // FindOneNoMerge is a FindOne without merging test results.
-func FindOneNoMerge(query db.Q) (*Task, error) {
+func FindOneNoMerge(query bson.M) (*Task, error) {
 	task := &Task{}
-	err := db.FindOneQ(Collection, query, task)
+	err := db.FindOneQ(Collection, db.Query(query), task)
 	if err == mgo.ErrNotFound {
 		return nil, nil
 	}
@@ -610,7 +596,7 @@ func FindOneNoMerge(query db.Q) (*Task, error) {
 }
 
 // FindOne returns one task that satisfies the query.
-func FindOne(query db.Q) (*Task, error) {
+func FindOne(query bson.M) (*Task, error) {
 	task, err := FindOneNoMerge(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "error finding task")
@@ -620,6 +606,17 @@ func FindOne(query db.Q) (*Task, error) {
 	}
 	if err = task.MergeNewTestResults(); err != nil {
 		return nil, errors.Wrap(err, "errors merging new test results")
+	}
+	return task, err
+}
+
+func FindLatest(query bson.M) (*Task, error) {
+	q := db.Query(query).Sort([]string{"-" + RevisionOrderNumberKey})
+
+	task := &Task{}
+	err := db.FindOneQ(Collection, q, task)
+	if err == mgo.ErrNotFound {
+		return nil, nil
 	}
 	return task, err
 }
@@ -640,9 +637,9 @@ func FindOneId(id string) (*Task, error) {
 }
 
 // FindOneOldNoMerge is a FindOneOld without merging test results.
-func FindOneOldNoMerge(query db.Q) (*Task, error) {
+func FindOneOldNoMerge(query bson.M) (*Task, error) {
 	task := &Task{}
-	err := db.FindOneQ(OldCollection, query, task)
+	err := db.FindOneQ(OldCollection, db.Query(query), task)
 	if err == mgo.ErrNotFound {
 		return nil, nil
 	}
@@ -698,7 +695,8 @@ func FindAllTaskIDsFromBuild(buildId string) ([]string, error) {
 }
 
 // FindOneOld returns one task from the old tasks collection that satisfies the query.
-func FindOneOld(query db.Q) (*Task, error) {
+func FindOneOld(query bson.M) (*Task, error) {
+
 	task, err := FindOneOldNoMerge(query)
 	if err != nil {
 		return nil, errors.Wrap(err, "error finding task")
@@ -713,9 +711,11 @@ func FindOneOld(query db.Q) (*Task, error) {
 }
 
 // FindOld returns all task from the old tasks collection that satisfies the query.
-func FindOld(query db.Q) ([]Task, error) {
+func FindOld(query bson.M) ([]Task, error) {
+	query[DisplayOnlyKey] = false
+
 	tasks := []Task{}
-	err := db.FindAllQ(OldCollection, query, &tasks)
+	err := db.FindAllQ(OldCollection, db.Query(query), &tasks)
 	if err == mgo.ErrNotFound {
 		return nil, nil
 	}
@@ -726,13 +726,24 @@ func FindOld(query db.Q) ([]Task, error) {
 		tasks[i] = task
 	}
 
-	// remove display tasks from results
-	for i := len(tasks) - 1; i >= 0; i-- {
-		t := tasks[i]
-		if t.DisplayOnly {
-			tasks = append(tasks[:i], tasks[i+1:]...)
-		}
+	return tasks, err
+}
+
+func FindOldWithProjection(query, projection bson.M) ([]Task, error) {
+	query[DisplayOnlyKey] = false
+
+	tasks := []Task{}
+	err := db.FindAllQ(OldCollection, db.Query(query).Project(projection), &tasks)
+	if err == mgo.ErrNotFound {
+		return nil, nil
 	}
+	for i, task := range tasks {
+		if err = task.MergeNewTestResults(); err != nil {
+			return nil, errors.Wrap(err, "error merging new test results")
+		}
+		tasks[i] = task
+	}
+
 	return tasks, err
 }
 
@@ -765,31 +776,50 @@ func FindOneIdOldOrNew(id string, execution int) (*Task, error) {
 }
 
 // Find returns all tasks that satisfy the query.
-func Find(query db.Q) ([]Task, error) {
+func Find(query bson.M) ([]Task, error) {
+	query[DisplayOnlyKey] = false
+
 	tasks := []Task{}
-	err := db.FindAllQ(Collection, query, &tasks)
+	err := db.FindAllQ(Collection, db.Query(query), &tasks)
 	if err == mgo.ErrNotFound {
 		return nil, nil
 	}
 
-	filtered := []Task{}
-
-	// remove display tasks from results
-	for idx := range tasks {
-		t := tasks[idx]
-		if t.DisplayOnly {
-			continue
-		}
-		filtered = append(filtered, t)
-
-	}
-
-	return filtered, err
+	return tasks, err
 }
 
-func FindWithDisplayTasks(query db.Q) ([]Task, error) {
+func FindWithProjection(query, projection bson.M) ([]Task, error) {
+	query[DisplayOnlyKey] = false
 	tasks := []Task{}
-	err := db.FindAllQ(Collection, query, &tasks)
+
+	err := db.FindAllQ(Collection, db.Query(query).Project(projection), &tasks)
+	if err == mgo.ErrNotFound {
+		return nil, nil
+	}
+
+	return tasks, err
+}
+
+func FindWithFields(query bson.M, fields ...string) ([]Task, error) {
+	query[DisplayOnlyKey] = false
+	q := db.Query(query)
+
+	if len(fields) > 0 {
+		q.WithFields(fields...)
+	}
+
+	tasks := []Task{}
+	err := db.FindAllQ(Collection, db.Query(query), &tasks)
+	if err == mgo.ErrNotFound {
+		return nil, nil
+	}
+
+	return tasks, errors.WithStack(err)
+}
+
+func FindWithDisplayTasks(query bson.M) ([]Task, error) {
+	tasks := []Task{}
+	err := db.FindAllQ(Collection, db.Query(query), &tasks)
 	if err == mgo.ErrNotFound {
 		return nil, nil
 	}

@@ -1108,7 +1108,7 @@ func AddNewTasks(activated bool, v *version.Version, p *Project, pairs TaskVaria
 
 	for _, b := range builds {
 		// Find the set of task names that already exist for the given build
-		tasksInBuild, err := task.Find(task.ByBuildId(b.Id).WithFields(task.DisplayNameKey))
+		tasksInBuild, err := task.FindWithFields(task.ByBuildId(b.Id), task.DisplayNameKey)
 		if err != nil {
 			return err
 		}

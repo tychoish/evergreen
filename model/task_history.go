@@ -775,11 +775,11 @@ func testHistoryV2Results(params *TestHistoryParameters) ([]task.Task, error) {
 		task.ProjectKey:             1,
 		task.DetailsKey:             1,
 	}
-	tasks, err := task.Find(db.Query(tasksQuery).Project(projection))
+	tasks, err := task.FindWithProjection(tasksQuery, projection)
 	if err != nil {
 		return nil, err
 	}
-	oldTasks, err := task.FindOld(db.Query(tasksQuery).Project(projection))
+	oldTasks, err := task.FindOldWithProjection(tasksQuery, projection)
 	if err != nil {
 		return nil, err
 	}
@@ -1067,7 +1067,7 @@ func TaskHistoryPickaxe(params PickaxeParams) ([]task.Task, error) {
 		"time_taken":    1,
 		"build_variant": 1,
 	}
-	last, err := task.Find(db.Query(query).Project(projection))
+	last, err := task.FindWithProjection(query, projection)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error querying tasks")
 	}

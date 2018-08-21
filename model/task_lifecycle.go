@@ -105,7 +105,7 @@ func ActivatePreviousTask(taskId, caller string) error {
 	}
 
 	// find previous task limiting to just the last one
-	prevTask, err := task.FindOne(task.ByBeforeRevision(t.RevisionOrderNumber, t.BuildVariant, t.DisplayName, t.Project, t.Requester))
+	prevTask, err := task.FindLatest(task.ByBeforeRevision(t.RevisionOrderNumber, t.BuildVariant, t.DisplayName, t.Project, t.Requester))
 	if err != nil {
 		return errors.Wrap(err, "Error finding previous task")
 	}

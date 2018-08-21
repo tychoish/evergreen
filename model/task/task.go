@@ -16,6 +16,7 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -320,7 +321,7 @@ func (t *Task) DependenciesMet(depCaches map[string]Task) (bool, error) {
 	}
 
 	if len(depIdsToQueryFor) > 0 {
-		newDeps, err := Find(ByIds(depIdsToQueryFor).WithFields(StatusKey))
+		newDeps, err := FindWithFields(ByIds(depIdsToQueryFor), StatusKey)
 		if err != nil {
 			return false, err
 		}
@@ -423,8 +424,15 @@ func (t *Task) PreviousCompletedTask(project string,
 	if len(statuses) == 0 {
 		statuses = CompletedStatuses
 	}
-	return FindOneNoMerge(ByBeforeRevisionWithStatuses(t.RevisionOrderNumber, statuses, t.BuildVariant,
-		t.DisplayName, project))
+
+	task := &Task{}
+	err := db.FindOneQ(Collection,
+		ByBeforeRevisionWithStatuses(t.RevisionOrderNumber, statuses, t.BuildVariant,
+			t.DisplayName, project), task)
+	if err == mgo.ErrNotFound {
+		return nil, nil
+	}
+	return task, err
 }
 
 // SetExpectedDuration updates the expected duration field for the task
@@ -1342,11 +1350,12 @@ func FindSchedulable(distroID string) ([]Task, error) {
 	query := scheduleableTasksQuery()
 
 	if distroID == "" {
-		return Find(db.Query(query))
+		return Find(query)
 	}
 
 	query[DistroIdKey] = distroID
-	return Find(db.Query(query))
+
+	return Find(query)
 }
 
 func FindRunnable(distroID string) ([]Task, error) {
